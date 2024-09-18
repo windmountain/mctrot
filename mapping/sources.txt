@@ -1,0 +1,42 @@
+NYC Planimetric Database_ Sidewalk_20240806.geojson
+  Url: https://data.cityofnewyork.us/City-Government/NYC-Planimetric-Database-Sidewalk/52n9-sdep/about_data
+  Accessed: Tue Aug  6 13:30:01 EDT 2024
+  Sha256: a39c81712cba89719cc8491935220747606a6cf0f72d4dc6dbe2de7041db8421
+
+Borough Boundaries.geojson
+  Url: https://data.cityofnewyork.us/City-Government/Borough-Boundaries/tqmj-j8zm
+  Accessed: Wed Aug  7 14:05:10 EDT 2024
+  Sha256: 00546356e15ef541c3094c6080aac012efcdde25f86e45110a604bb555b216a1
+
+NYC Street Centerline (CSCL).geojson
+  Url: https://data.cityofnewyork.us/City-Government/NYC-Street-Centerline-CSCL-/exjm-f27b
+  Accessed: Thu Aug  8 20:58:09 EDT 2024
+  Sha256: 88bfe971a031dea6c30756a01f5a68c0f7e22729b0e030529bf1429a0e1edcaa
+
+manhattanMcDs.geojson
+  CopiedFrom: ../scraping/manhattanMcDs.json
+  Accessed: Mon Aug 12 08:40:27 EDT 2024
+  Sha256: 98f6ad6f044aca0681608989b028b6667fb73f2d89d57c8e8ec28e9cd157d6ad
+
+mcghosts_geocoded.csv
+  CopiedFrom: ../mcghosts/mcghosts_geocoded.csv
+  Accessed: Mon Aug 19 16:47:59 EDT 2024
+  Sha256: 44d2459ca911ee987f6f0e3fd9cb47450d2193c6ff4b2adbb8ca72bb455d4d3b
+
+SIDEWALK_LINE_20240812.geojson
+  Url: https://data.cityofnewyork.us/dataset/SIDEWALK_LINE/fytp-pq92/data_preview
+  Accessed: Mon Aug 12 15:54:37 EDT 2024
+  Sha256: 71ebf4efc7fa0d87cc3962698174dd5f3d717c971c6d32181157c61689c1980e
+
+NYC Planimetric Database_ Open Space (Parks)_20240814.geojson
+  Url: https://data.cityofnewyork.us/City-Government/NYC-Planimetric-Database-Open-Space-Parks-/y6ja-fw4f/about_data
+  Accessed: Wed Aug 14 12:22:52 EDT 2024
+  Sha256: 1e6f0a35bb9712bb2d4ef8541f183abc4ce2f72432e58d65f66528919c431643
+
+cugir-007888-geojson.json
+  Url: https://cugir.library.cornell.edu/catalog/cugir-007888
+  Accessed: Fri Aug 16 00:24:50 EDT 2024
+  Sha256: 5f41b639004a233bb585edbce3f4a46298b60b4c0928bfab0258e5cb84f70664
+
+
+

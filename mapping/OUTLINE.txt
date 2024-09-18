@@ -1,0 +1,49 @@
+List Dataset -> List Restaurant -> DayOfWeek -> Map -> PDF -> Printed map
+
+
+Make a data pipeline
+  x Sidewalks
+  x Street centerline
+  x Boroughs
+  x McD restaurants
+    x scrape
+    x transform to geojson
+    x load
+  x Parks
+    "punch" running tracks, courts, baseball fields out of contataining parks for legibility with non-transparent QGIS patterns?
+  x Historical locations
+    x scan from microfiche/microfilm at NYPL
+    x enter to spreadsheet
+    x geocode
+    x load
+    make a nice view, with window functions for first and last listing years
+
+Load into postgres for filtering! (Spatial join on manhattan borough)
+  ogr2ogr
+
+Design the map
+  Layers:
+    - Topo shaded baselayer?
+    - Sidewalks
+    - Street names
+    - Restaurants
+      - Hours (by day of week)
+      - Store number
+      - Name on the app
+      - (Historical availability of apple slices)
+      - Checkbox (sharpie sized)
+      - Time _______ (also for sharpie)
+      - Checkbox for what you had, like: [] apple slices [] honey packet [] _________
+    - Fixed
+      - Legend
+      - Compass Rose
+      - Scale
+      - McTrot $YYYY
+      - "Eating at every..."
+
+Print the map
+  Waterproof, creasable substrate
+    x Tyvek
+  Printer (local?) who will print on that substrate
+    x https://www.printingnewyork.com/blueprints-printing/
+  Print black and white Tyvek, highlight manually with yellow and red sharpie

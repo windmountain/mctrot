@@ -1,0 +1,11 @@
+DIR="$( cd "$( dirname "$0" )" && pwd )"
+
+$DIR/.venv/bin/osxphotos export photos \
+  --update \
+  --download-missing \
+  --album "Workout Results" \
+  --skip-live \
+  --skip-edited \
+  --convert-to-jpeg \
+  --jpeg-ext jpg \
+  --filename "{shortuuid}-{created.date}"

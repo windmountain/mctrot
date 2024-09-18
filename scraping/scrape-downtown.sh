@@ -1,0 +1,11 @@
+curl 'https://www.mcdonalds.com/googleappsv2/geolocation?latitude=40.7250632&longitude=-73.9976946&radius=32.18&maxResults=100&country=us&language=en-us' \
+-X 'GET' \
+-H 'Accept: */*' \
+-H 'Sec-Fetch-Site: same-origin' \
+-H 'Sec-Fetch-Dest: empty' \
+-H 'Accept-Language: en-US,en;q=0.9' \
+-H 'Sec-Fetch-Mode: cors' \
+-H 'Host: www.mcdonalds.com' \
+-H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15' \
+-H 'Referer: https://www.mcdonalds.com/us/en-us/restaurant-locator.html' \
+-H 'Connection: keep-alive'

@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+const workoutsDir = path.join(process.cwd(), 'workouts')
+const workoutPath = (f) => path.join(process.cwd(), 'workouts', f)
+
+const getWorkouts = () => fs.readdirSync(workoutsDir)
+    .filter((fileName) => fileName.endsWith('json'))
+    .map((fileName) => {
+      const w = JSON.parse(fs.readFileSync(workoutPath(fileName), 'utf-8'));
+      return {
+        ...w,
+        photoId: fileName.split('-').slice(0, 1)[0],
+        date: fileName.split('-').slice(1).join('-').split('.')[0]
+      }
+    })
+    .map((wo) => {
+      const elapsedSeconds = Number(wo['elapsed-minutes'])
+        * 60
+        + Number(wo['elapsed-seconds']);
+      const elapsedMinutes = Number(wo['elapsed-minutes'])
+        + (Number(wo['elapsed-seconds']) / 60);
+      const stepsPerMinute = Number(wo['average-steps-per-minute']);
+      const steps = stepsPerMinute * elapsedMinutes;
+      const time24 = wo['clock-ampm'] == 'AM'
+        ? wo['clock-hours'].length == 2
+          ? `${wo['clock-hours']}:${wo['clock-minutes']}:00`
+          : `0${wo['clock-hours']}:${wo['clock-minutes']}:00`
+        : wo['clock-hours'] == 12 // PM
+          ? `${wo['clock-hours']}:${wo['clock-minutes']}:00`
+          : `${Number(wo['clock-hours']) + 12}:${wo['clock-minutes']}:00`;
+      return {
+        clock: `${wo['clock-hours']}:${wo['clock-minutes']} ${wo['clock-ampm']}`,
+        elapsed: `${wo['elapsed-minutes']}:${wo['elapsed-seconds']}`,
+        elapsedSeconds: elapsedSeconds,
+        distanceMiles: Number(wo['distance-miles']),
+        caloriesBurned: Number(wo['calories-burned']),
+        stepsPerMinute: stepsPerMinute,
+        steps: steps,
+        averageSpeedMPH: Number(wo['average-speed']),
+        watts: Number(wo['watts']),
+        mets: Number(wo['mets']),
+        date: wo.date,
+        photoId: wo.photoId,
+        dateTime: wo.date + 'T' + time24
+      }
+    })
+    .toSorted((wo1, wo2) => {
+      return new Date(wo1.dateTime).getTime() - new Date(wo2.dateTime).getTime();
+    })
+
+const workouts = getWorkouts();
+
+
+/*
+  A better way to weed out duplicates would be to do it in the osxphotos export,
+  perhaps by exporting to a filename with date, hour, and minute, then taking the
+  last photo for the given hour and minute.
+*/
+
+const duplicates = workouts
+  .reduce((memo, wo, i, list) => {
+    const previous = list[i-1];
+    if(previous && wo.dateTime == previous.dateTime) {
+      return [...memo, wo.photoId + '-' + wo.date ];
+    } else {
+      return memo;
+    }
+  }, []);
+
+if(duplicates.length) {
+  console.error('Probable duplicates found:');
+  duplicates.forEach((id) => console.log(id));
+  process.exit(1);
+}
+
+console.log(JSON.stringify(workouts, null, 2));

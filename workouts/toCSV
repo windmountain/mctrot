@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# from user3899165 on Stack Overflow: https://stackoverflow.com/questions/32960857/how-to-convert-arbitrary-simple-json-to-csv-using-jq
+
+# usage: cat workouts.json > ./toCSV > workouts.csv
+
+jq -r '(map(keys) | add | unique) as $cols | map(. as $row | $cols | map($row[.])) as $rows | $cols, $rows[] | @csv'
+

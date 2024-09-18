@@ -1,0 +1,239 @@
+year, phonebook, name, address, phone_number, lat, lon
+1979-1980,yellow,McDonald Restaurant,262 Canal,431-4165,40.71852,-74.00115
+1979-1980,yellow,Mc Donalds,3549 Bway,281-1800,40.82687,-73.95074
+1979-1980,yellow,Mc Donald’s,102 1 Av,475-6424,40.72643,-73.98581
+1979-1980,yellow,McDonald’s,427 10 Av,244-8206,40.75454,-74.0001
+1979-1980,yellow,McDonalds,3549 Bway,283-9584,40.82687,-73.95074
+1979-1980,yellow,McDonald’s,4259 Bway,923-9506,40.85009,-73.93625
+1979-1980,yellow,McDonald’s,444 Lenox Av,281-2888,40.81239,-73.94161
+1979-1980,yellow,McDonald’s,39 Union Sq W,675-3780,40.73708,-73.99081
+1979-1980,yellow,Mc Donald’s,215 W 125,865-6323,40.80969,-73.94894
+1979-1980,yellow,McDonalds Hamburgers,1327 2 Av,535-2205,40.76733,-73.95992
+1979-1980,yellow,Mc Donald’s Hamburgers,1327 2 Av,650-1401,40.76733,-73.95992
+1979-1980,yellow,Mcdonalds Hamburgers,1327 2 Av,861-8095,40.76733,-73.95992
+1979-1980,yellow,McDonald’s of Greenwich Village,126 W 3,674-3566,40.73045,-74.00075
+1979-1980,yellow,Mcdonald’s Restrnt,102 1 Av,475-9538,40.72643,-73.98581
+1979-1980,yellow,McDonald’s Restrnt,427 10 Av,564-7115,40.75454,-74.0001
+1979-1980,yellow,McDonald’s Restrnt,480 3 Av,679-1160,40.74497,-73.97908
+1979-1980,yellow,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1979-1980,yellow,McDonald’s Restrnt,543 6 Av,924-8249,40.73791,-73.99685
+1979-1980,yellow,McDonald’s Restrnt,335 8 Av,243-9594,40.74771,-73.99742
+1979-1980,yellow,McDonald’s Restrnt,2049 Bway,595-8198,40.7778,-73.98279
+1979-1980,yellow,Mc Donalds Restrnt,2549 Bway,850-1620,40.79442,-73.97246
+1979-1980,yellow,Mc Donald’s Restrnt,2549 Bway,864-9314,40.79442,-73.97246
+1979-1980,yellow,Mc Donalds Restrnt,4046 Bway,795-1791,40.84276,-73.9389
+1979-1980,yellow,McDonald’s Restrnt,336 E 23,674-9027,40.73696,-73.97945
+1979-1980,yellow,Mc Donald’s Restraurant,444 Lenox Av,694-9843,40.81239,-73.94161
+1979-1980,yellow,Mc Donald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1979-1980,yellow,Mc Donald’s Restrnt,341 5 Av,686-5342,40.74796,-73.98452
+1979-1980,yellow,McDonalds 40 Street,556 7 Av,730-9237,40.75473,-73.98832
+1980-1981,white,McDonald’s,3549 Bway,283-9584,40.82687,-73.95074
+1980-1981,white,McDonald’s,4036 Bway,923-9582,40.84182,-73.9388
+1980-1981,white,McDonald’s,4259 Bway,923-9506,40.85009,-73.93625
+1980-1981,white,McDonalds,444 Lenox Av,862-8480,40.81239,-73.94161
+1980-1981,white,McDonald’s,39 Union Sq W,675-3780,40.73708,-73.99081
+1980-1981,white,McDonald’s,102 1 Av,475-6424,40.72643,-73.98581
+1980-1981,white,McDonald’s,972 6 Av,244-8555,40.75079,-73.98673
+1980-1981,white,McDonald’s,972 6 Av,244-8625,40.75079,-73.98673
+1980-1981,white,McDonald’s,215 W 125,865-6323,40.80969,-73.94894
+1980-1981,white,McDonalds 40 Street,556 7 Av,730-9237,40.75473,-73.98832
+1980-1981,white,McDonalds Hamburgers,1327 2 Av,861-8095,40.76733,-73.95992
+1980-1981,white,McDonald’s Of Greenwich Village,136 W 3,67?-2566,40.73076,-74.00111
+1980-1981,white,McDonald’s Restrnt,317 Bway,349-7165,40.71581,-74.00532
+1980-1981,white,McDonald’s Restrnt,2049 Bway,595-8198,40.7778,-73.98279
+1980-1981,white,McDonalds Restrnt,2549 Bway,864-8138,40.79442,-73.97246
+1980-1981,white,Mc Donald’s Restrnt,2549 Bway,864-9314,40.79442,-73.97246
+1980-1981,white,McDonalds Restrnt,4046 Bway,795-1791,40.84276,-73.9389
+1980-1981,white,McDonald’s Restrnt,40 Fulton,349-1015,40.70788,-74.00475
+1980-1981,white,McDonalds Restrnt,444 Lenox Av,694-9843,40.81239,-73.94161
+1980-1981,white,McDonald’s Restrnt,113 Nassau,233-0440,40.71088,-74.00737
+1980-1981,white,McDonald’s Restrnt,102 1 Av,475-9538,40.72643,-73.98581
+1980-1981,white,McDonald’s Restrnt,480 3 Av,679-1160,40.74497,-73.97908
+1980-1981,white,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1980-1981,white,McDonald’s Restraurant,341 5 Av,725-9088,40.74796,-73.98452
+1980-1981,white,McDonald’s Restr,543 6 Av,924-8249,40.73791,-73.99685
+1980-1981,white,McDonald’s Restrnt,809 6 Av,243-9465,40.74604,-73.99092
+1980-1981,white,McDonalds Restaurant,439 7 Av,736-0935,40.66325,-73.98425
+1980-1981,white,McDonald’s Restrnt,335 8 Av,243-9594,40.74771,-73.99742
+1980-1981,white,McDonald’s Restrnt,946 8 Av,586-6670,40.76582,-73.98314
+1980-1981,white,McDonald’s Restrnt,427 10 Av,564-7115,40.75454,-74.0001
+1980-1981,white,McDonald’s Restrnt,336 E43,674-9027,
+1980-1981,white,McDonald’s Restrnt,22 E 42,599-2127,40.75265,-73.98003
+1980-1981,white,McDonald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1980-1981,white,McDonald’s Restrt,341 5 Av,686-5342,40.74796,-73.98452
+1980-1981,white,McDonal’s,427 10 Av,244-8206,40.75454,-74.0001
+1980-1981,yellow,McDonald’s,3549 Bway,283-9584,40.82687,-73.95074
+1980-1981,yellow,McDonald’s,4259 Bway,923-9506,40.85009,-73.93625
+1980-1981,yellow,McDonald’s,444 Lenox Av,281-2888,40.81239,-73.94161
+1980-1981,yellow,McDonald’s,39 Union Sq W,675-3780,40.73708,-73.99081
+1980-1981,yellow,Mc Donald’s ,102 1 Av,475-6424,40.72643,-73.98581
+1980-1981,yellow,McDonald’s,427 10 Av,244-8206,40.75454,-74.0001
+1980-1981,yellow,Mc Donald’s ,215 W 125,865-6323,40.80969,-73.94894
+1980-1981,yellow,Mc Donald’s Hamburgers,1327 2 Av,650-1401,40.76733,-73.95992
+1980-1981,yellow,Mcdonalds Hamburgers,1327 2 Av,861-8095,40.76733,-73.95992
+1980-1981,yellow,McDonald’s Of Greenwich Village,136 W 3,674-2566,40.73076,-74.00111
+1980-1981,yellow,McDonald’s Restrnt,427 10 Av,244-8206,40.75454,-74.0001
+1980-1981,yellow,McDonald’s Restrnt,317 Bway,349-7165,40.71581,-74.00532
+1980-1981,yellow,McDonald’s Restrnt,2049 Bway,595-8198,40.7778,-73.98279
+1980-1981,yellow,Mc Donalds Restrnt,2549 Bway,864-8138,40.79442,-73.97246
+1980-1981,yellow,Mc Donald’s Restrnt,2549 Bway,864-9314,40.79442,-73.97246
+1980-1981,yellow,Mc Donald’s Restrnt,4046 Bway,795-1791,40.84276,-73.9389
+1980-1981,yellow,Mc Donalds Restrnt,40 Fulton,349-1015,40.70788,-74.00475
+1980-1981,yellow,McDonalds Restrnt,444 Lenox Av,694-9843,40.81239,-73.94161
+1980-1981,yellow,Mc Donald’s Restrnt,113 Nassau,233-0440,40.71088,-74.00737
+1980-1981,yellow,McDonald’s Restrnt,102 1 Av,475-9538,40.72643,-73.98581
+1980-1981,yellow,McDonald’s Restrnt,480 3 Av,679-1160,40.74497,-73.97908
+1980-1981,yellow,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1980-1981,yellow,McDonald’s Restrnt,543 6 Av,924-8249,40.73791,-73.99685
+1980-1981,yellow,McDonald’s Restrnt,335 8 Av,243-9594,40.74771,-73.99742
+1980-1981,yellow,McDonald’s Restrnt,336 E 23,674-9027,40.73696,-73.97945
+1980-1981,yellow,Mc Donald’s Restrnt,22 E 42,599-2127,40.75265,-73.98003
+1980-1981,yellow,Mc Donald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1980-1981,yellow,Mc Donald’s Restrt,341 5 Av,686-5342,40.74796,-73.98452
+1980-1981,yellow,McDonalds 40 Street,556 7 Av,730-9237,40.75473,-73.98832
+1980,,Mc Donald Restrnt,2142 3 Av,831-3468,40.79866,-73.93991
+1980,,McDonald Restaurant,262 Canal,431-4165,40.71852,-74.00115
+1980,,McDonald’s,3549 Bway,283-9584,40.82687,-73.95074
+1980,,McDonald’s,4259 Bway,923-9506,40.85009,-73.93625
+1980,,McDonald’s,444 Lenox Av,281-2888,40.81239,-73.94161
+1980,,McDonald’s,39 Union Sq W,675-3780,40.73708,-73.99081
+1980,,Mc Donald’s ,102 1 Av,475-6424,40.72643,-73.98581
+1980,,McDonald’s,427 10 Av,244-8206,40.75454,-74.0001
+1980,,Mc Donald’s ,215 W 125,865-6323,40.80969,-73.94894
+1980,,Mc Donald’s Hamburgers,1327 2 Av,650-1401,40.76733,-73.95992
+1980,,Mcdonalds Hamburgers,1327 2 Av,861-8095,40.76733,-73.95992
+1980,,McDonald’s Of Greenwich Village,136 W 3,674-2566,40.73076,-74.00111
+1980,,McDonald’s Restrnt,427 10 Av,564-7115,40.75454,-74.0001
+1980,,McDonald’s Restrnt,317 Bway,349-7165,40.71581,-74.00532
+1980,,McDonald’s Restrnt,2049 Bway,595-8198,40.7778,-73.98279
+1980,,Mc Donalds Restrnt,2549 Bway,864-8138,40.79442,-73.97246
+1980,,Mc Donald’s Restrnt,2549 Bway,864-9314,40.79442,-73.97246
+1980,,Mc Donald’s Restrnt,4046 Bway,795-1791,40.84276,-73.9389
+1980,,Mc Donalds Restrnt,40 Fulton,349-1015,40.70788,-74.00475
+1980,,McDonalds Restrnt,444 Lenox Av,694-9843,40.81239,-73.94161
+1980,,Mc Donald’s Restrnt,113 Nassau,233-0440,40.71088,-74.00737
+1980,,McDonald’s Restrnt,102 1 Av,475-9538,40.72643,-73.98581
+1980,,McDonald’s Restrnt,480 3 Av,679-1160,40.74497,-73.97908
+1980,,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1980,,McDonald’s Restrnt,543 6 Av,924-8249,40.73791,-73.99685
+1980,,McDonald’s Restrnt,335 8 Av,243-9594,40.74771,-73.99742
+1980,,McDonald’s Restrnt,336 E 23,674-9027,40.73696,-73.97945
+1980,,Mc Donald’s Restrnt,22 E 42,599-2127,40.75265,-73.98003
+1980,,Mc Donald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1980,,Mc Donald’s Restrt,341 5 Av,686-5342,40.74796,-73.98452
+1980,,McDonalds 40 Street,556 7 Av,730-9237,40.75473,-73.98832
+1985,yellow,McDonald Restaurant,262 Canal,431-4165,40.71852,-74.00115
+1985,yellow,McDonald's ,4036 Bdway,923-9582,
+1985,yellow,McDonald's ,3549 Bway,283-9584,40.82687,-73.95074
+1985,yellow,McDonald's ,4259 Bway,923-9506,40.85009,-73.93625
+1985,yellow,McDonalds,444 Lenox Av,862-8480,40.81239,-73.94161
+1985,yellow,McDonald’s,39 Union Sq W,675-3780,40.73708,-73.99081
+1985,yellow,Mc Donald’s,600 W 125,864-9522,40.81581,-73.95884
+1985,yellow,McDonald’s,427 10 Av,244-8206,40.75454,-74.0001
+1985,yellow,McDonald’s Of Greenwich Village,136 W 3,674-2566,40.73076,-74.00111
+1985,yellow,Mc Donald’s Restrnt,1560 Bway,921-9469,40.75858,-73.98443
+1985,yellow,McDonalds Restrnt,2049 Bway,724-0435,40.7778,-73.98279
+1985,yellow,McDonalds Restrnt,2549 Bway,864-8138,40.79442,-73.97246
+1985,yellow,McDonalds Restrnt,4046 Bway,795-1791,40.84276,-73.9389
+1985,yellow,McDonald’s Restrnt,336 E 23,674-9027,40.73696,-73.97945
+1985,yellow,McDonald’s Restrnt,22 E 42,599-2127,40.75265,-73.98003
+1985,yellow,McDonald’s Restrnt,40 Fulton,349-1015,40.70788,-74.00475
+1985,yellow,McDonalds Restrnt,444 Lenox Av,694-9843,40.81239,-73.94161
+1985,yellow,McDonalds Restrnt ,113 Nassau,233-0440,40.71088,-74.00737
+1985,yellow,Mc Donalds Restaurant,1327 2 Av,650-0049,40.76733,-73.95992
+1985,yellow,McDonald’s Restrnt,102 1 Av,475-9538,40.72643,-73.98581
+1985,yellow,McDonald’s Restrnt,427 10 Av,564-7115,40.75454,-74.0001
+1985,yellow,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1985,yellow,Mc Donald’s Restrnt,2142 3 Av,831-3468,40.79866,-73.93991
+1985,yellow,McDonald’s Restrnt,543 6 Av,924-8249,40.73791,-73.99685
+1985,yellow,Mcdonald’s Restrnt,556 7 Av,869-1918,40.75473,-73.98832
+1985,yellow,McDonald’s Restrnt,335 8 Av,243-9594,40.74771,-73.99742
+1985,yellow,McDonald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1985,yellow,McDonald’s Restrnts,341 5 Av,686-5342,40.74796,-73.98452
+1985,yellow,Mc Donald’s 21 St Century Training Center,336 E 23,475-5111,40.73696,-73.97945
+1985,yellow,McDonalds 40 Street,556 7 Av,730-9237,40.75473,-73.98832
+1990,white,Mcdonald Restrnt,543 6 Av,243-9298,40.73791,-73.99685
+1990,white,MCDONALD RESTURANT,262 Canal,431-4165,40.71852,-74.00115
+1990,white,Mc Donald’s,14 E 47,599-8818,40.75608,-73.97779
+1990,white,Mcdonald’s,14 E 47,697-8148,40.75608,-73.97779
+1990,white,Mc Donald’s,215 W 125,864-8614,40.80969,-73.94894
+1990,white,Mc Donald’s,600 W 125,864-9522,40.81581,-73.95884
+1990,white,Mc Donalds At Waverly Place,724 Bway,529-9660,40.7291,-73.99321
+1990,white,Mcdonalds Family Restrnt,6 Water,509-0920,40.70297,-74.01223
+1990,white,McDonalds 40 Street,556 7 Av,730-9237,40.75473,-73.98832
+1990,white,McDonald’s Of Greenwich Village,136 W 3,674-2566,40.73076,-74.00111
+1990,white,Mcdonald’s Restrnt,160 Bway,285-9026,40.7093,-74.00976
+1990,white,MCDONALD’S RESTRNT,2049 Bway,724-0435,40.7778,-73.98279
+1990,white,McDonalds Restrnt,2549 Bway,864-8138,40.79442,-73.97246
+1990,white,Mc Donald’s Restrnt,2549 Bway,864-9314,40.79442,-73.97246
+1990,white,Mdonald’s Restaurant,638 Colmbs Av,721-7509,
+1990,white,Mcdonald’s Restrnt,208 Dyckman,304-1610,40.86513,-73.9274
+1990,white,McDonalds Restrnt,444 Lenox Av,694-9843,40.81239,-73.94161
+1990,white,Mc Donalds Restrnt,113 Nassau,285-9192,40.71088,-74.00737
+1990,white,Mcdonald’s Renstrnt,102 1 Av,475-9538,40.72643,-73.98581
+1990,white,Mc Donalds Restaurant,1327 2 Av,650-0049,40.76733,-73.95992
+1990,white,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1990,white,Mc Donald’s Restrnt,1499 3 Av,734-3158,40.77772,-73.95438
+1990,white,Mc Donald’s Restrnt,2142 3 Av,831-3468,40.79866,-73.93991
+1990,white,McDonald’s Restrnt,543 6 Av,989-4043,40.73791,-73.99685
+1990,white,Mc Donalds Restaurant,809 6 Av,243-??65,40.74604,-73.99092
+1990,white,McDonald’s Restrnt,556 7 Av,869-1918,40.75473,-73.98832
+1990,white,Mcdonalds Restrnt,335 8 Av,243-9594,40.74771,-73.99742
+1990,white,McDonald’s Restrnt,946 8 Av,586-6676,40.76582,-73.98314
+1990,white,McDonald’s Restrnt,427 10 Av,564-7115,40.75454,-74.0001
+1990,white,MCDONALD’S RESTRNT,336 E 23,674-9027,40.73696,-73.97945
+1990,white,McDonald’s Restrnt,22 E 42,599-2127,40.75265,-73.98003
+1990,white,McDonald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1990,white,McDonald’s Restrt ,341 5 Av,686-5342,40.74796,-73.98452
+1990,white,Mc Donald’s 21st Century Training Center,336 E 23,475-5111,40.73696,-73.97945
+1990,white,McDonald’s ,3549 Bway,283-9584,40.82687,-73.95074
+1990,white,MCDONALD’S,4036 Bway,923-9582,40.84182,-73.9388
+1990,white,McDonald’s,4259 Bway,923-9506,40.85009,-73.93625
+1990,white,McDonalds,444 Lenox Av,862-8480,40.81239,-73.94161
+1990,white,MCDONALD’S,39 Union Sq W,645-9079,40.73708,-73.99081
+1990,white,Mc Donalds ,996 3 Av,753-5360,40.76221,-73.96717
+1990,white,Mc Donalds ,1872 3 Av,996-2864,40.79002,-73.94621
+1990,white,MCDONALDS,972 6 Av,279-2022,40.75079,-73.98673
+1990,white,Mc Donald’s,972 6 Av,502-4563,40.75079,-73.98673
+1990,white,Mc Donald’s,427 10 Av,502-5095,40.75454,-74.0001
+1990,white,Mc Donalds,22 E 23,353-9??0,40.74051,-73.9881
+1995,yellow,Mcdonald Restrnt,543 6 Av,243-9298,40.73791,-73.99685
+1995,yellow,Mc Donald ‘s Restrnt,946 8 Av,586-6676,40.76582,-73.98314
+1995,yellow,Mcdonalds,3794 Bway,923-2222,40.83419,-73.94422
+1995,yellow,Mc Donalds,262 Canal,941-5823,40.71852,-74.00115
+1995,yellow,Mc Donalds,22 E 23,353-9140,40.74051,-73.9881
+1995,yellow,Mc Donald’s,3549 Bway,281-5330,40.82687,-73.95074
+1995,yellow,Mc Donald’s,102 1 Av,477-9171,40.72643,-73.98581
+1995,yellow,Mc Donald’s,404 E 14,598-0045,40.73081,-73.98243
+1995,yellow,Mcdonald’s,600 W 125,662-2965,40.81581,-73.95884
+1995,yellow,McDonald’s,4036 Bway,923-9582,40.84182,-73.9388
+1995,yellow,McDonald’s,4259 Bway,923-9506,40.85009,-73.93625
+1995,yellow,McDonald’s,638 Columbus Av,721-4348,40.78946,-73.97048
+1995,yellow,McDonald’s,39 Union Sq W,645-9079,40.73708,-73.99081
+1995,yellow,McDonalds,972 6 Av,279-2022,40.75079,-73.98673
+1995,yellow,Mc Donald’s ACNC Corp,14 E 47,697-8148,40.75608,-73.97779
+1995,yellow,McDonalds 40 Street ,556 7 Av,730-9237,40.75473,-73.98832
+1995,yellow,Mc Donalds Mc Delivery Svce,134 W 26,337-3278,40.74526,-73.99309
+1995,yellow,McDonald’s Of Greenwich Village,136 W 3,674-2566,40.73076,-74.00111
+1995,yellow,Mc Donald’s Of Harlem,215 W 125,663-8859,40.80969,-73.94894
+1995,yellow,Mc Donalds Restrnt,303 Greenwich,962-9218,40.71636,-74.01047
+1995,yellow,Mc Donalds Restrnt,809 6 Av,463-9495,40.74604,-73.99092
+1995,yellow,Mc Donald’s Restrnt,2549 Bway,863-9314,40.79442,-73.97246
+1995,yellow,Mc Donald’s Restrnt,1499 3 Av,628-8100,40.77772,-73.95438
+1995,yellow,Mcdonald’s Restrnt,556 7 Av,869-1918,40.75473,-73.98832
+1995,yellow,McDonald’s Restrnt,2049 Bway,724-0435,40.7778,-73.98279
+1995,yellow,McDonalds Restrnt,2549 Bway,864-8138,40.79442,-73.97246
+1995,yellow,McDonald’s Restrnt,208 Dyckman,304-1610,40.86513,-73.9274
+1995,yellow,McDonald’s Restrnt,427 10 Av,564-7115,40.75454,-74.0001
+1995,yellow,McDonald’s Restrnt,336 E 23,674-9027,40.73696,-73.97945
+1995,yellow,McDonald’s Restrnt,22 E 42,599-2127,40.75265,-73.98003
+1995,yellow,Mcdonalds Restaurant,1109 6 Av,827-0378,40.75557,-73.98471
+1995,yellow,Mcdonalds Restaurant,113 Nassau,285-9192,40.71088,-74.00737
+1995,yellow,Mcdonalds Restaurant,4 World Trade Ctr,432-7297,40.71164,-74.01234
+1995,yellow,Mc Donald’s Restaurant,541 6 Av,463-8860,40.73791,-73.99685
+1995,yellow,Mcdonald’s Restaurant,451 Lexington Av,661-1685,40.75308,-73.97455
+1995,yellow,Mcdonald’s Restaurant,1286 1 Av,249-3551,40.76589,-73.95697
+1995,yellow,McDonald’s Restaurant,638 Columbus Av,721-7509,40.78946,-73.97048
+1995,yellow,McDonald’s Restrnts,729 2 Av,686-7124,40.74826,-73.97372
+1995,yellow,Mc Donalds Restaurants,480 3 Av,532-8186,40.74497,-73.97908
+1995,yellow,Mcdonald’s One Sixty Bway,160 Bway,385-2063,40.7093,-74.00976

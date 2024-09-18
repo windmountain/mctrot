@@ -1,0 +1,10 @@
+{
+  "name": "mctrot",
+  "type": "module",
+  "workspaces": [
+    "scraping",
+    "workouts"
+  ],
+  "dependencies": {
+  }
+}

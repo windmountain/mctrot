@@ -1,0 +1,55 @@
+#!/usr/bin/env node
+
+import chalk from 'chalk'
+import split2 from 'split2'
+import { execSync } from 'node:child_process'
+
+process.stdin.setEncoding('utf-8');
+
+const memo = {};
+
+process.stdin
+  .pipe(split2())
+  .on('data', (chunk) => {
+    const [year, month, date] = chunk.split('-')
+    const key = `${year}-${month}`
+    memo[key] = memo[key] || [];
+    memo[key] = memo[key].concat([Number(date).toString()])
+  });
+
+process.stdin.on('end', () => {
+  const commands = Object.entries(memo)
+    .map((entry) => {
+      const year = entry[0].split('-')[0];
+      const month = entry[0].split('-')[1];
+      const dates = entry[1];
+      return {
+        year: year,
+        month: month,
+        dates: dates
+      }
+    })
+    .forEach((page) => {
+      toHighlightedText(page)
+    });
+});
+
+const toHighlightedText = (page) => {
+  let lines= execSync(`cal -h ${page.month} ${page.year}`, {
+    encoding: 'utf-8'
+  }).split('\n')
+  const header = lines.slice(0,2).join('\n');
+  const bodyLines = lines.slice(2)
+  console.log(header);
+  bodyLines.forEach((bl) => {
+    let bodyLine = bl;
+    page.dates.forEach((date) => {
+      date = date.length == 1 ? ' ' + date : date;
+      if(bodyLine.includes(date+' ')) {
+        const [before, after] = bodyLine.split(date+' ')
+        bodyLine = before + chalk.yellow(date) + ' ' + after;
+      }
+    });
+    process.stdout.write(bodyLine+'\n', 'utf-8');
+  });
+}

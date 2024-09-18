@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas: "picture form"
+      }
+      picture {
+        grid-area: picture;
+        text-align: center;
+        height: 100vh;
+      }
+      picture img {
+        height: 800px;
+        margin: 0 auto;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-area: form;
+      }
+      #clock {
+        grid-column: 2 / 3;
+        text-align: center;
+      }
+      h1, p {
+        grid-column: 1 / -1;
+        text-align: center;
+      }
+      label {
+        display: block;
+      }
+      input[type=text] {
+        width: 2em;
+      }
+      input[type=text], select {
+        font-size: 150%;
+      }
+      input[type=submit] {
+        grid-column: 1 / -1;
+        padding: 1em 0;
+      }
+    </style>
+  </head>
+  <body>
+    <picture>
+      <img src="">
+    </picture>
+    <form>
+      <!-- clock -->
+      <fieldset id="clock">
+        <h4>Clock</h4>
+        <input tabindex="1" name="clock-hours" type="text" placeholder="hh">
+        :
+        <input name="clock-minutes" type="text" placeholder="mm">
+        <select name="clock-ampm">
+          <option><option>
+          <option>AM</option>
+          <option>PM</option>
+        </select>
+      </fieldset>
+
+      <h1>Workout Results</h1>
+      <p>loading workout...</p>
+
+      <fieldset>
+        <h4>Time</h4>
+        <label for="elapsed-minutes">
+          ELAPSED
+          <input name="elapsed-minutes" type="text" placeholder="mm">
+          :
+          <input name="elapsed-seconds" type="text" placeholder="ss">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <h4>Distance</h4>
+        <label for="distance-miles">
+          TOTAL (MI)
+          <input name="distance-miles" type="text" placeholder="mi">
+        </label>
+      </fieldset>
+      
+      <fieldset>
+        <h4>Calories</h4>
+        <label for="calories-burned">
+          BURNED
+          <input name="calories-burned" type="text">
+        </label>
+        <label for="calories-per-hour">
+          CALORIES / HOUR
+          <input name="calories-per-hour" type="text">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <h4>Pace</h4>
+        <label for="pace-average-minutes">
+          AVERAGE (MIN/MI)
+          <input name="pace-average-minutes" type="text" placeholder="mm">
+          :
+          <input name="pace-average-seconds" type="text" placeholder="ss">
+        </label>
+        <label for="average-speed">
+          AVERAGE SPEED (MPH)
+          <input name="average-speed" type="text">
+        </label>
+        <label for="average-steps-per-minute">
+          AVERAGE SPM
+          <input name="average-steps-per-minute" type="text">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <h4>Heart Rate</h4>
+        <label for="average-heart-rate">
+          AVERAGE (BPM)
+          <input name="average-heart-rate" type="text">
+        </label>
+        <label for="max-heart-rate">
+          MAX (BPM)
+          <input name="max-heart-rate" type="text">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <label for="mets">
+          METS
+          <input name="mets" type="text">
+        </label>
+        <label for="watts">
+          WATTS
+          <input name="watts" type="text">
+        </label>
+      </fieldset>
+      <input type="submit">
+    </form>
+    <script>
+
+      const form = document.querySelector('form');
+
+      async function get() {
+        const next = await fetch('/next')
+        if(!next.ok) {
+          console.error('whoops');
+        }
+        const text = await next.text();
+        document.querySelector('picture img').src = `/photos/${text}.jpg`;
+        document.querySelector('p').textContent = text;
+      }
+
+      async function post(id, workout) {
+        const response = await fetch(`/workout/${id}`, {
+          headers: {
+            "Content-Type": "application/json"
+          },
+          method: 'PUT',
+          body: JSON.stringify(workout, null, 2)
+        });
+        if(response.ok) {
+          form.reset();
+          document.querySelector('input').focus();
+          get();
+        }
+      }
+
+      get();
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const d = Array.from(new FormData(e.target).entries()).reduce((memo, entry) => {
+          return { ...memo, [entry[0]]: entry[1] }; 
+        }, {})
+        const id = document.querySelector('p').textContent;
+        post(id, d);
+      });
+    </script>
+  </body>
+</html>
