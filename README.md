@@ -3,6 +3,10 @@
 Tools and stuff for:
   - downloading current McDonald's locations from their API
   - researching and cataloging historical McDonald's locations from microfiche at NYPL
+  - making a map
+    - downloading geospatial layers from NYC Open Data
+    - massaging layers into Postgres views
+    - designing the map in QGIS
   - keeping track of workouts for McTrot
   - etc
 
