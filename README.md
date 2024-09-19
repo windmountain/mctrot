@@ -6,4 +6,12 @@ Tools and stuff for:
   - keeping track of workouts for McTrot
   - etc
 
-This repository manages its dependencies with [devenv.sh](https://devenv.sh).
+This repository manages its external dependencies (gdal, postgres, jq, etc.) with [devenv.sh](https://devenv.sh).
+
+The output of the scraping and mcghosts projects feed into the mapping project:
+
+```
+scraping ━━━━━┳━━━━━▶ mapping
+              ┃
+mcghosts ━━━━━┛
+```
