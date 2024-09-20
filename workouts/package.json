@@ -1,5 +1,5 @@
 {
-  "name": "mctrot-workouts"
+  "name": "mctrot-workouts",
   "type": "module",
   "dependencies": {
     "chalk": "^5.3.0",

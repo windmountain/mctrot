@@ -41,7 +41,9 @@ Compiling:
 Visualizing:
   - Quick charts:
     - Convert workouts.json to CSV:
-      - `cat workouts | ./toCSV`
+      - `cat workouts.json | ./toCSV > workouts.csv`
     - Open the CSV in LibreOffice or similar, make charts (see workouts.ods for example)
+    - (I was hoping to see some exciting trend but nothing stood out.)
   - As highlighted cal output:
     - `cat workouts.json | ./toDates | ./toHighlightedCalendar`
+    - (More satisfying.)

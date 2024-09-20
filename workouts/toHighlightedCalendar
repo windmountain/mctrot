@@ -18,7 +18,7 @@ process.stdin
   });
 
 process.stdin.on('end', () => {
-  const commands = Object.entries(memo)
+  Object.entries(memo)
     .map((entry) => {
       const year = entry[0].split('-')[0];
       const month = entry[0].split('-')[1];
@@ -30,26 +30,25 @@ process.stdin.on('end', () => {
       }
     })
     .forEach((page) => {
-      toHighlightedText(page)
+      printHighlighted(page)
     });
 });
 
-const toHighlightedText = (page) => {
-  let lines= execSync(`cal -h ${page.month} ${page.year}`, {
+const printHighlighted = (page) => {
+  let lines = execSync(`cal -h ${page.month} ${page.year}`, {
     encoding: 'utf-8'
-  }).split('\n')
+  }).split('\n');
   const header = lines.slice(0,2).join('\n');
-  const bodyLines = lines.slice(2)
+  const weeks = lines.slice(2);
   console.log(header);
-  bodyLines.forEach((bl) => {
-    let bodyLine = bl;
+  weeks.forEach((week) => {
     page.dates.forEach((date) => {
       date = date.length == 1 ? ' ' + date : date;
-      if(bodyLine.includes(date+' ')) {
-        const [before, after] = bodyLine.split(date+' ')
-        bodyLine = before + chalk.yellow(date) + ' ' + after;
+      if(week.includes(date+' ')) {
+        const [before, after] = week.split(date+' ')
+        week= before + chalk.yellow(date) + ' ' + after;
       }
     });
-    process.stdout.write(bodyLine+'\n', 'utf-8');
+    process.stdout.write(week + '\n', 'utf-8');
   });
 }
