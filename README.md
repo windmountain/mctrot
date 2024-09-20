@@ -19,3 +19,7 @@ scraping ━━━━━┳━━━━━▶ mapping
               ┃
 mcghosts ━━━━━┛
 ```
+
+Here's a screenshot of the work in progress map:
+
+![Simple map of Manhattan with yellow diamonds, red diamonds, and gray dots](/mapping/inprogress.png)
