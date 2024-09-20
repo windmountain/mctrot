@@ -1,6 +1,8 @@
 # McTrot Tools
 
-Tools and stuff for:
+McTrot is an annual personal challenge to eat at every McDonald's in Manhattan, on foot, in less than 24 hours.
+
+This repo contains tools for:
   - downloading current McDonald's locations from their API
   - researching and cataloging historical McDonald's locations from microfiche at NYPL
   - making a map
