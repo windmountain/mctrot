@@ -21,7 +21,7 @@ manhattanMcDs.geojson
 mcghosts_geocoded.csv
   CopiedFrom: ../mcghosts/mcghosts_geocoded.csv
   Accessed: Mon Aug 19 16:47:59 EDT 2024
-  Sha256: 44d2459ca911ee987f6f0e3fd9cb47450d2193c6ff4b2adbb8ca72bb455d4d3b
+  Sha256: 5be2b2d407fbb462cf4b9b83664d5d573b0f059d64c82f1c3f0a1d6b498a709a
 
 SIDEWALK_LINE_20240812.geojson
   Url: https://data.cityofnewyork.us/dataset/SIDEWALK_LINE/fytp-pq92/data_preview
@@ -37,6 +37,4 @@ cugir-007888-geojson.json
   Url: https://cugir.library.cornell.edu/catalog/cugir-007888
   Accessed: Fri Aug 16 00:24:50 EDT 2024
   Sha256: 5f41b639004a233bb585edbce3f4a46298b60b4c0928bfab0258e5cb84f70664
-
-
 
