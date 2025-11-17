@@ -1,3 +1,4 @@
 node_modules
 .devenv/
 .devenv.flake.nix
+*.DS_Store
