@@ -1,0 +1,189 @@
+{
+  "name": "mctrot",
+  "title": "Datasets for mapping every McDonald's in Manhattan",
+  "version": "1.0.0",
+  "resources": [
+    {
+      "name": "sidewalk-polygons",
+      "title": "NYC Planimetric Database: Sidewalk (Polygons)",
+      "description": "Sidewalk polygon geometry for base map rendering.",
+      "path": "data/NYC Planimetric Database_ Sidewalk_20260210.geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "NYC Planimetric Database: Sidewalk",
+          "path": "https://data.cityofnewyork.us/City-Government/NYC-Planimetric-Database-Sidewalk/52n9-sdep",
+          "api": "https://data.cityofnewyork.us/api/v3/views/52n9-sdep/query.geojson"
+        }
+      ],
+      "hash": "sha256:da645c9169c9db9cd20414335ef5673ef0e9f36529d6829e684dc1afd0c5b196",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
+      "name": "borough-boundaries",
+      "title": "Borough Boundaries",
+      "description": "NYC borough boundary polygons. Used as a base map layer and for spatial filtering (e.g., clipping to Manhattan).",
+      "path": "data/Borough Boundaries.geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "Borough Boundaries",
+          "path": "https://data.cityofnewyork.us/City-Government/Borough-Boundaries/yqww-f9f3",
+          "api": "https://data.cityofnewyork.us/resource/gthc-hcne.geojson"
+        }
+      ],
+      "hash": "sha256:890b7ee4cf97c37796220a44d7549e0e51970a63403d4a76162666f44b92b544",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
+      "name": "street-centerline",
+      "title": "NYC Street Centerline (CSCL)",
+      "description": "Street centerline geometry for base map rendering.",
+      "path": "data/NYC Street Centerline (CSCL).geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "Centerline",
+          "path": "https://data.cityofnewyork.us/City-Government/Centerline/3mf9-qshr",
+          "api": "https://data.cityofnewyork.us/api/v3/views/inkn-q76z/query.geojson"
+        }
+      ],
+      "hash": "sha256:47000cba0a6c292f19f21f14b54d8eeffff97b98bb0b8b48033a32b38211a178",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
+      "name": "manhattan-mcdonalds",
+      "title": "Manhattan McDonald's Locations",
+      "description": "Current McDonald's restaurant locations in Manhattan, scraped from the McDonald's website/API.",
+      "path": "data/manhattanMcDs.geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "McDonald's Restaurant Locator",
+          "path": "https://www.mcdonalds.com/"
+        }
+      ],
+      "hash": "sha256:98f6ad6f044aca0681608989b028b6667fb73f2d89d57c8e8ec28e9cd157d6ad",
+      "accessed": "2026-02-12"
+    },
+    {
+      "name": "mcghosts-geocoded",
+      "title": "Former McDonald's Locations (Geocoded)",
+      "description": "Locations of former McDonald's restaurants in Manhattan, compiled from historical phone book and business directory listings, then geocoded.",
+      "path": "data/mcghosts_geocoded.csv",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "sources": [
+        {
+          "title": "Historical phone books and business directories"
+        }
+      ],
+      "hash": "sha256:5be2b2d407fbb462cf4b9b83664d5d573b0f059d64c82f1c3f0a1d6b498a709a",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
+      "name": "sidewalk-lines",
+      "title": "Sidewalk Lines",
+      "description": "Sidewalk line geometry for base map rendering.",
+      "path": "data/SIDEWALK_LINE_20240812.geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "SIDEWALK_LINE",
+          "path": "https://data.cityofnewyork.us/dataset/SIDEWALK_LINE/fytp-pq92",
+          "api": "https://data.cityofnewyork.us/api/v3/views/fytp-pq92/query.geojson"
+        }
+      ],
+      "hash": "sha256:40319ce40635831eb40f7f5d5eaa9f84ea55e4d3c126388ab081e0977128ee94",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
+      "name": "open-space-parks",
+      "title": "NYC Planimetric Database: Open Space (Parks)",
+      "description": "Park and open space polygons for base map rendering.",
+      "path": "data/NYC Planimetric Database_ Open Space (Parks)_20240814.geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "NYC Planimetric Database: Open Space (Parks)",
+          "path": "https://data.cityofnewyork.us/City-Government/NYC-Planimetric-Database-Open-Space-Parks-/g84h-jbjm",
+          "api": "https://data.cityofnewyork.us/api/v3/views/y6ja-fw4f/query.geojson"
+        }
+      ],
+      "hash": "sha256:18e8e026e09283c7e914b7fa2b51ec6644e817498251de052538a325a1db972e",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
+      "name": "hudson-river-shoreline",
+      "title": "Hudson River Estuary Shoreline",
+      "description": "Detailed shoreline of the Hudson River Estuary (Staten Island to Troy), for base map rendering. Data from 1988-1998.",
+      "path": "data/cugir-007888-geojson.json",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "CUGIR: Shoreline, Hudson River Estuary, 1998",
+          "path": "https://cugir.library.cornell.edu/catalog/cugir-007888",
+          "api": "https://cugir.library.cornell.edu/download/file/cugir-007888-geojson.json"
+        }
+      ],
+      "hash": "sha256:43158265551714926f20a56773cd8af0cd74f067ac0e58960c4a9ae48f43f456",
+      "accessed": "2026-02-12",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    }
+  ]
+}

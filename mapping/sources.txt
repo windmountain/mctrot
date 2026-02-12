@@ -1,3 +1,7 @@
+# OUTDATED! Please see datapackage.json.
+## This will be deleted once the migration of all sources to datapackage.json is complete.
+
+
 NYC Planimetric Database_ Sidewalk_20240806.geojson
   Url: https://data.cityofnewyork.us/City-Government/NYC-Planimetric-Database-Sidewalk/52n9-sdep/about_data
   Accessed: Tue Aug  6 13:30:01 EDT 2024
@@ -37,4 +41,6 @@ cugir-007888-geojson.json
   Url: https://cugir.library.cornell.edu/catalog/cugir-007888
   Accessed: Fri Aug 16 00:24:50 EDT 2024
   Sha256: 5f41b639004a233bb585edbce3f4a46298b60b4c0928bfab0258e5cb84f70664
+
+c891e7bde3348322562f133676cf15ab1043383829114779c3be1c4bf9fc026a  data/NYC Planimetric Database_ Sidewalk_20260210.geojson
 

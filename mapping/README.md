@@ -1,8 +1,23 @@
+# Fetching data
+
+The data dependencies of this map are listed in datapackage.json [spec](https://datapackage.org/standard/data-package/).
+
+For some of these dependencies, you will need an account with NYC Open Data. Follow these steps:
+    - Copy the .env.example file to a new file named .env.
+    - Visit [their sign up page](https://data.cityofnewyork.us/signup) and sign up.
+    - Verify your email address.
+    - Go to [Developer Settings](https://data.cityofnewyork.us/profile/edit/developer_settings).
+    - Click the "Create new API Key" button. Give it a name.
+    - Fill in your .env file with your new API Key ID and Api Key Secret.
+
+Once set up, fetch the data by running the fetch.py Python script.
+
+# Postgres import
+
 Start Postgres with `devenv up`
 
 Connect to postgres on 127.0.0.1:5432/mctrot with your favorite client
 
-Read the 'sources.txt' file and download the geospatial data from those links into data
 
 Run `devenv shell` and then `./scripts/load.sh` to import data and make map-specific Postgres views
 
