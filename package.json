@@ -2,8 +2,7 @@
   "name": "mctrot",
   "type": "module",
   "workspaces": [
-    "scraping",
-    "workouts"
+    "scraping"
   ],
   "dependencies": {
   }

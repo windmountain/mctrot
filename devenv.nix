@@ -14,6 +14,10 @@
     echo "welcome to mctrot tools"
   '';
 
+  scripts.ss.exec = ''
+    git status
+  '';
+
   languages.javascript = {
     enable = true;
     npm = {

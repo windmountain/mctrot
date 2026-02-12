@@ -2,3 +2,21 @@ node_modules
 .devenv/
 .devenv.flake.nix
 *.DS_Store
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# credentials
+.env
+
+# pre-commit
+.pre-commit-config.yaml
+
+# data
+data/*
+!data/.gitkeep
