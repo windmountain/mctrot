@@ -2,7 +2,7 @@ set -euo pipefail
 
 ogr2ogr -f "PostgreSQL" \
   PG:"dbname=mctrot host=127.0.0.1 port=5432" \
-  "data/manhattanMcDs.geojson" \
+  "data/manhattan-mcdonalds-locations.geojson" \
   -nln mcd \
   -t_srs "EPSG:4326" \
   -lco GEOM_TYPE=geography \

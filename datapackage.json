@@ -76,10 +76,10 @@
       ]
     },
     {
-      "name": "manhattan-mcdonalds",
+      "name": "manhattan-mcdonalds-locations",
       "title": "Manhattan McDonald's Locations",
       "description": "Current McDonald's restaurant locations in Manhattan, scraped from the McDonald's website/API.",
-      "path": "data/manhattanMcDs.geojson",
+      "path": "data/manhattan-mcdonalds-locations.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [
