@@ -2,7 +2,7 @@ IFS=$'\n';
 
 rm /tmp/geocoded.csv 2> /dev/null;
 
-for phonebook_address in $(cat mcghosts.csv | cut -d ',' -f4); do
+for phonebook_address in $(cat historical-locations.csv | cut -d ',' -f4); do
   curl -s -G \
     --data-urlencode text="$phonebook_address, Manhattan, New York, NY" \
     https://geosearch.planninglabs.nyc/v2/autocomplete \
@@ -10,5 +10,5 @@ for phonebook_address in $(cat mcghosts.csv | cut -d ',' -f4); do
     >>/tmp/geocoded.csv 2>&1;
 done
 
-echo "year, phonebook, name, address, phone_number, lat, lon" > hitorical-locations-geocoded.csv
-paste -d',' mcghosts.csv /tmp/geocoded.csv >> historical-locations-geocoded.csv
+echo "year, phonebook, name, address, phone_number, lat, lon" > historical-locations-geocoded.csv
+paste -d',' historical-locations.csv /tmp/geocoded.csv >> historical-locations-geocoded.csv

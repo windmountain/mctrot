@@ -20,3 +20,6 @@ devenv.local.yaml
 # data
 data/*
 !data/.gitkeep
+
+# LibreOffice lock files
+.~lock*
