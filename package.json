@@ -2,7 +2,7 @@
   "name": "mctrot",
   "type": "module",
   "workspaces": [
-    "scraping"
+    "current-locations"
   ],
   "dependencies": {
   }

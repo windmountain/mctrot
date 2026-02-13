@@ -2,7 +2,7 @@ set -euo pipefail
 
 ogr2ogr -f "PostgreSQL" \
   PG:"dbname=mctrot host=127.0.0.1 port=5432" \
-  "data/mcghosts_geocoded.csv" \
+  "data/historical-locations-geocoded.csv" \
   -oo X_POSSIBLE_NAMES=lon \
   -oo Y_POSSIBLE_NAMES=lat \
   -s_srs "EPSG:4326" \
@@ -31,7 +31,7 @@ SQL
 
 psql -h 127.0.0.1 -d mctrot << SQL
   CREATE OR REPLACE VIEW
-      mcghost AS
+      historical_locations AS
   SELECT DISTINCT
       (l.address),
       min(l.min_year) OVER by_address AS first_seen,

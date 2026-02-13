@@ -92,10 +92,10 @@
       "accessed": "2026-02-12"
     },
     {
-      "name": "mcghosts-geocoded",
+      "name": "historical-locations-geocoded",
       "title": "Former McDonald's Locations (Geocoded)",
       "description": "Locations of former McDonald's restaurants in Manhattan, compiled from historical phone book and business directory listings, then geocoded.",
-      "path": "data/mcghosts_geocoded.csv",
+      "path": "data/historical-locations-geocoded.csv",
       "format": "csv",
       "mediatype": "text/csv",
       "sources": [

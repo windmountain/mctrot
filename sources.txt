@@ -22,6 +22,7 @@ manhattanMcDs.geojson
   Accessed: Mon Aug 12 08:40:27 EDT 2024
   Sha256: 98f6ad6f044aca0681608989b028b6667fb73f2d89d57c8e8ec28e9cd157d6ad
 
+deprecated (see historical-locations-geocoded.csv)
 mcghosts_geocoded.csv
   CopiedFrom: ../mcghosts/mcghosts_geocoded.csv
   Accessed: Mon Aug 19 16:47:59 EDT 2024
