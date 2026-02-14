@@ -3,7 +3,7 @@ set -euo pipefail
 # sidewalk_centerline
 ogr2ogr -f "PostgreSQL" \
   PG:"dbname=mctrot host=127.0.0.1 port=5432" \
-  "data/NYC Planimetric Database_ Open Space (Parks)_20240814.geojson" \
+  "data/open-space-parks.geojson" \
   -nln park_feature \
   -t_srs "EPSG:4326" \
   -lco GEOM_TYPE=geography \

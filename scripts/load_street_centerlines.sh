@@ -2,7 +2,7 @@
 
 ogr2ogr -f "PostgreSQL" \
   PG:"dbname=mctrot host=127.0.0.1 port=5432" \
-  "data/NYC Street Centerline (CSCL).geojson" \
+  "data/street-centerline.geojson" \
   -nln street_centerline \
   -t_srs "EPSG:4326" \
   -lco GEOM_TYPE=geography \

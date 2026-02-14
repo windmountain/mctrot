@@ -1,7 +1,7 @@
 # sidewalk
 ogr2ogr -f "PostgreSQL" \
   PG:"dbname=mctrot host=127.0.0.1 port=5432" \
-  "data/NYC Planimetric Database_ Sidewalk_20240806.geojson" \
+  "data/sidewalk-polygons.geojson" \
   -nln sidewalk \
   -t_srs "EPSG:4326" \
   -lco GEOM_TYPE=geography \

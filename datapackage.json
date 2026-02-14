@@ -7,7 +7,7 @@
       "name": "sidewalk-polygons",
       "title": "NYC Planimetric Database: Sidewalk (Polygons)",
       "description": "Sidewalk polygon geometry for base map rendering.",
-      "path": "data/NYC Planimetric Database_ Sidewalk_20260210.geojson",
+      "path": "data/sidewalk-polygons.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [
@@ -31,7 +31,7 @@
       "name": "borough-boundaries",
       "title": "Borough Boundaries",
       "description": "NYC borough boundary polygons. Used as a base map layer and for spatial filtering (e.g., clipping to Manhattan).",
-      "path": "data/Borough Boundaries.geojson",
+      "path": "data/borough-boundaries.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [
@@ -55,7 +55,7 @@
       "name": "street-centerline",
       "title": "NYC Street Centerline (CSCL)",
       "description": "Street centerline geometry for base map rendering.",
-      "path": "data/NYC Street Centerline (CSCL).geojson",
+      "path": "data/street-centerline.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [
@@ -117,7 +117,7 @@
       "name": "sidewalk-lines",
       "title": "Sidewalk Lines",
       "description": "Sidewalk line geometry for base map rendering.",
-      "path": "data/SIDEWALK_LINE_20240812.geojson",
+      "path": "data/sidewalk-lines.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [
@@ -141,7 +141,7 @@
       "name": "open-space-parks",
       "title": "NYC Planimetric Database: Open Space (Parks)",
       "description": "Park and open space polygons for base map rendering.",
-      "path": "data/NYC Planimetric Database_ Open Space (Parks)_20240814.geojson",
+      "path": "data/open-space-parks.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [
@@ -165,7 +165,7 @@
       "name": "hudson-river-shoreline",
       "title": "Hudson River Estuary Shoreline",
       "description": "Detailed shoreline of the Hudson River Estuary (Staten Island to Troy), for base map rendering. Data from 1988-1998.",
-      "path": "data/cugir-007888-geojson.json",
+      "path": "data/hudson-river-shoreline.geojson",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [

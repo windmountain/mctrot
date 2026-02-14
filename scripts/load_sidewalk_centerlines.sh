@@ -1,7 +1,7 @@
 # sidewalk_centerline
 ogr2ogr -f "PostgreSQL" \
   PG:"dbname=mctrot host=127.0.0.1 port=5432" \
-  "data/SIDEWALK_LINE_20240812.geojson" \
+  "data/sidewalk-lines.geojson" \
   -nln sidewalk_centerline \
   -t_srs "EPSG:4326" \
   -lco GEOM_TYPE=geography \
