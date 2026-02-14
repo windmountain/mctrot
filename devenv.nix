@@ -10,6 +10,8 @@
     pkgs.jq
   ];
 
+  dotenv.enable = true;
+
   scripts.hello.exec = ''
     echo "welcome to mctrot tools"
   '';
