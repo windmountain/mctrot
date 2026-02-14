@@ -16,23 +16,23 @@ CREATE OR REPLACE VIEW mcisland AS
 
 WITH chunk AS
 (SELECT
-  borough.boro_code,
-  borough.boro_name,
+  borough.borocode,
+  borough.boroname,
   (ST_DUMP(borough.the_geog::geometry)).geom
 FROM borough)
 
 SELECT
   row_number() over() as id,
-  chunk.boro_code,
-  chunk.boro_name,
+  chunk.borocode,
+  chunk.boroname,
   ST_TRANSFORM(chunk.geom, 4326)::geography as the_geog
 FROM chunk
 INNER JOIN mcd
 ON ST_CONTAINS(chunk.geom, mcd.the_geog::geometry)
-AND chunk.boro_name = 'Manhattan'
+AND chunk.boroname = 'Manhattan'
 GROUP BY
-  chunk.boro_code,
-  chunk.boro_name,
+  chunk.borocode,
+  chunk.boroname,
   ST_TRANSFORM(chunk.geom, 4326)::geography
 
 SQL

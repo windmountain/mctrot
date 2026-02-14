@@ -26,7 +26,7 @@ psql -h 127.0.0.1 -d mctrot << SQL
           borough.the_geog::geometry,
           raw_phonebook_listing.the_geog::geometry
       )
-      AND borough.boro_name = 'Manhattan';
+      AND borough.boroname = 'Manhattan';
 SQL
 
 psql -h 127.0.0.1 -d mctrot << SQL

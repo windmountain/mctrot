@@ -12,6 +12,6 @@ psql -h 127.0.0.1 -d mctrot << SQL
   CREATE OR REPLACE VIEW mcisland_mcd AS
   SELECT mcd.* FROM mcd
   JOIN borough ON ST_CONTAINS(borough.the_geog::geometry, mcd.the_geog::geometry)
-  AND borough.boro_name = 'Manhattan'
+  AND borough.boroname = 'Manhattan'
 SQL
     
