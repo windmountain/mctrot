@@ -7,7 +7,7 @@ ogr2ogr -f "PostgreSQL" \
   -lco GEOM_TYPE=geography \
   -lco OVERWRITE=YES;
 
-psql -h 127.0.0.1 -d mctrot << SQL
+psql -h 127.0.0.1 -p 5432 -d mctrot << SQL
   CREATE OR REPLACE VIEW mcisland_sidewalk AS
   SELECT sidewalk.* FROM sidewalk
   INNER JOIN mcisland ON ST_CONTAINS(mcisland.the_geog::geometry, sidewalk.the_geog::geometry);

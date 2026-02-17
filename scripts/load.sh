@@ -1,5 +1,6 @@
 set -euo pipefail
 
+. $(dirname "$0")/create_database.sh
 . $(dirname "$0")/create_extensions.sh
 . $(dirname "$0")/load_boroughs.sh
 . $(dirname "$0")/load_mcds.sh

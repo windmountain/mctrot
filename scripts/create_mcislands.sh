@@ -10,7 +10,7 @@ set -euo pipefail;
 #     In the case of Manhattan, it turns out that all of the McDonald's are on Manhattan Island, so 'mcisland' will only have one row.
 #     But it's good to be prepared in case they open a Marble Hill McDonald's.
 
-psql -h 127.0.0.1 -d mctrot << SQL
+psql -h 127.0.0.1 -p 5432 -d mctrot << SQL
 
 CREATE OR REPLACE VIEW mcisland AS
 

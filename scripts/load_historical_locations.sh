@@ -11,7 +11,7 @@ ogr2ogr -f "PostgreSQL" \
   -lco GEOM_TYPE=geography \
   -lco OVERWRITE=YES;
 
-psql -h 127.0.0.1 -d mctrot << SQL
+psql -h 127.0.0.1 -p 5432 -d mctrot << SQL
   CREATE OR REPLACE VIEW
       phonebook_listing AS
   SELECT
@@ -29,7 +29,7 @@ psql -h 127.0.0.1 -d mctrot << SQL
       AND borough.boroname = 'Manhattan';
 SQL
 
-psql -h 127.0.0.1 -d mctrot << SQL
+psql -h 127.0.0.1 -p 5432 -d mctrot << SQL
   CREATE OR REPLACE VIEW
       historical_locations AS
   SELECT DISTINCT

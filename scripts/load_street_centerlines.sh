@@ -9,7 +9,7 @@ ogr2ogr -f "PostgreSQL" \
   -lco OVERWRITE=YES \
   -lco COLUMN_TYPES="streetwidth:NUMERIC";
 
-psql -h 127.0.0.1 -d mctrot << SQL
+psql -h 127.0.0.1 -p 5432 -d mctrot << SQL
   CREATE OR REPLACE VIEW mcisland_street_centerline AS
   SELECT street_centerline.*,
   (street_centerline.streetwidth * 0.3048) AS st_width_meters

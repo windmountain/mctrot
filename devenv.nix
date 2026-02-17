@@ -8,6 +8,7 @@
     pkgs.gdal
     pkgs.git
     pkgs.jq
+    pkgs.postgresql_18 # for psql, see below note on services.postgres
   ];
 
   dotenv.enable = true;
@@ -44,17 +45,20 @@
     git --version | grep "2.42.0"
   '';
 
-  # https://devenv.sh/services/
+
+  # The pgrouting extension isn't working under nix/devenv.
+  # Until it is, I'm disabling services.postgres and using Postgres.app, which
+  # runs a server on 127.0.0.1:5432 just like would be done here.
+  # (Postgres.app comes with pgrouting.)
   services.postgres = {
-    enable = true;
-    package = pkgs.postgresql_16;
+    enable = false; # the part that disables this service
+    package = pkgs.postgresql_18;
     initialDatabases = [{ name = "mctrot"; }];
     extensions = extensions: [
       extensions.postgis
-      extensions.timescaledb
+      # extensions.pgrouting # not working, see above
     ];
     listen_addresses = "127.0.0.1";
-    port = 5432;
   };
 
   # https://devenv.sh/languages/
