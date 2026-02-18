@@ -162,6 +162,29 @@
       ]
     },
     {
+      "name": "nj-county-boundaries",
+      "title": "County Boundaries of New Jersey",
+      "description": "NJ county boundary polygons.",
+      "path": "data/nj-county-boundaries.geojson",
+      "format": "geojson",
+      "mediatype": "application/geo+json",
+      "sources": [
+        {
+          "title": "County Boundaries of NJ",
+          "path": "https://njogis-newjersey.opendata.arcgis.com/datasets/county-boundaries-of-nj-hosted-3424/explore",
+          "api": "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/NJ_Counties_3424/FeatureServer/replicafilescache/NJ_Counties_3424_-8325300193892812354.geojson"
+        }
+      ],
+      "hash": "sha256:9645e96dfcea66d0ec7dd058403a314f18c28d4f3092175fec48ae3b96d611eb",
+      "accessed": "2026-02-17",
+      "licenses": [
+        {
+          "title": "NJ Office of Information Technology, Office of GIS (NJOGIS) Data License",
+          "text": "This data set is not survey data and must not be used as survey data. The polygons delineated in this data set do not represent legal boundaries.\n\nSee the balance of this metadata record for conditions that limit appropriate uses. Acknowledgement of the data set provider, NJ Office of Information Technology, Office of GIS (NJOGIS), would be appreciated for maps, data or other products derived from this data set.\n\nThe State of New Jersey makes great effort to provide secure, accurate, and complete data and metadata. However, portions of the data and metadata may be incorrect or not current. Any errors or omissions should be reported for investigation.\n\nThe State of New Jersey, its officers, employees or agents shall not be liable for damages or losses of any kind arising out of or in connection with the use or performance of data and metadata, including but not limited to, damages or losses caused by reliance upon the accuracy or timeliness of any such data and metadata, or damages incurred from the viewing, distributing, or copying of those materials.\n\nThe data and metadata are provided \"as is.\" No warranty of any kind, implied, expressed, or statutory, including but not limited to the warranties of non-infringement of third party rights, title, merchantability, fitness for a particular purpose, and freedom from computer virus, is given with respect to the data and metadata, or its hyperlinks to other Internet resources.\n\nThe State disclaims any duty or obligation either to maintain availability of or to update the data and metadata."
+        }
+      ]
+    },
+    {
       "name": "hudson-river-shoreline",
       "title": "Hudson River Estuary Shoreline",
       "description": "Detailed shoreline of the Hudson River Estuary (Staten Island to Troy), for base map rendering. Data from 1988-1998.",
