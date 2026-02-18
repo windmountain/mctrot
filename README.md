@@ -9,7 +9,8 @@ This repo contains tools for:
   - downloading geospatial layers from NYC Open Data
   - massaging layers into Postgres views
   - designing the map in QGIS
-- etc
+- computing a walking-distance cost matrix between every pair of locations by routing along sidewalk centerlines with pgRouting
+- solving the TSP (travelling salesman problem) to find the shortest walking route that visits every location, using simulated annealing (`tsp.ipynb`)
 
 This repository manages its external dependencies (gdal, postgres, jq, etc.) with [devenv.sh](https://devenv.sh).
 
@@ -50,3 +51,14 @@ Download and open QGIS, create a new project, open the Data Source Manager windo
 - database: mctrot
 
 Choose tables to add into the project.
+
+# TSP notebook
+
+`tsp.ipynb` loads the `route_summary` cost matrix from Postgres and uses simulated annealing to find an approximate shortest route visiting every Manhattan McDonald's.
+
+Python dependencies are declared in `pyproject.toml`. To install them and launch the notebook:
+
+```
+uv sync
+uv run jupyter lab
+```
