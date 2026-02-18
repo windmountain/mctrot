@@ -23,3 +23,6 @@ data/*
 
 # LibreOffice lock files
 .~lock*
+
+# Jupyter notebook state
+.ipynb_checkpoints
