@@ -16,13 +16,13 @@ This repository manages its external dependencies (gdal, postgres, jq, etc.) wit
 
 Here's a screenshot of the work in progress map:
 
-![Simple map of Manhattan with yellow diamonds, red diamonds, and gray dots](/inprogress.png)
+<img src="/inprogress.png" width="200px" alt="Simple map of Manhattan with yellow diamonds, red diamonds, and gray dots">
 
 See also: [maps from previous years](/previous-mctrot-maps/) before GIS.
 
 # Fetching data
 
-The data dependencies of this map are listed in datapackage.json [spec](https://datapackage.org/standard/data-package/).
+The data dependencies of this map are listed in datapackage.json. Datapackage is a [specification](https://datapackage.org/standard/data-package/) for documenting where data came from, how it's licensed, etc.
 
 For some of these dependencies, you will need an account with NYC Open Data. Follow these steps:
 - Copy the .env.example file to a new file named .env.
@@ -34,16 +34,15 @@ For some of these dependencies, you will need an account with NYC Open Data. Fol
 
 Once set up, fetch the data by running the fetch.py Python script.
 
-# Postgres import
+# Postgres and QGIS
 
-Start Postgres with `devenv up`
+Much of this project is concerned with loading data into Postgres, using views to filter what's relevant for McTrot, and bringing those views into QGIS for designing an actual map. Loading data directly into QGIS just uses way too much memory and is too slow.
 
-Connect to postgres on 127.0.0.1:5432/mctrot with your favorite client
+~~Start Postgres with `devenv up`~~ Running Postgres from devenv is disabled because the pgrouting extension there is busted. Try [Postgres.app](https://postgresapp.com) if you're on a Mac. If you're not on a Mac, there are [many other options](https://www.postgresql.org/download/). The main thing is you want a local server running on the default port.
 
+Run `devenv shell` and then `./scripts/load.sh` to set up the mctrot database, import data from data/, and make map-specific views.
 
-Run `devenv shell` and then `./scripts/load.sh` to import data and make map-specific Postgres views
-
-Download and open QGIS, create a new project, open the Data Source Manager window and a new Postgres connection with these details:
+Download and open [QGIS](https://qgis.org), create a new project, open the Data Source Manager window and a new Postgres connection with these details:
 
 - name: mctrot
 - host: 127.0.0.1
