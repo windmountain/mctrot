@@ -1,6 +1,8 @@
 # McTrot Tools
 
-McTrot is an annual personal challenge to eat at every McDonald's in Manhattan, on foot, in less than 24 hours.
+McTrot is an annual personal challenge to eat at every McDonald's in Manhattan, on foot, in one go. I've been doing this annually since 2022. Making a map has always been [part of the tradition](/previous-mctrot-maps/) and this repo is about making a souped-up GIS one for 2026.
+
+(I am more a student of McDonald's than a straight ahead fan, and also use the company as a springboard to learn about finance, management, and supply chains at [Hamburger Business Review](https://www.hamburgerbusinessreview.com/).)
 
 This repo contains tools for:
 - downloading current McDonald's locations from their API
@@ -13,12 +15,6 @@ This repo contains tools for:
 - solving the TSP (travelling salesman problem) to find the shortest walking route that visits every location, using simulated annealing (`tsp.ipynb`)
 
 This repository manages its external dependencies (gdal, postgres, jq, etc.) with [devenv.sh](https://devenv.sh).
-
-Here's a screenshot of the work in progress map:
-
-<img src="/inprogress.png" width="200px" alt="Simple map of Manhattan with yellow diamonds, red diamonds, and gray dots">
-
-See also: [maps from previous years](/previous-mctrot-maps/) before GIS.
 
 # Fetching data
 
@@ -61,3 +57,7 @@ Python dependencies are declared in `pyproject.toml`. To install them and launch
 uv sync
 uv run jupyter lab
 ```
+
+# A note on AI
+
+This GIS endeavor began in 2024 with the usual kind of Googling around for stuff. In 2026 I started using Claude pretty heavily to build on what's here and go on side quests like the route optimization.
