@@ -26,3 +26,6 @@ data/*
 
 # Jupyter notebook state
 .ipynb_checkpoints
+
+# special projects
+*radio
