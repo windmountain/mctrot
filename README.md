@@ -1,6 +1,6 @@
 # McTrot Tools
 
-McTrot is an annual personal challenge to eat at every McDonald's in Manhattan, on foot, in one go. I've been doing this annually since 2022. Making a map has always been [part of the tradition](/previous-mctrot-maps/) and this repo is about making a souped-up GIS one for 2026.
+McTrot is an annual personal challenge to eat at every McDonald's in Manhattan, on foot, in one go. I've been doing this annually since 2022. Making a map has always been [part of the tradition](/about/previous-mctrot-maps/) and this repo is about making a souped-up GIS one for 2026.
 
 (I am more a student of McDonald's than a straight-ahead fan, and also use the company as a springboard to learn about finance, management, and supply chains at [Hamburger Business Review](https://www.hamburgerbusinessreview.com/).)
 
