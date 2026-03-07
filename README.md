@@ -13,6 +13,8 @@ This repo contains tools for:
   - designing the map in QGIS
 - computing a walking-distance cost matrix between every pair of locations by routing along sidewalk centerlines with pgRouting
 - solving the TSP (travelling salesman problem) to find the shortest walking route that visits every location, using simulated annealing (`tsp.ipynb`)
+- solving TSPTW (TSP with time windows) to find the shortest route at a given pace while making sure that they're all open when I get to them
+- doing analysis on the TSPTW solutions per pace
 
 This repository manages its external dependencies (gdal, postgres, jq, etc.) with [devenv.sh](https://devenv.sh).
 
@@ -32,7 +34,7 @@ Once set up, fetch the data by running the fetch.py Python script.
 
 # Postgres and QGIS
 
-Much of this project is concerned with loading data into Postgres, using views to filter what's relevant for McTrot, and bringing those views into QGIS for designing an actual map. Loading data directly into QGIS just uses way too much memory and is too slow.
+Much of this project is concerned with loading data into Postgres, using views to filter what's relevant for McTrot, and bringing those views into QGIS for designing an actual map. Loading data directly into QGIS makes things too sluggish.
 
 ~~Start Postgres with `devenv up`~~ Running Postgres from devenv is disabled because the pgrouting extension there is busted. Try [Postgres.app](https://postgresapp.com) if you're on a Mac. If you're not on a Mac, there are [many other options](https://www.postgresql.org/download/). The main thing is you want a local server running on the default port.
 
@@ -47,16 +49,45 @@ Download and open [QGIS](https://qgis.org), create a new project, open the Data 
 
 Choose tables to add into the project.
 
-# TSP notebook
+# Route optimization
 
-`tsp.ipynb` loads the `route_summary` cost matrix from Postgres and uses simulated annealing to find an approximate shortest route visiting every Manhattan McDonald's.
+Route optimization happens in two phases: loading (above), then solving. The solve step reads from the database and writes results back to it.
 
-Python dependencies are declared in `pyproject.toml`. To install them and launch the notebook:
+Python dependencies are declared in `pyproject.toml`. To install them:
 
 ```
 uv sync
-uv run jupyter lab
 ```
+
+## Solving
+
+Run one of the solve scripts to execute a notebook and write results to Postgres:
+
+```
+./scripts/solve_tsptw_single.sh
+./scripts/solve_tsptw_multi.sh
+```
+
+Or open and run notebooks interactively with `uv run jupyter lab`.
+
+## Post-solve analysis
+
+After solving, run analysis scripts to derive summary tables from the results:
+
+```
+./scripts/create_tsptw_multi_route_segments.sh   # sidewalk segments for each pace's route
+./scripts/create_tsptw_multi_analytics.sh        # per-pace analytics (length, total time, hours to close)
+```
+
+These depend on the solve having run first. The analytics script also prints a summary table to stdout.
+
+To generate a PDF chart of the analytics:
+
+```
+uv run scripts/chart_tsptw_multi_analytics.py
+```
+
+This writes `tsptw_multi_analytics.pdf` to the project root with two line charts: route length and minimum hours to close, both by pace.
 
 # A note on AI
 

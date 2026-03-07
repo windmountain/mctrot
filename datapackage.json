@@ -185,6 +185,30 @@
       ]
     },
     {
+      "name": "ny-county-boundaries",
+      "title": "NYS Civil Boundaries: Counties Shoreline",
+      "description": "NY State county boundary polygons following the shoreline.",
+      "path": "data/nys-civil-boundaries.zip",
+      "format": "zip",
+      "mediatype": "application/zip",
+      "sources": [
+        {
+          "title": "NYS GIS Program Office: Civil Boundaries",
+          "path": "https://gis.ny.gov/civil-boundaries",
+          "api": "https://gisdata.ny.gov/GISData/State/Civil_Boundaries/NYS_Civil_Boundaries.shp.zip"
+        }
+      ],
+      "hash": "sha256:7b4c3537c35b510fe7d4bdf24a5c81db9e3eebbd39ed97456079e8a9835f5c0d",
+      "accessed": "2026-03-05",
+      "licenses": [
+        {
+          "name": "ODC-PDDL-1.0",
+          "path": "http://opendatacommons.org/licenses/pddl/",
+          "title": "Open Data Commons Public Domain Dedication and License"
+        }
+      ]
+    },
+    {
       "name": "hudson-river-shoreline",
       "title": "Hudson River Estuary Shoreline",
       "description": "Detailed shoreline of the Hudson River Estuary (Staten Island to Troy), for base map rendering. Data from 1988-1998.",

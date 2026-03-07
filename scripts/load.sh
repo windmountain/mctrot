@@ -12,4 +12,5 @@ set -euo pipefail
 . $(dirname "$0")/load_park_features.sh
 . $(dirname "$0")/load_hudson.sh
 . $(dirname "$0")/load_nj_counties.sh
+. $(dirname "$0")/load_ny_counties.sh
 . $(dirname "$0")/create_routes.sh
