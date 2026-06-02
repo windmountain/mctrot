@@ -47,7 +47,7 @@ Download and open [QGIS](https://qgis.org), create a new project, open the Data 
 - port: 5432
 - database: mctrot
 
-Choose tables to add into the project.
+Choose tables to add into the project. Each table makes a layer on the map, with settings for how it's drawn and labeled.
 
 # Route optimization
 
