@@ -1,0 +1,1 @@
+xelatex "Shoe Deal.tex"
