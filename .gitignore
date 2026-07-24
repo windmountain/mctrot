@@ -27,5 +27,9 @@ data/*
 # Jupyter notebook state
 .ipynb_checkpoints
 
+# shoe deal build intermediates
+shoe-deal/*.aux
+shoe-deal/*.log
+
 # special projects
 *radio
