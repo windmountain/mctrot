@@ -12,7 +12,7 @@ This repo contains tools for:
   - massaging layers into Postgres views
   - designing the map in QGIS
 - computing a walking-distance cost matrix between every pair of locations by routing along sidewalk centerlines with pgRouting
-- solving the TSP (travelling salesman problem) to find the shortest walking route that visits every location, using simulated annealing (`tsp.ipynb`)
+- solving the TSP (traveling salesman problem) to find the shortest walking route that visits every location, using simulated annealing (`tsp.ipynb`)
 - solving TSPTW (TSP with time windows) to find the shortest route at a given pace while making sure that they're all open when I get to them
 - doing analysis on the TSPTW solutions per pace
 
