@@ -137,17 +137,24 @@ main {
   padding-bottom: 4rem;
 }
 
+h1 {
+  margin: 0 0 0.25em;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--ink-1);
+}
+
 .hero {
   max-width: 46rem;
   padding: clamp(2.5rem, 10vh, 6rem) 0 clamp(2rem, 6vh, 3.5rem);
 }
 
-h1 {
-  margin: 0 0 0.25em;
+.hero h1 {
   font-size: clamp(2.5rem, 8vw, 5.25rem);
   line-height: 1.02;
   letter-spacing: -0.015em;
-  text-wrap: balance;
 }
 
 h1 .line-1 {
@@ -190,6 +197,99 @@ h1 .line-2 {
 .more a:hover,
 .more a:focus-visible {
   text-decoration-color: var(--ink-1);
+}
+
+/* content pages */
+
+.page-head {
+  max-width: var(--measure);
+  padding: clamp(2rem, 8vh, 3.5rem) 0 2.5rem;
+}
+
+.page-head h1 {
+  font-size: clamp(1.875rem, 5vw, 2.75rem);
+}
+
+.tldr {
+  margin: 1rem 0 0;
+  max-width: var(--measure);
+  color: var(--ink-2);
+}
+
+.page-body {
+  max-width: var(--measure);
+  padding-bottom: 4rem;
+}
+
+.page-body h2 {
+  margin: 2.25rem 0 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.page-body h2:first-child {
+  margin-top: 0;
+}
+
+.page-body p,
+.page-body ul,
+.page-body ol {
+  margin: 0 0 1rem;
+  color: var(--ink-2);
+}
+
+.page-body ul,
+.page-body ol {
+  padding-left: 1.25rem;
+}
+
+.page-body li + li {
+  margin-top: 0.4rem;
+}
+
+.page-body a {
+  color: var(--ink-1);
+  text-decoration: underline;
+  text-underline-offset: 0.1em;
+}
+
+table.records {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+}
+
+table.records th,
+table.records td {
+  text-align: left;
+  padding: 0.6rem 1rem 0.6rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums;
+}
+
+table.records th {
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+table.records td {
+  color: var(--ink-2);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* footer */

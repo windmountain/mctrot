@@ -53,12 +53,6 @@ In order of priority:
 - Nav: Home, Rules, Route, Results. Placement (header vs. elsewhere)
   intentionally tabled.
 - Footer links: Instagram, this GitHub repo, contact email.
-- Footer boilerplate line (locked):
-
-  > McTrot is self-administered. Honor system only — no verification, no
-  > prize, nothing at stake but the eating and the walking. Disputes,
-  > questions, and challenges to the record: admin@mctrot.nyc.
-
 - No dedicated Contact page for v1 — the footer email covers it.
 
 ## The End
