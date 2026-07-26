@@ -86,6 +86,12 @@ button:focus-visible {
   margin: 0 auto;
 }
 
+@media (max-width: 900px) {
+  .wrap {
+    padding: 0 0.5em;
+  }
+}
+
 /* header */
 
 .header-inner {
