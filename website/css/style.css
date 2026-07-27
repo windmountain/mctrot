@@ -6,7 +6,6 @@
   --bg: #FFD100;
   --ink-1: #0D0D08;   /* headline weight */
   --ink-2: #26241A;   /* body weight */
-  --ink-3: #3A3826;   /* muted / footer / nav */
   --rule: var(--ink-1);
 
   --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -18,7 +17,6 @@
     --bg: #E8B800;
     --ink-1: #0A0A06;
     --ink-2: #201F14;
-    --ink-3: #332F1E;
     --rule: rgba(10, 10, 6, 0.3);
   }
 }
@@ -27,7 +25,6 @@
   --bg: #E8B800;
   --ink-1: #0A0A06;
   --ink-2: #201F14;
-  --ink-3: #332F1E;
   --rule: rgba(10, 10, 6, 0.3);
 }
 
@@ -35,7 +32,6 @@
   --bg: #FFD100;
   --ink-1: #0D0D08;
   --ink-2: #26241A;
-  --ink-3: #3A3826;
   --rule: rgba(13, 13, 8, 0.25);
 }
 
@@ -185,13 +181,13 @@ h1 .line-2 {
 .lede-secondary {
   margin: 0.75rem 0 0;
   max-width: var(--measure);
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .more {
   margin: 2.5rem 0 0;
   font-size: 1.0625rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .more a {
@@ -310,7 +306,7 @@ table.records td {
   margin: 0;
   max-width: var(--measure);
   font-size: 0.9375rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .boilerplate a {
@@ -326,7 +322,7 @@ table.records td {
   flex-wrap: wrap;
   gap: 0.4rem 1.25rem;
   font-size: 0.9375rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .footer-links a {
