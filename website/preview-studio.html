@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>McTrot — Favicon &amp; Social Preview Studio</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --panel-bg: #17160f;
+    --panel-ink: #f2efe2;
+    --panel-muted: #a9a494;
+    --panel-line: #35331f;
+    --accent: #FFD100;
+    --card-bg: #1f1d13;
+    --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --panel-bg: #f4f2ea;
+      --panel-ink: #16150d;
+      --panel-muted: #5a5644;
+      --panel-line: #ddd8c4;
+      --card-bg: #ffffff;
+    }
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    font-family: var(--font);
+    background: var(--panel-bg);
+    color: var(--panel-ink);
+    display: flex;
+    min-height: 100vh;
+  }
+  .panel{
+    width: 320px;
+    flex: 0 0 320px;
+    padding: 1.5rem;
+    border-right: 1px solid var(--panel-line);
+    overflow-y: auto;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+  .panel h1{
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin: 0 0 .1rem;
+  }
+  .panel .sub{
+    margin: 0 0 1.5rem;
+    color: var(--panel-muted);
+    font-size: .8rem;
+  }
+  .panel label{
+    display: block;
+    font-size: .8rem;
+    font-weight: 700;
+    margin: 1rem 0 .35rem;
+  }
+  .panel label.inline{
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 400;
+  }
+  .panel input[type="text"],
+  .panel select,
+  .panel input[type="number"]{
+    width: 100%;
+    font-family: var(--font);
+    font-size: .9rem;
+    padding: .4rem .5rem;
+    background: var(--card-bg);
+    color: var(--panel-ink);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+  }
+  .panel input[type="range"]{ width: 100%; }
+  .panel input[type="color"]{
+    width: 100%;
+    height: 2rem;
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    background: none;
+    padding: 0;
+  }
+  fieldset{
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    margin: 1rem 0 0;
+    padding: .6rem .75rem .75rem;
+  }
+  fieldset legend{
+    font-size: .8rem;
+    font-weight: 700;
+    padding: 0 .3rem;
+  }
+  fieldset label{
+    margin: .3rem 0;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+  }
+  .range-row{ display: flex; justify-content: space-between; align-items: baseline; }
+  .range-row span{ font-weight: 400; color: var(--panel-muted); font-size: .75rem; }
+  #customColors{ display: flex; gap: .75rem; margin-top: .5rem; }
+  #customColors > div{ flex: 1; }
+  #customColors label{ margin: 0 0 .25rem; font-size: .7rem; }
+  button.reset{
+    margin-top: 1.5rem;
+    width: 100%;
+    padding: .6rem;
+    font-family: var(--font);
+    font-weight: 700;
+    font-size: .8rem;
+    background: none;
+    color: var(--panel-ink);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button.reset:hover{ border-color: var(--panel-muted); }
+
+  .main{
+    flex: 1;
+    padding: 1.5rem 2rem 3rem;
+    overflow-y: auto;
+  }
+  .grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.25rem;
+  }
+  .card{
+    background: var(--card-bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .card.wide{ grid-column: 1 / -1; }
+  .card h3{
+    margin: 0;
+    font-size: .95rem;
+  }
+  .card .note{
+    margin: -.4rem 0 0;
+    font-size: .72rem;
+    color: var(--panel-muted);
+  }
+  .preview-wrap{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    background:
+      linear-gradient(45deg, #0000 25%, rgba(128,128,128,.15) 25%, rgba(128,128,128,.15) 50%, #0000 50%, #0000 75%, rgba(128,128,128,.15) 75%) 0 0/16px 16px;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .preview-wrap canvas{
+    image-rendering: pixelated;
+    display: block;
+    max-width: 100%;
+  }
+  .preview-wrap.smooth canvas{ image-rendering: auto; }
+  .safe-guide{
+    position: absolute;
+    inset: 10%;
+    border: 1px dashed rgba(255,60,60,.85);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .card button, .card a.dl{
+    font-family: var(--font);
+    font-weight: 700;
+    font-size: .78rem;
+    padding: .5rem .6rem;
+    background: var(--accent);
+    color: #0D0D08;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+  }
+  .card button.secondary{
+    background: none;
+    color: var(--panel-ink);
+    border: 1px solid var(--panel-line);
+  }
+  .btn-row{ display: flex; gap: .5rem; flex-wrap: wrap; }
+  textarea{
+    width: 100%;
+    min-height: 120px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .75rem;
+    background: var(--panel-bg);
+    color: var(--panel-ink);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    padding: .6rem;
+    resize: vertical;
+  }
+  .section-title{
+    grid-column: 1 / -1;
+    margin: .5rem 0 -.5rem;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--panel-muted);
+  }
+</style>
+</head>
+<body>
+
+  <div class="panel">
+    <h1>McTrot</h1>
+    <p class="sub">Favicon &amp; social preview studio</p>
+
+    <label for="text">Text</label>
+    <input id="text" type="text" value="McTrot" maxlength="24">
+
+    <fieldset>
+      <legend>Theme</legend>
+      <label><input type="radio" name="theme" value="light" checked> Light — site default (#FFD100 / #0D0D08)</label>
+      <label><input type="radio" name="theme" value="dark"> Dark (#E8B800 / #0A0A06)</label>
+      <label><input type="radio" name="theme" value="custom"> Custom</label>
+    </fieldset>
+
+    <div id="customColors" hidden>
+      <div>
+        <label for="bgCustom">Background</label>
+        <input id="bgCustom" type="color" value="#FFD100">
+      </div>
+      <div>
+        <label for="inkCustom">Ink</label>
+        <input id="inkCustom" type="color" value="#0D0D08">
+      </div>
+    </div>
+
+    <label for="weight">Weight</label>
+    <select id="weight">
+      <option value="400">400 Regular</option>
+      <option value="500">500 Medium</option>
+      <option value="700" selected>700 Bold — site default</option>
+      <option value="900">900 Black</option>
+    </select>
+
+    <label for="padding">
+      <div class="range-row"><span>Padding</span><span id="paddingVal">12%</span></div>
+    </label>
+    <input id="padding" type="range" min="0" max="35" value="12">
+
+    <label for="tracking">
+      <div class="range-row"><span>Letter spacing</span><span id="trackingVal">0%</span></div>
+    </label>
+    <input id="tracking" type="range" min="-5" max="20" value="0">
+
+    <label for="nudge">
+      <div class="range-row"><span>Vertical nudge</span><span id="nudgeVal">0%</span></div>
+    </label>
+    <input id="nudge" type="range" min="-15" max="15" value="0">
+
+    <label for="radius">
+      <div class="range-row"><span>Corner radius</span><span id="radiusVal">0%</span></div>
+    </label>
+    <input id="radius" type="range" min="0" max="50" value="0">
+
+    <fieldset>
+      <legend>Small sizes</legend>
+      <label><input id="maskableSafe" type="checkbox" checked> Extra safe-zone padding for maskable Android icons (192 / 512)</label>
+      <label><input id="smallLetterMode" type="checkbox" checked> Use first letter only at or below <input id="smallThreshold" type="number" value="48" min="8" max="128" style="width:3.5em;display:inline-block;margin-left:.3em"> px</label>
+    </fieldset>
+    <p class="sub" style="margin-top:.4rem">48px and below render as "M" — the full wordmark reads better from 180px up. Toggle off to compare.</p>
+
+    <button class="reset" id="resetBtn" type="button">Reset to site defaults</button>
+  </div>
+
+  <div class="main">
+    <div class="grid" id="grid"></div>
+  </div>
+
+<script>
+(function(){
+  const LIGHT = { bg: '#FFD100', ink: '#0D0D08' };
+  const DARK  = { bg: '#E8B800', ink: '#0A0A06' };
+
+  const state = {
+    text: 'McTrot',
+    theme: 'light',
+    bgCustom: '#FFD100',
+    inkCustom: '#0D0D08',
+    weight: 700,
+    padding: 12,
+    tracking: 0,
+    nudge: 0,
+    radius: 0,
+    maskableSafe: true,
+    smallLetterMode: true,
+    smallThreshold: 48,
+  };
+
+  function getColors(){
+    if (state.theme === 'light') return LIGHT;
+    if (state.theme === 'dark') return DARK;
+    return { bg: state.bgCustom, ink: state.inkCustom };
+  }
+
+  // ---------- rendering ----------
+
+  function roundRectPath(ctx, x, y, w, h, r){
+    r = Math.max(0, Math.min(r, w/2, h/2));
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function fontString(size){
+    return `${state.weight} ${size}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  }
+
+  function measureTracked(ctx, text, size, trackingFrac){
+    ctx.font = fontString(size);
+    if (Math.abs(trackingFrac) < 0.0001 || text.length < 2) return ctx.measureText(text).width;
+    let total = 0;
+    for (const ch of text) total += ctx.measureText(ch).width + trackingFrac * size;
+    return total - trackingFrac * size;
+  }
+
+  function fitFontSize(ctx, text, maxW, maxH, trackingFrac){
+    let lo = 1, hi = Math.max(2, maxH * 1.4);
+    for (let i = 0; i < 22; i++){
+      const mid = (lo + hi) / 2;
+      const w = measureTracked(ctx, text, mid, trackingFrac);
+      if (w > maxW || mid > maxH * 1.15) hi = mid; else lo = mid;
+    }
+    return lo;
+  }
+
+  function drawTracked(ctx, text, cx, cy, size, trackingFrac){
+    ctx.font = fontString(size);
+    const total = measureTracked(ctx, text, size, trackingFrac);
+    let x = cx - total / 2;
+    const prevAlign = ctx.textAlign;
+    ctx.textAlign = 'left';
+    for (const ch of text){
+      ctx.fillText(ch, x, cy);
+      x += ctx.measureText(ch).width + trackingFrac * size;
+    }
+    ctx.textAlign = prevAlign;
+  }
+
+  function renderIcon(canvas, target){
+    canvas.width = target.w;
+    canvas.height = target.h;
+    const ctx = canvas.getContext('2d');
+    const { bg, ink } = getColors();
+    const w = target.w, h = target.h;
+
+    const r = (state.radius/100) * Math.min(w,h) / 2;
+    ctx.fillStyle = bg;
+    roundRectPath(ctx, 0, 0, w, h, r);
+    ctx.fill();
+
+    let text = (state.text || 'McTrot');
+    if (state.smallLetterMode && Math.min(w,h) <= state.smallThreshold){
+      text = text.charAt(0);
+    }
+    if (!text) return;
+
+    let pad = (state.padding/100) * Math.min(w,h);
+    if (target.maskable && state.maskableSafe){
+      pad = Math.max(pad, 0.1 * Math.min(w,h));
+    }
+    const maxW = Math.max(1, w - pad*2);
+    const maxH = Math.max(1, h - pad*2);
+    const trackingFrac = state.tracking/100;
+
+    const size = fitFontSize(ctx, text, maxW, maxH, trackingFrac);
+    ctx.font = fontString(size);
+    ctx.fillStyle = ink;
+    ctx.textBaseline = 'middle';
+    const cx = w/2;
+    const cy = h/2 + (state.nudge/100) * h;
+
+    if (Math.abs(trackingFrac) < 0.0001){
+      ctx.textAlign = 'center';
+      ctx.fillText(text, cx, cy);
+    } else {
+      drawTracked(ctx, text, cx, cy, size, trackingFrac);
+    }
+  }
+
+  // ---------- SVG ----------
+
+  function escapeXml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fitFontSizeSvg(text, maxW, maxH, trackingFrac){
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    return fitFontSize(ctx, text, maxW, maxH, trackingFrac);
+  }
+
+  function buildSvg(adaptive){
+    const w = 64, h = 64;
+    const text = state.text || 'McTrot';
+    const pad = (state.padding/100) * Math.min(w,h);
+    const maxW = w - pad*2, maxH = h - pad*2;
+    const trackingFrac = state.tracking/100;
+    const size = fitFontSizeSvg(text, maxW, maxH, trackingFrac);
+    const r = (state.radius/100) * Math.min(w,h) / 2;
+    const cy = h/2 + (state.nudge/100) * h;
+    const letterSpacingAttr = Math.abs(trackingFrac) > 0.0001
+      ? ` letter-spacing="${(trackingFrac*size).toFixed(2)}"` : '';
+
+    function group(cls, bg, ink){
+      return `<g class="${cls}">`
+        + `<rect width="${w}" height="${h}" rx="${r.toFixed(2)}" fill="${bg}"/>`
+        + `<text x="${w/2}" y="${cy.toFixed(2)}" text-anchor="middle" dominant-baseline="central" `
+        + `font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="${state.weight}" `
+        + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(text)}</text>`
+        + `</g>`;
+    }
+
+    if (!adaptive){
+      const { bg, ink } = getColors();
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">\n${group('mark', bg, ink)}\n</svg>\n`;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">
+<style>
+  .dark{ display:none }
+  @media (prefers-color-scheme: dark){ .light{ display:none } .dark{ display:inline } }
+</style>
+${group('light', LIGHT.bg, LIGHT.ink)}
+${group('dark', DARK.bg, DARK.ink)}
+</svg>
+`;
+  }
+
+  // ---------- ICO ----------
+
+  async function canvasToPngBytes(size){
+    const c = document.createElement('canvas');
+    renderIcon(c, { w: size, h: size });
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  async function buildIco(){
+    const sizes = [16, 32, 48];
+    const pngs = [];
+    for (const s of sizes) pngs.push(await canvasToPngBytes(s));
+
+    const count = sizes.length;
+    const headerSize = 6 + 16*count;
+    let total = headerSize;
+    for (const b of pngs) total += b.length;
+
+    const out = new Uint8Array(total);
+    const dv = new DataView(out.buffer);
+    dv.setUint16(0, 0, true);
+    dv.setUint16(2, 1, true);
+    dv.setUint16(4, count, true);
+
+    let offset = headerSize;
+    for (let i = 0; i < count; i++){
+      const entry = 6 + 16*i;
+      const s = sizes[i], buf = pngs[i];
+      out[entry+0] = s === 256 ? 0 : s;
+      out[entry+1] = s === 256 ? 0 : s;
+      out[entry+2] = 0;
+      out[entry+3] = 0;
+      dv.setUint16(entry+4, 1, true);
+      dv.setUint16(entry+6, 32, true);
+      dv.setUint32(entry+8, buf.length, true);
+      dv.setUint32(entry+12, offset, true);
+      out.set(buf, offset);
+      offset += buf.length;
+    }
+    return new Blob([out], { type: 'image/x-icon' });
+  }
+
+  // ---------- snippets ----------
+
+  function buildHeadTags(){
+    const { bg } = getColors();
+    return `<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="${bg}">`;
+  }
+
+  function buildManifest(){
+    const { bg } = getColors();
+    const text = state.text || 'McTrot';
+    return JSON.stringify({
+      name: text,
+      short_name: text,
+      icons: [
+        { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+      ],
+      theme_color: bg,
+      background_color: bg,
+      display: "standalone"
+    }, null, 2);
+  }
+
+  function buildOgTags(){
+    const text = state.text || 'McTrot';
+    return `<meta property="og:type" content="website">
+<meta property="og:title" content="${text}">
+<meta property="og:description" content="McTrot is a challenge to eat at every McDonald&#8217;s in Manhattan, on foot, in one go.">
+<meta property="og:image" content="https://mctrot.nyc/og-image.png">
+<meta property="og:url" content="https://mctrot.nyc/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://mctrot.nyc/og-image.png">`;
+  }
+
+  // ---------- download helpers ----------
+
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  function downloadCanvasPng(canvas, filename){
+    canvas.toBlob(blob => downloadBlob(blob, filename), 'image/png');
+  }
+
+  async function copyText(text, btn){
+    const original = btn.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied';
+    } catch (e) {
+      btn.textContent = 'Select & copy manually';
+    }
+    setTimeout(() => { btn.textContent = original; }, 1400);
+  }
+
+  // ---------- build UI ----------
+
+  const targets = [
+    { id: 'fav16',   w: 16,   h: 16,   label: '16×16',    note: 'Browser tab (small)',            file: 'favicon-16.png',        display: 96,  smooth: false },
+    { id: 'fav32',   w: 32,   h: 32,   label: '32×32',     note: 'Browser tab / favicon.ico source', file: 'favicon-32.png',     display: 128, smooth: false },
+    { id: 'fav48',   w: 48,   h: 48,   label: '48×48',     note: 'favicon.ico source (Windows)',  file: 'favicon-48.png',        display: 144, smooth: false },
+    { id: 'apple180',w: 180,  h: 180,  label: '180×180',   note: 'apple-touch-icon.png — iOS applies its own mask, keep this square',
+      file: 'apple-touch-icon.png', display: 160, smooth: true },
+    { id: 'android192', w: 192, h: 192, label: '192×192', note: 'Android / manifest icon', file: 'icon-192.png', display: 160, smooth: true, maskable: true },
+    { id: 'android512', w: 512, h: 512, label: '512×512', note: 'Android / manifest + splash', file: 'icon-512.png', display: 160, smooth: true, maskable: true },
+    { id: 'og', w: 1200, h: 630, label: '1200×630', note: 'Open Graph / Twitter / iMessage link preview', file: 'og-image.png', display: 400, smooth: true, wide: true },
+  ];
+
+  const canvasesById = {};
+  const grid = document.getElementById('grid');
+
+  function makeIconCard(t){
+    const card = document.createElement('div');
+    card.className = 'card' + (t.wide ? ' wide' : '');
+    const canvas = document.createElement('canvas');
+    canvasesById[t.id] = { canvas, target: t };
+
+    const wrapClass = 'preview-wrap' + (t.smooth ? ' smooth' : '');
+    const guide = t.maskable ? '<div class="safe-guide" title="Approximate safe zone for circular/squircle masks"></div>' : '';
+
+    card.innerHTML = `
+      <h3>${t.label}</h3>
+      <p class="note">${t.note}</p>
+      <div class="${wrapClass}" style="${t.wide ? '' : `width:${t.display}px;height:${t.display}px;margin:0 auto;`}"></div>
+      <div class="btn-row">
+        <button type="button">Download ${t.file}</button>
+      </div>
+    `;
+    const wrap = card.querySelector('.preview-wrap');
+    if (!t.wide){
+      canvas.style.width = t.display + 'px';
+      canvas.style.height = t.display + 'px';
+    } else {
+      canvas.style.width = '100%';
+      canvas.style.height = 'auto';
+    }
+    wrap.appendChild(canvas);
+    if (guide) wrap.insertAdjacentHTML('beforeend', guide);
+
+    card.querySelector('button').addEventListener('click', () => downloadCanvasPng(canvas, t.file));
+    grid.appendChild(card);
+  }
+
+  targets.forEach(makeIconCard);
+
+  // ICO card
+  (function(){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <h3>favicon.ico</h3>
+      <p class="note">Packs 16 / 32 / 48px into one multi-resolution .ico for legacy browsers &amp; bookmarks.</p>
+      <div class="btn-row"><button type="button" id="icoBtn">Build &amp; download favicon.ico</button></div>
+    `;
+    card.querySelector('#icoBtn').addEventListener('click', async (e) => {
+      const btn = e.target;
+      btn.textContent = 'Building…';
+      const blob = await buildIco();
+      downloadBlob(blob, 'favicon.ico');
+      btn.textContent = 'Build & download favicon.ico';
+    });
+    grid.appendChild(card);
+  })();
+
+  // SVG card
+  (function(){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <h3>favicon.svg</h3>
+      <p class="note">Scalable, used by modern browsers ahead of the .ico.</p>
+      <label class="inline" style="font-size:.78rem;font-weight:400;margin:0">
+        <input type="checkbox" id="svgAdaptive" checked> Adaptive — auto-swap light/dark via prefers-color-scheme
+      </label>
+      <div class="btn-row"><button type="button" id="svgBtn">Download favicon.svg</button></div>
+    `;
+    card.querySelector('#svgBtn').addEventListener('click', () => {
+      const adaptive = card.querySelector('#svgAdaptive').checked;
+      const svg = buildSvg(adaptive);
+      downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'favicon.svg');
+    });
+    grid.appendChild(card);
+  })();
+
+  // Snippets card
+  (function(){
+    const card = document.createElement('div');
+    card.className = 'card wide';
+    card.innerHTML = `
+      <h3>Copy into &lt;head&gt; / project files</h3>
+      <p class="note">Head tags, site.webmanifest, and Open Graph / Twitter tags — generated from the settings on the left. og:url and og:image assume mctrot.nyc; edit before shipping if that changes.</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+        <div>
+          <div class="btn-row" style="margin-bottom:.4rem"><strong style="font-size:.78rem">&lt;head&gt; tags</strong></div>
+          <textarea id="headOut" readonly></textarea>
+          <div class="btn-row" style="margin-top:.4rem"><button type="button" class="secondary" id="headCopy">Copy</button></div>
+        </div>
+        <div>
+          <div class="btn-row" style="margin-bottom:.4rem"><strong style="font-size:.78rem">site.webmanifest</strong></div>
+          <textarea id="manifestOut" readonly></textarea>
+          <div class="btn-row" style="margin-top:.4rem"><button type="button" class="secondary" id="manifestCopy">Copy</button></div>
+        </div>
+        <div>
+          <div class="btn-row" style="margin-bottom:.4rem"><strong style="font-size:.78rem">Open Graph / Twitter</strong></div>
+          <textarea id="ogOut" readonly></textarea>
+          <div class="btn-row" style="margin-top:.4rem"><button type="button" class="secondary" id="ogCopy">Copy</button></div>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    card.querySelector('#headCopy').addEventListener('click', (e) => copyText(card.querySelector('#headOut').value, e.target));
+    card.querySelector('#manifestCopy').addEventListener('click', (e) => copyText(card.querySelector('#manifestOut').value, e.target));
+    card.querySelector('#ogCopy').addEventListener('click', (e) => copyText(card.querySelector('#ogOut').value, e.target));
+  })();
+
+  function renderAll(){
+    Object.values(canvasesById).forEach(({ canvas, target }) => renderIcon(canvas, target));
+    document.getElementById('headOut').value = buildHeadTags();
+    document.getElementById('manifestOut').value = buildManifest();
+    document.getElementById('ogOut').value = buildOgTags();
+  }
+
+  // ---------- wire controls ----------
+
+  const el = id => document.getElementById(id);
+
+  el('text').addEventListener('input', e => { state.text = e.target.value; renderAll(); });
+
+  document.querySelectorAll('input[name="theme"]').forEach(r => {
+    r.addEventListener('change', e => {
+      state.theme = e.target.value;
+      el('customColors').hidden = state.theme !== 'custom';
+      renderAll();
+    });
+  });
+
+  el('bgCustom').addEventListener('input', e => { state.bgCustom = e.target.value; renderAll(); });
+  el('inkCustom').addEventListener('input', e => { state.inkCustom = e.target.value; renderAll(); });
+
+  el('weight').addEventListener('change', e => { state.weight = Number(e.target.value); renderAll(); });
+
+  el('padding').addEventListener('input', e => { state.padding = Number(e.target.value); el('paddingVal').textContent = state.padding + '%'; renderAll(); });
+  el('tracking').addEventListener('input', e => { state.tracking = Number(e.target.value); el('trackingVal').textContent = state.tracking + '%'; renderAll(); });
+  el('nudge').addEventListener('input', e => { state.nudge = Number(e.target.value); el('nudgeVal').textContent = state.nudge + '%'; renderAll(); });
+  el('radius').addEventListener('input', e => { state.radius = Number(e.target.value); el('radiusVal').textContent = state.radius + '%'; renderAll(); });
+
+  el('maskableSafe').addEventListener('change', e => { state.maskableSafe = e.target.checked; renderAll(); });
+  el('smallLetterMode').addEventListener('change', e => { state.smallLetterMode = e.target.checked; renderAll(); });
+  el('smallThreshold').addEventListener('input', e => { state.smallThreshold = Number(e.target.value) || 32; renderAll(); });
+
+  el('resetBtn').addEventListener('click', () => {
+    Object.assign(state, {
+      text: 'McTrot', theme: 'light', bgCustom: '#FFD100', inkCustom: '#0D0D08',
+      weight: 700, padding: 12, tracking: 0, nudge: 0, radius: 0,
+      maskableSafe: true, smallLetterMode: true, smallThreshold: 48,
+    });
+    el('text').value = state.text;
+    document.querySelector('input[name="theme"][value="light"]').checked = true;
+    el('customColors').hidden = true;
+    el('bgCustom').value = state.bgCustom;
+    el('inkCustom').value = state.inkCustom;
+    el('weight').value = String(state.weight);
+    el('padding').value = state.padding; el('paddingVal').textContent = state.padding + '%';
+    el('tracking').value = state.tracking; el('trackingVal').textContent = state.tracking + '%';
+    el('nudge').value = state.nudge; el('nudgeVal').textContent = state.nudge + '%';
+    el('radius').value = state.radius; el('radiusVal').textContent = state.radius + '%';
+    el('maskableSafe').checked = true;
+    el('smallLetterMode').checked = true;
+    el('smallThreshold').value = 48;
+    renderAll();
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
