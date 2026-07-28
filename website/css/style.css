@@ -10,6 +10,7 @@
 
   --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --measure: 38rem;
+  --kern-fix: -0.05em;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -105,6 +106,10 @@ button:focus-visible {
   font-weight: 700;
   font-size: 1.375rem;
   color: var(--ink-1);
+}
+
+.wordmark .kern-fix {
+  margin-left: var(--kern-fix);
 }
 
 nav[aria-label="Primary"] ul {

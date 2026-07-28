@@ -1,8 +1,3 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<style>
-  .dark{ display:none }
-  @media (prefers-color-scheme: dark){ .light{ display:none } .dark{ display:inline } }
-</style>
-<g class="light"><rect width="64" height="64" rx="0.00" fill="#FFD100"/><text x="32" y="32.00" text-anchor="middle" dominant-baseline="central" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="53.63" fill="#0D0D08">M</text></g>
-<g class="dark"><rect width="64" height="64" rx="0.00" fill="#E8B800"/><text x="32" y="32.00" text-anchor="middle" dominant-baseline="central" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="53.63" fill="#0A0A06">M</text></g>
+<g class="mark"><rect width="64" height="64" rx="0.00" fill="#FFD100"/><text x="7.68" y="32.00" text-anchor="start" dominant-baseline="central" font-family='"Helvetica Neue", Helvetica, Arial, sans-serif' font-weight="700" font-size="14.81" fill="#0D0D08">Mc</text><text x="28.87" y="32.00" text-anchor="start" dominant-baseline="central" font-family='"Helvetica Neue", Helvetica, Arial, sans-serif' font-weight="700" font-size="14.81" fill="#0D0D08">Trot</text></g>
 </svg>

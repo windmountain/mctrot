@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>McTrot — Favicon &amp; Social Preview Studio</title>
+<link rel="stylesheet" href="css/style.css">
 <style>
   :root{
     color-scheme: light dark;
@@ -47,6 +48,9 @@
     font-size: 1.375rem;
     font-weight: 700;
     margin: 0 0 .1rem;
+  }
+  .panel h1 .kern-fix{
+    margin-left: var(--kern-fix);
   }
   .panel .sub{
     margin: 0 0 1.5rem;
@@ -221,7 +225,7 @@
 <body>
 
   <div class="panel">
-    <h1>McTrot</h1>
+    <h1>Mc<span class="kern-fix">Trot</span></h1>
     <p class="sub">Favicon &amp; social preview studio</p>
 
     <label for="text">Text</label>
@@ -289,8 +293,29 @@
 
 <script>
 (function(){
-  const LIGHT = { bg: '#FFD100', ink: '#0D0D08' };
-  const DARK  = { bg: '#E8B800', ink: '#0A0A06' };
+  // Pull the actual palette + font out of css/style.css rather than
+  // duplicating hex values here, so this tool stays in sync with the site.
+  function readTheme(theme){
+    const root = document.documentElement;
+    const prev = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', theme);
+    const cs = getComputedStyle(root);
+    const bg = cs.getPropertyValue('--bg').trim();
+    const ink = cs.getPropertyValue('--ink-1').trim();
+    if (prev === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prev);
+    return {
+      bg: bg || (theme === 'dark' ? '#E8B800' : '#FFD100'),
+      ink: ink || (theme === 'dark' ? '#0A0A06' : '#0D0D08'),
+    };
+  }
+
+  const LIGHT = readTheme('light');
+  const DARK  = readTheme('dark');
+  const FONT_STACK = getComputedStyle(document.documentElement).getPropertyValue('--font').trim()
+    || '"Helvetica Neue", Helvetica, Arial, sans-serif';
+  // Same manual c→T kern nudge used by the site's .wordmark .kern-fix span,
+  // read as a fraction-of-em number so canvas/SVG rendering can apply it too.
+  const KERN_FIX = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kern-fix')) || 0;
 
   const state = {
     text: 'McTrot',
@@ -327,7 +352,7 @@
   }
 
   function fontString(size){
-    return `${state.weight} ${size}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    return `${state.weight} ${size}px ${FONT_STACK}`;
   }
 
   function measureTracked(ctx, text, size, trackingFrac){
@@ -338,27 +363,65 @@
     return total - trackingFrac * size;
   }
 
-  function fitFontSize(ctx, text, maxW, maxH, trackingFrac){
+  // Splits "McTrot" into "Mc" / "Trot" so the kern nudge can be inserted
+  // between them specifically, leaving tracking of the other pairs alone.
+  function findKernSplit(text){
+    const idx = text.indexOf('cT');
+    return idx === -1 ? -1 : idx + 1;
+  }
+
+  function measureWord(ctx, text, size, trackingFrac, kernFrac){
+    const splitAt = findKernSplit(text);
+    if (splitAt === -1) return measureTracked(ctx, text, size, trackingFrac);
+    const prefix = text.slice(0, splitAt);
+    const suffix = text.slice(splitAt);
+    return measureTracked(ctx, prefix, size, trackingFrac) + kernFrac * size + measureTracked(ctx, suffix, size, trackingFrac);
+  }
+
+  function fitFontSize(ctx, text, maxW, maxH, trackingFrac, kernFrac){
     let lo = 1, hi = Math.max(2, maxH * 1.4);
     for (let i = 0; i < 22; i++){
       const mid = (lo + hi) / 2;
-      const w = measureTracked(ctx, text, mid, trackingFrac);
+      const w = measureWord(ctx, text, mid, trackingFrac, kernFrac);
       if (w > maxW || mid > maxH * 1.15) hi = mid; else lo = mid;
     }
     return lo;
   }
 
-  function drawTracked(ctx, text, cx, cy, size, trackingFrac){
-    ctx.font = fontString(size);
-    const total = measureTracked(ctx, text, size, trackingFrac);
-    let x = cx - total / 2;
+  function drawTrackedFrom(ctx, text, x, y, size, trackingFrac){
+    if (!text) return;
     const prevAlign = ctx.textAlign;
     ctx.textAlign = 'left';
     for (const ch of text){
-      ctx.fillText(ch, x, cy);
+      ctx.fillText(ch, x, y);
       x += ctx.measureText(ch).width + trackingFrac * size;
     }
     ctx.textAlign = prevAlign;
+  }
+
+  function drawWord(ctx, text, cx, cy, size, trackingFrac, kernFrac){
+    ctx.font = fontString(size);
+    const splitAt = findKernSplit(text);
+    if (splitAt === -1){
+      if (Math.abs(trackingFrac) < 0.0001){
+        const prevAlign = ctx.textAlign;
+        ctx.textAlign = 'center';
+        ctx.fillText(text, cx, cy);
+        ctx.textAlign = prevAlign;
+      } else {
+        const total = measureTracked(ctx, text, size, trackingFrac);
+        drawTrackedFrom(ctx, text, cx - total / 2, cy, size, trackingFrac);
+      }
+      return;
+    }
+    const prefix = text.slice(0, splitAt);
+    const suffix = text.slice(splitAt);
+    const prefixW = measureTracked(ctx, prefix, size, trackingFrac);
+    const suffixW = measureTracked(ctx, suffix, size, trackingFrac);
+    const gap = kernFrac * size;
+    const x0 = cx - (prefixW + gap + suffixW) / 2;
+    drawTrackedFrom(ctx, prefix, x0, cy, size, trackingFrac);
+    drawTrackedFrom(ctx, suffix, x0 + prefixW + gap, cy, size, trackingFrac);
   }
 
   function renderIcon(canvas, target){
@@ -386,20 +449,16 @@
     const maxW = Math.max(1, w - pad*2);
     const maxH = Math.max(1, h - pad*2);
     const trackingFrac = state.tracking/100;
+    const kernFrac = KERN_FIX;
 
-    const size = fitFontSize(ctx, text, maxW, maxH, trackingFrac);
+    const size = fitFontSize(ctx, text, maxW, maxH, trackingFrac, kernFrac);
     ctx.font = fontString(size);
     ctx.fillStyle = ink;
     ctx.textBaseline = 'middle';
     const cx = w/2;
     const cy = h/2 + (state.nudge/100) * h;
 
-    if (Math.abs(trackingFrac) < 0.0001){
-      ctx.textAlign = 'center';
-      ctx.fillText(text, cx, cy);
-    } else {
-      drawTracked(ctx, text, cx, cy, size, trackingFrac);
-    }
+    drawWord(ctx, text, cx, cy, size, trackingFrac, kernFrac);
   }
 
   // ---------- SVG ----------
@@ -408,10 +467,10 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function fitFontSizeSvg(text, maxW, maxH, trackingFrac){
+  function fitFontSizeSvg(text, maxW, maxH, trackingFrac, kernFrac){
     const c = document.createElement('canvas');
     const ctx = c.getContext('2d');
-    return fitFontSize(ctx, text, maxW, maxH, trackingFrac);
+    return fitFontSize(ctx, text, maxW, maxH, trackingFrac, kernFrac);
   }
 
   function buildSvg(adaptive){
@@ -420,18 +479,45 @@
     const pad = (state.padding/100) * Math.min(w,h);
     const maxW = w - pad*2, maxH = h - pad*2;
     const trackingFrac = state.tracking/100;
-    const size = fitFontSizeSvg(text, maxW, maxH, trackingFrac);
+    const kernFrac = KERN_FIX;
+    const size = fitFontSizeSvg(text, maxW, maxH, trackingFrac, kernFrac);
     const r = (state.radius/100) * Math.min(w,h) / 2;
     const cy = h/2 + (state.nudge/100) * h;
     const letterSpacingAttr = Math.abs(trackingFrac) > 0.0001
       ? ` letter-spacing="${(trackingFrac*size).toFixed(2)}"` : '';
 
+    const splitAt = findKernSplit(text);
+    let prefix = '', suffix = '', x0 = w/2, prefixW = 0, gap = 0;
+    if (splitAt !== -1){
+      const measureCanvas = document.createElement('canvas');
+      const mctx = measureCanvas.getContext('2d');
+      mctx.font = `${state.weight} ${size}px ${FONT_STACK}`;
+      prefix = text.slice(0, splitAt);
+      suffix = text.slice(splitAt);
+      prefixW = measureTracked(mctx, prefix, size, trackingFrac);
+      const suffixW = measureTracked(mctx, suffix, size, trackingFrac);
+      gap = kernFrac * size;
+      x0 = w/2 - (prefixW + gap + suffixW) / 2;
+    }
+
+    function textMarkup(ink){
+      if (splitAt === -1){
+        return `<text x="${w/2}" y="${cy.toFixed(2)}" text-anchor="middle" dominant-baseline="central" `
+          + `font-family='${FONT_STACK}' font-weight="${state.weight}" `
+          + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(text)}</text>`;
+      }
+      return `<text x="${x0.toFixed(2)}" y="${cy.toFixed(2)}" text-anchor="start" dominant-baseline="central" `
+          + `font-family='${FONT_STACK}' font-weight="${state.weight}" `
+          + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(prefix)}</text>`
+        + `<text x="${(x0 + prefixW + gap).toFixed(2)}" y="${cy.toFixed(2)}" text-anchor="start" dominant-baseline="central" `
+          + `font-family='${FONT_STACK}' font-weight="${state.weight}" `
+          + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(suffix)}</text>`;
+    }
+
     function group(cls, bg, ink){
       return `<g class="${cls}">`
         + `<rect width="${w}" height="${h}" rx="${r.toFixed(2)}" fill="${bg}"/>`
-        + `<text x="${w/2}" y="${cy.toFixed(2)}" text-anchor="middle" dominant-baseline="central" `
-        + `font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="${state.weight}" `
-        + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(text)}</text>`
+        + textMarkup(ink)
         + `</g>`;
     }
 
