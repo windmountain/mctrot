@@ -7,10 +7,14 @@
   --ink-1: #0D0D08;   /* headline weight */
   --ink-2: #26241A;   /* body weight */
   --rule: var(--ink-1);
-
-  --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font: Helvetica, Arial, sans-serif;
   --measure: 38rem;
   --kern-fix: -0.05em;
+
+  /* Vertical rhythm unit — the body line-box height (1.0625rem × 1.6).
+     Running-text margins below are multiples of this so baselines land
+     on a shared grid. Fluid, clamp()-sized headings sit outside it. */
+  --rhythm: 1.7rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -177,20 +181,20 @@ h1 .line-2 {
 }
 
 .lede {
-  margin: 1.5rem 0 0;
+  margin: calc(var(--rhythm) * 1) 0 0;
   max-width: var(--measure);
   font-size: 1.125rem;
   color: var(--ink-2);
 }
 
 .lede-secondary {
-  margin: 0.75rem 0 0;
+  margin: calc(var(--rhythm) * 0.5) 0 0;
   max-width: var(--measure);
   color: var(--ink-2);
 }
 
 .more {
-  margin: 2.5rem 0 0;
+  margin: calc(var(--rhythm) * 1.5) 0 0;
   font-size: 1.0625rem;
   color: var(--ink-2);
 }
@@ -218,7 +222,7 @@ h1 .line-2 {
 }
 
 .tldr {
-  margin: 1rem 0 0;
+  margin: calc(var(--rhythm) * 0.5) 0 0;
   max-width: var(--measure);
   color: var(--ink-2);
 }
@@ -229,7 +233,7 @@ h1 .line-2 {
 }
 
 .page-body h2 {
-  margin: 2.25rem 0 0.75rem;
+  margin: calc(var(--rhythm) * 1.5) 0 calc(var(--rhythm) * 0.5);
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--ink-1);
@@ -242,7 +246,7 @@ h1 .line-2 {
 .page-body p,
 .page-body ul,
 .page-body ol {
-  margin: 0 0 1rem;
+  margin: 0 0 calc(var(--rhythm) * 1);
   color: var(--ink-2);
 }
 
@@ -252,7 +256,7 @@ h1 .line-2 {
 }
 
 .page-body li + li {
-  margin-top: 0.4rem;
+  margin-top: calc(var(--rhythm) * 0.25);
 }
 
 .page-body a {
@@ -270,7 +274,7 @@ table.records {
 table.records th,
 table.records td {
   text-align: left;
-  padding: 0.6rem 1rem 0.6rem 0;
+  padding: calc(var(--rhythm) * 0.25) 1rem calc(var(--rhythm) * 0.25) 0;
   border-bottom: 1px solid var(--rule);
   font-variant-numeric: tabular-nums;
 }
@@ -304,7 +308,7 @@ table.records td {
 .footer-inner {
   padding: 1.75rem 0 2.5rem;
   display: grid;
-  gap: 0.75rem;
+  gap: calc(var(--rhythm) * 0.5);
 }
 
 .boilerplate {
