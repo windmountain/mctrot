@@ -25,6 +25,45 @@
   <link rel="prefetch" href="/route.html">
   <link rel="prefetch" href="/rules.html">
   <link rel="prefetch" href="/results.html">
+
+  <!-- Temporary rhythm-testing overlay — safe to delete once you're done checking baselines. -->
+  <style>
+    .rhythm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 0, 0, 0.35) 0,
+        rgba(255, 0, 0, 0.35) 1px,
+        transparent 1px,
+        transparent 1.7rem
+      );
+    }
+    .rhythm-overlay.is-active {
+      display: block;
+    }
+    .rhythm-toggle {
+      display: none;
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      z-index: 10000;
+      font: 700 0.8rem/1 Helvetica, Arial, sans-serif;
+      padding: 0.5rem 0.75rem;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.7;
+    }
+    .rhythm-toggle:hover {
+      opacity: 1;
+    }
+  </style>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -75,5 +114,21 @@
       </ul>
     </div>
   </footer>
+
+  <!-- Temporary rhythm-testing overlay — safe to delete once you're done checking baselines. -->
+  <div class="rhythm-overlay" id="rhythmOverlay"></div>
+  <button class="rhythm-toggle" id="rhythmToggle" type="button">Grid: off</button>
+  <script>
+    (function(){
+      if (location.protocol !== 'file:') return;
+      var overlay = document.getElementById('rhythmOverlay');
+      var toggle = document.getElementById('rhythmToggle');
+      toggle.style.display = 'block';
+      toggle.addEventListener('click', function(){
+        var active = overlay.classList.toggle('is-active');
+        toggle.textContent = 'Grid: ' + (active ? 'on' : 'off');
+      });
+    })();
+  </script>
 </body>
 </html>
