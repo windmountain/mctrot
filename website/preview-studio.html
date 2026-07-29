@@ -363,6 +363,18 @@
     return total - trackingFrac * size;
   }
 
+  // Sums per-glyph widths the same way drawTrackedFrom paints them, so a
+  // split segment's measured width always matches its actual drawn width —
+  // ctx.measureText(wholeString) can differ slightly from that sum because
+  // it lets the font apply kerning between letters that get drawn as
+  // separate fillText calls (which see no shaping context from neighbors).
+  function measureCharSum(ctx, text, size, trackingFrac){
+    ctx.font = fontString(size);
+    let total = 0;
+    for (const ch of text) total += ctx.measureText(ch).width + trackingFrac * size;
+    return total - trackingFrac * size;
+  }
+
   // Splits "McTrot" into "Mc" / "Trot" so the kern nudge can be inserted
   // between them specifically, leaving tracking of the other pairs alone.
   function findKernSplit(text){
@@ -416,8 +428,8 @@
     }
     const prefix = text.slice(0, splitAt);
     const suffix = text.slice(splitAt);
-    const prefixW = measureTracked(ctx, prefix, size, trackingFrac);
-    const suffixW = measureTracked(ctx, suffix, size, trackingFrac);
+    const prefixW = measureCharSum(ctx, prefix, size, trackingFrac);
+    const suffixW = measureCharSum(ctx, suffix, size, trackingFrac);
     const gap = kernFrac * size;
     const x0 = cx - (prefixW + gap + suffixW) / 2;
     drawTrackedFrom(ctx, prefix, x0, cy, size, trackingFrac);

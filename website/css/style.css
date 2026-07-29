@@ -8,7 +8,7 @@
   --ink-2: #26241A;   /* body weight */
   --rule: var(--ink-1);
   --font: Helvetica, Arial, sans-serif;
-  --measure: 38rem;
+  --measure: 39rem;
   --kern-fix: -0.05em;
 
   /* Vertical rhythm unit — the body line-box height (1.0625rem × 1.6).
@@ -46,15 +46,28 @@
 
 html {
   background: var(--bg);
+  height: 100%;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
   color: var(--ink-2);
   font-family: var(--font);
   font-size: 1.0625rem;
   line-height: 1.6;
+}
+
+body.home {
+  background: var(--bg);
+}
+
+header,
+footer {
+  background: var(--bg);
 }
 
 .skip-link {
@@ -145,6 +158,7 @@ nav[aria-label="Primary"] a[aria-current="page"] {
 /* hero */
 
 main {
+  flex: 1 0 auto;
   padding-bottom: 4rem;
 }
 
