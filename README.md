@@ -87,7 +87,18 @@ To generate a PDF chart of the analytics:
 uv run scripts/chart_tsptw_multi_analytics.py
 ```
 
-This writes `tsptw_multi_analytics.pdf` to the project root with two line charts: route length and minimum hours to close, both by pace.
+This writes `output/tsptw_multi_analytics.pdf` with two line charts: route length and minimum hours to close, both by pace.
+
+# Map export
+
+This only depends on `scripts/create_routes.sh` having been run — no TSP solve step required.
+
+```
+./scripts/create_route_pair_segments.sh   # per-pair-tagged, deduplicated sidewalk edges
+uv run scripts/export_map_svg.py          # writes output/mctrot_map.svg
+```
+
+The export reprojects everything to EPSG:2263 (NAD83 / New York Long Island State Plane, US feet) and rotates it 29.0° so Manhattan's street grid runs perfectly vertical. Each sidewalk edge in the output is tagged with a CSS class per location-pair whose route uses it (e.g. `l23-l47`), so a future frontend can toggle one pair's route on and off without duplicating geometry.
 
 # A note on AI
 
