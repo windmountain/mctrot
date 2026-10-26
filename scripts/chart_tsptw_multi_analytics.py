@@ -20,5 +20,5 @@ ax2.set_ylabel("Min hours to close")
 ax2.set_xlabel("Pace (min/mi)")
 
 plt.tight_layout()
-plt.savefig("tsptw_multi_analytics.pdf")
-print("Saved tsptw_multi_analytics.pdf")
+plt.savefig("output/tsptw_multi_analytics.pdf")
+print("Saved output/tsptw_multi_analytics.pdf")

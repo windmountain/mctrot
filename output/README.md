@@ -1,0 +1,1 @@
+This directory is for things that are produced by certain scripts (chart_tsptw_multi_analytics.py, export_map_svg.py). Those things aren't meant to be fed back into the project. Accordingly, this directory will stay empty (except for this README.md) and the output will not be checked in to git.

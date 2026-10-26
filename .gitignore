@@ -21,6 +21,10 @@ devenv.local.yaml
 data/*
 !data/.gitkeep
 
+# output
+output/*
+!output/README.md
+
 # LibreOffice lock files
 .~lock*
 
