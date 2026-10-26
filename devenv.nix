@@ -9,6 +9,9 @@
     pkgs.git
     pkgs.jq
     pkgs.postgresql_18 # for psql, see below note on services.postgres
+    pkgs.elmPackages.elm # website/build.sh
+    pkgs.elmPackages.elm-test
+    pkgs.terser
   ];
 
   dotenv.enable = true;

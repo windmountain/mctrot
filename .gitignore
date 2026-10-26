@@ -37,3 +37,6 @@ shoe-deal/*.log
 
 # special projects
 *radio
+
+# elm
+elm-stuff/

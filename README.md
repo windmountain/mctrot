@@ -100,6 +100,22 @@ uv run scripts/export_map_svg.py          # writes output/mctrot_map.svg
 
 The export reprojects everything to EPSG:2263 (NAD83 / New York Long Island State Plane, US feet) and rotates it 29.0° so Manhattan's street grid runs perfectly vertical. Each sidewalk edge in the output is tagged with a CSS class per location-pair whose route uses it (e.g. `l23-l47`), so a future frontend can toggle one pair's route on and off without duplicating geometry.
 
+# Website
+
+`website/` holds the hand-written pages of mctrot.nyc plus the Elm source (`website/src/`) for `simulator.html`. The deployable site is `website/build/`, which is committed. Rebuild it after changing any page, CSS, or Elm:
+
+```
+devenv shell -- website/build.sh   # copies public pages/assets, compiles Elm to build/js/simulator.js
+```
+
+Elm tests: `cd website && elm-test`.
+
+The simulator's map data is generated separately from `website/data/mctrot_map.svg` (a copy of an earlier `output/mctrot_map.svg` export):
+
+```
+uv run website/data/generate_map_data.py   # writes website/src/MctrotMapData.elm and website/css/mctrot-map.css
+```
+
 # A note on AI
 
 This GIS endeavor began in 2024 with the usual kind of Googling around for stuff. In 2026 I started using Claude pretty heavily to build on what's here and go on side quests like the route optimization.

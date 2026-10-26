@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulator — McTrot</title>
+  <meta name="description" content="A simulated annealing search for a McTrot route, run in the browser.">
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#FFD100">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Simulator — McTrot">
+  <meta property="og:description" content="A simulated annealing search for a McTrot route.">
+  <meta property="og:image" content="https://mctrot.nyc/og-image.png">
+  <meta property="og:url" content="https://mctrot.nyc/simulator.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://mctrot.nyc/og-image.png">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/mctrot-map.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header>
+    <div class="wrap header-inner">
+      <a class="wordmark" href="/">Mc<span class="kern-fix">Trot</span></a>
+      <nav aria-label="Primary">
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="route.html">Route</a></li>
+          <li><a href="rules.html">Rules</a></li>
+          <li><a href="results.html">Results</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="wrap">
+      <div class="page-head">
+        <h1>Simulator</h1>
+        <p class="tldr">
+          This simulator searches for a short route through all 47 of
+          Manhattan&rsquo;s McDonald&rsquo;s using
+          <a href="https://en.wikipedia.org/wiki/Simulated_annealing">simulated annealing</a>.
+          The route ends at 160 Broadway. Arriving at a closed restaurant
+          means waiting for it to open.
+        </p>
+        <p>
+          Start date and time determine which restaurants are open when.
+          Pace converts walking distance to time. Seed fixes the random
+          choices, so the same inputs give the same result. Changes apply on
+          restart. The result is one possible route, not a recommended or
+          official one. See <a href="route.html">Route</a>.
+        </p>
+      </div>
+
+      <div id="simulator">
+        <noscript><p>The simulator requires JavaScript.</p></noscript>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <p class="boilerplate">
+        Questions and new results:
+        <a href="mailto:admin@mctrot.nyc">admin@mctrot.nyc</a>.
+      </p>
+      <ul class="footer-links">
+        <li><a href="https://www.instagram.com/mctrot.nyc/">Instagram</a></li>
+        <li><a href="https://github.com/windmountain/mctrot">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script src="js/simulator.js"></script>
+  <script>Elm.Simulator.init({ node: document.getElementById("simulator") });</script>
+</body>
+</html>

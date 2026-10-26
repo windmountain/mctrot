@@ -9,6 +9,11 @@ sensible non-JS alternative — and even then, the site must keep working with
 JS disabled. Don't reach for a script to solve something CSS or plain HTML
 can do.
 
+The one exception is `simulator.html`, an interactive Elm demo that
+requires JS (it shows a `<noscript>` note without it). It's unlinked for
+now (a soft secret), and every other page must keep working with JS
+disabled.
+
 ## Browsers
 
 Broad, conservative support. Old iPhones stuck on outdated iOS (and therefore

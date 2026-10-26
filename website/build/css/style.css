@@ -1,0 +1,374 @@
+/* McTrot — shared styles. Plain CSS, no build step. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #FFD100;
+  --ink-1: #0D0D08;   /* headline weight */
+  --ink-2: #26241A;   /* body weight */
+  --rule: var(--ink-1);
+  --font: Helvetica, Arial, sans-serif;
+  --measure: 39rem;
+  --kern-fix: -0.05em;
+
+  /* Vertical rhythm unit — the body line-box height (1.0625rem × 1.6).
+     Running-text margins below are multiples of this so baselines land
+     on a shared grid. Fluid, clamp()-sized headings sit outside it. */
+  --rhythm: 1.7rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #E8B800;
+    --ink-1: #0A0A06;
+    --ink-2: #201F14;
+    --rule: rgba(10, 10, 6, 0.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #E8B800;
+  --ink-1: #0A0A06;
+  --ink-2: #201F14;
+  --rule: rgba(10, 10, 6, 0.3);
+}
+
+:root[data-theme="light"] {
+  --bg: #FFD100;
+  --ink-1: #0D0D08;
+  --ink-2: #26241A;
+  --rule: rgba(13, 13, 8, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: var(--ink-2);
+  font-family: var(--font);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+body.home {
+  background: var(--bg);
+}
+
+header,
+footer {
+  background: var(--bg);
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--ink-1);
+  color: var(--bg);
+  padding: 0.5em 1em;
+  z-index: 10;
+}
+
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+a {
+  color: inherit;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--ink-1);
+  outline-offset: 3px;
+}
+
+.wrap {
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .wrap {
+    padding: 0 0.5em;
+  }
+}
+
+/* header */
+
+.header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding-top: 2rem;
+  padding-bottom: 1rem;
+}
+
+.wordmark {
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.375rem;
+  color: var(--ink-1);
+}
+
+.wordmark .kern-fix {
+  margin-left: var(--kern-fix);
+}
+
+nav[aria-label="Primary"] ul {
+  list-style: none;
+  display: flex;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+}
+
+nav[aria-label="Primary"] a {
+  text-decoration: none;
+  color: var(--ink-2);
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid transparent;
+}
+
+nav[aria-label="Primary"] a:hover,
+nav[aria-label="Primary"] a:focus-visible {
+  border-bottom-color: var(--ink-2);
+}
+
+nav[aria-label="Primary"] a[aria-current="page"] {
+  color: var(--ink-1);
+  font-weight: 700;
+  border-bottom-color: var(--ink-1);
+}
+
+/* hero */
+
+main {
+  flex: 1 0 auto;
+  padding-bottom: 4rem;
+}
+
+h1 {
+  margin: 0 0 0.25em;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--ink-1);
+}
+
+.hero {
+  max-width: 46rem;
+  padding: clamp(2.5rem, 10vh, 6rem) 0 clamp(2rem, 6vh, 3.5rem);
+}
+
+.hero h1 {
+  font-size: clamp(2.5rem, 8vw, 5.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+h1 .line-1 {
+  display: block;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+h1 .line-2 {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.lede {
+  margin: calc(var(--rhythm) * 1) 0 0;
+  max-width: var(--measure);
+  font-size: 1.125rem;
+  color: var(--ink-2);
+}
+
+.lede-secondary {
+  margin: calc(var(--rhythm) * 0.5) 0 0;
+  max-width: var(--measure);
+  color: var(--ink-2);
+}
+
+.more {
+  margin: calc(var(--rhythm) * 1.5) 0 0;
+  font-size: 1.0625rem;
+  color: var(--ink-2);
+}
+
+.more a {
+  color: var(--ink-1);
+  text-decoration: underline;
+  text-underline-offset: 0.1em;
+}
+
+.more a:hover,
+.more a:focus-visible {
+  text-decoration-color: var(--ink-1);
+}
+
+/* content pages */
+
+.page-head {
+  max-width: var(--measure);
+  padding: clamp(2rem, 8vh, 3.5rem) 0 2.5rem;
+}
+
+.page-head h1 {
+  font-size: clamp(1.875rem, 5vw, 2.75rem);
+}
+
+.tldr {
+  margin: calc(var(--rhythm) * 0.5) 0 0;
+  max-width: var(--measure);
+  color: var(--ink-2);
+}
+
+.page-body {
+  max-width: var(--measure);
+  padding-bottom: 4rem;
+}
+
+.page-body h2 {
+  margin: calc(var(--rhythm) * 1.5) 0 calc(var(--rhythm) * 0.5);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.page-body h2:first-child {
+  margin-top: 0;
+}
+
+.page-body p,
+.page-body ul,
+.page-body ol {
+  margin: 0 0 calc(var(--rhythm) * 1);
+  color: var(--ink-2);
+}
+
+.page-body ul,
+.page-body ol {
+  padding-left: 1.25rem;
+}
+
+.page-body li + li {
+  margin-top: calc(var(--rhythm) * 0.25);
+}
+
+.page-body a {
+  color: var(--ink-1);
+  text-decoration: underline;
+  text-underline-offset: 0.1em;
+}
+
+table.records {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+}
+
+table.records th,
+table.records td {
+  text-align: left;
+  padding: calc(var(--rhythm) * 0.25) 1rem calc(var(--rhythm) * 0.25) 0;
+  border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums;
+}
+
+table.records th {
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+table.records td {
+  color: var(--ink-2);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* footer */
+
+.footer-inner {
+  padding: 1.75rem 0 2.5rem;
+  display: grid;
+  gap: calc(var(--rhythm) * 0.5);
+}
+
+.boilerplate {
+  margin: 0;
+  max-width: var(--measure);
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.boilerplate a {
+  color: var(--ink-2);
+  text-decoration: underline;
+}
+
+.footer-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.footer-links a {
+  color: var(--ink-2);
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  header nav,
+  .skip-link,
+  footer {
+    display: none;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
