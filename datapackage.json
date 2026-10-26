@@ -231,6 +231,57 @@
           "title": "Open Data Commons Public Domain Dedication and License"
         }
       ]
+    },
+    {
+      "name": "pedestrian-network-flows",
+      "title": "NYC Pedestrian Network with Estimated Foot-Traffic Flows",
+      "description": "Citywide pedestrian network (315,577 segments) with estimated pedestrian volumes by trip type and time-of-day, calibrated against 2018-2019 observed foot-traffic counts. Supplementary Data 1 from Sevtsuk, Basu, Liu, Alhassan & Kollar (2025), 'Spatial distribution of foot traffic in New York City and applications for urban planning,' Nature Cities.",
+      "path": "data/pedestrian-network-flows.zip",
+      "format": "zip",
+      "mediatype": "application/zip",
+      "sources": [
+        {
+          "title": "Spatial distribution of foot traffic in New York City and applications for urban planning — Supplementary Data 1",
+          "path": "https://www.nature.com/articles/s44284-025-00383-y",
+          "api": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs44284-025-00383-y/MediaObjects/44284_2025_383_MOESM3_ESM.zip"
+        }
+      ],
+      "hash": "sha256:84d83d7d23760d33d77d9e8fec81e0ab9f24150f3899befc6d888eb9442149c7",
+      "accessed": "2026-08-02"
+    },
+    {
+      "name": "pedestrian-network-flows-metadata",
+      "title": "NYC Pedestrian Network Field Metadata",
+      "description": "Field-level metadata describing the columns in pedestrian-network-flows: estimated and observed pedestrian volumes by time period and trip type, calibration flags, and projection info. Supplementary Data 1 Metadata from Sevtsuk et al. (2025), Nature Cities.",
+      "path": "data/pedestrian-network-flows-metadata.txt",
+      "format": "txt",
+      "mediatype": "text/plain",
+      "sources": [
+        {
+          "title": "Spatial distribution of foot traffic in New York City and applications for urban planning — Supplementary Data 1 Metadata",
+          "path": "https://www.nature.com/articles/s44284-025-00383-y",
+          "api": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs44284-025-00383-y/MediaObjects/44284_2025_383_MOESM4_ESM.txt"
+        }
+      ],
+      "hash": "sha256:ff6af13df1e6a6c79a02e0aab207c2af0c51deac42ee504d29cffaa3502d56e4",
+      "accessed": "2026-08-02"
+    },
+    {
+      "name": "pedestrian-network-calibrated-models",
+      "title": "NYC Pedestrian Flow Calibrated Models",
+      "description": "Calibrated pedestrian-flow model files (.pckl) underlying the volume estimates in pedestrian-network-flows. Supplementary Data 2 from Sevtsuk et al. (2025), Nature Cities.",
+      "path": "data/pedestrian-network-calibrated-models.zip",
+      "format": "zip",
+      "mediatype": "application/zip",
+      "sources": [
+        {
+          "title": "Spatial distribution of foot traffic in New York City and applications for urban planning — Supplementary Data 2",
+          "path": "https://www.nature.com/articles/s44284-025-00383-y",
+          "api": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs44284-025-00383-y/MediaObjects/44284_2025_383_MOESM5_ESM.zip"
+        }
+      ],
+      "hash": "sha256:1423271acb811a2a65c0639b0a6b6d6b39574608a5711d628840dfadfb554db9",
+      "accessed": "2026-08-02"
     }
   ]
 }
