@@ -1,7 +1,7 @@
 module Simulator exposing (main)
 
 {-| The interactive route simulator on simulator.html, mounted with
-`Elm.Simulator.init({ node, flags: today })` (see `init`).
+`Elm.Simulator.init({ node, flags: defaultStartDate })` (see `init`).
 
   - The energy function isn't a simple sum of edge weights — it has to walk
     the tour in order, carrying an accumulated clock forward, because
@@ -462,11 +462,12 @@ startSearch model =
     }
 
 
-{-| `today` is the visitor's local date as `YYYY-MM-DD`, passed in as a flag
-by simulator.html, so the first run starts on the day they're looking at it.
+{-| `defaultStartDate` is the next Nov 21 (today or later) in the visitor's
+local time, as `YYYY-MM-DD`, passed in as a flag by simulator.html — the
+year depends on the visitor's clock, which Elm can't read synchronously.
 -}
 init : String -> ( Model, Cmd Msg )
-init today =
+init defaultStartDate =
     let
         speedInput =
             String.fromFloat defaultMinutesPerMile
@@ -478,10 +479,10 @@ init today =
             "1"
 
         startDate =
-            today
+            defaultStartDate
 
         startTimeOfDay =
-            "06:00"
+            "02:00"
 
         activeStart =
             { weekday = mondayIndexedWeekday startDate
@@ -627,6 +628,7 @@ view model =
                     Html.div []
                         [ Html.p [ Attr.style "color" "#666", Attr.style "font-size" "0.85rem", Attr.style "margin" "0 0 0.5rem 0" ]
                             [ Html.text "Pink bands are hours a restaurant is closed. Blue bars are time spent at a restaurant. Orange bars also include waiting for it to open." ]
+                        , viewTimeAxis model.activeStart viewMax
                         , Svg.svg
                             [ SvgAttr.width (String.fromFloat timelineWidth)
                             , SvgAttr.height (String.fromFloat (rowHeight * toFloat (List.length visits) + 10))
@@ -926,6 +928,125 @@ readout label value =
 xScale : Int -> Float -> Float
 xScale viewMax elapsedMinutes =
     elapsedMinutes * (timelineWidth / toFloat viewMax)
+
+
+timeAxisHeight : Float
+timeAxisHeight =
+    26
+
+
+{-| The schedule's x-axis, drawn as its own row above the visits on the
+same `xScale`: a tick every 15 minutes of clock time, taller ticks on the
+hour, and hour labels ("8 PM") spaced out to every 2, 3, ... hours when a
+long route squeezes them closer than `minLabelSpacing` pixels. Labels too
+close to either end to fit are left off.
+-}
+viewTimeAxis : StartTime -> Int -> Html msg
+viewTimeAxis startTime viewMax =
+    let
+        minLabelSpacing =
+            44
+
+        pixelsPerHour =
+            xScale viewMax 60
+
+        labelEveryHours =
+            [ 1, 2, 3, 4, 6, 12, 24 ]
+                |> List.filter (\hours -> toFloat hours * pixelsPerHour >= minLabelSpacing)
+                |> List.head
+                |> Maybe.withDefault 24
+
+        baseline =
+            timeAxisHeight - 2
+
+        firstQuarter =
+            modBy 15 (15 - modBy 15 startTime.minutes)
+
+        tick elapsed =
+            let
+                clock =
+                    modBy dayLength (startTime.minutes + elapsed)
+
+                isHour =
+                    modBy 60 clock == 0
+
+                x =
+                    xScale viewMax (toFloat elapsed)
+
+                tickLine =
+                    Svg.line
+                        [ SvgAttr.x1 (String.fromFloat x)
+                        , SvgAttr.x2 (String.fromFloat x)
+                        , SvgAttr.y1 (String.fromFloat baseline)
+                        , SvgAttr.y2
+                            (String.fromFloat
+                                (if isHour then
+                                    baseline - 8
+
+                                 else
+                                    baseline - 4
+                                )
+                            )
+                        , SvgAttr.stroke "#999"
+                        ]
+                        []
+
+                fitsLabel =
+                    x >= 16 && x <= timelineWidth - 16
+            in
+            if isHour && modBy labelEveryHours (clock // 60) == 0 && fitsLabel then
+                [ tickLine
+                , Svg.text_
+                    [ SvgAttr.x (String.fromFloat x)
+                    , SvgAttr.y (String.fromFloat (baseline - 11))
+                    , SvgAttr.textAnchor "middle"
+                    , SvgAttr.fontSize "11"
+                    , SvgAttr.fill "#333"
+                    ]
+                    [ Svg.text (formatHour (clock // 60)) ]
+                ]
+
+            else
+                [ tickLine ]
+    in
+    Svg.svg
+        [ SvgAttr.width (String.fromFloat timelineWidth)
+        , SvgAttr.height (String.fromFloat timeAxisHeight)
+        , Attr.style "display" "block"
+        ]
+        (Svg.line
+            [ SvgAttr.x1 "0"
+            , SvgAttr.x2 (String.fromFloat timelineWidth)
+            , SvgAttr.y1 (String.fromFloat baseline)
+            , SvgAttr.y2 (String.fromFloat baseline)
+            , SvgAttr.stroke "#999"
+            ]
+            []
+            :: (List.range 0 ((viewMax - firstQuarter) // 15)
+                    |> List.concatMap (\i -> tick (firstQuarter + i * 15))
+               )
+        )
+
+
+{-| An hour of the day (0-23) on a 12-hour clock: "12 AM", "8 PM".
+-}
+formatHour : Int -> String
+formatHour hour =
+    let
+        twelveHour =
+            if modBy 12 hour == 0 then
+                12
+
+            else
+                modBy 12 hour
+    in
+    String.fromInt twelveHour
+        ++ (if hour < 12 then
+                " AM"
+
+            else
+                " PM"
+           )
 
 
 viewRow : StartTime -> Int -> Int -> Visit -> List (Svg msg)

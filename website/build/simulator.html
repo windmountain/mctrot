@@ -81,14 +81,17 @@
 
   <script src="js/simulator.js"></script>
   <script>
-    // Local date, not toISOString(), which is UTC and can be off by a day.
-    var d = new Date();
-    var today = [
-      d.getFullYear(),
-      String(d.getMonth() + 1).padStart(2, "0"),
-      String(d.getDate()).padStart(2, "0")
-    ].join("-");
-    Elm.Simulator.init({ node: document.getElementById("simulator"), flags: today });
+    // Default start: the next Nov 21, today or later, by the visitor's local
+    // date (not toISOString(), which is UTC and can be off by a day).
+    var now = new Date();
+    var year = now.getFullYear();
+    if (now.getMonth() > 10 || (now.getMonth() === 10 && now.getDate() > 21)) {
+      year += 1;
+    }
+    Elm.Simulator.init({
+      node: document.getElementById("simulator"),
+      flags: year + "-11-21"
+    });
   </script>
 </body>
 </html>
