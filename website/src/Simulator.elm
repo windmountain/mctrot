@@ -15,9 +15,10 @@ module Simulator exposing (main)
 Every McDonald's location in Manhattan (as of the last scrape), named by their real nicknames and
 real per-weekday hours, connected by real walking distances in meters — all
 generated into `McdData` from the database by
-scripts/export_simulator_data.py. This is an open path, not a round
-trip: it can start at any location, but must end at "OCCUPY" (160
-Broadway). Some locations are open 24 hours; the rest have real weekly
+scripts/export_simulator_data.py. This is an open path: the start and
+end locations are each either picked in the UI or left "Flexible" for the
+search to choose (by default it runs from the northernmost location to the
+southernmost; see `stops`). Some locations are open 24 hours; the rest have real weekly
 schedules — including days that are fully open, days that close at midnight,
 and one or two nights that run past midnight into the next calendar day —
 and arriving while closed means waiting for the next opening, which the UI's
@@ -119,17 +120,15 @@ travelTime metersPerMinute from to =
         |> round
 
 
-{-| The route must finish here: "OCCUPY", 160 Broadway. Looked up by name
-rather than hardcoded so it stays correct if `cities` is ever reordered.
+{-| Every city index, north to south along the street grid
+(`MctrotMapData.locationCoords` is already rotated so the grid runs
+vertically, with y growing southward). Orders the start/end pickers and
+gives their defaults: the northernmost start and the southernmost end.
 -}
-endIndex : Int
-endIndex =
-    cities
-        |> Array.toIndexedList
-        |> List.filter (\( _, city ) -> city.name == "OCCUPY")
-        |> List.head
-        |> Maybe.map Tuple.first
-        |> Maybe.withDefault 0
+northToSouth : List Int
+northToSouth =
+    List.range 0 (Array.length cities - 1)
+        |> List.sortBy (\i -> Array.get i MctrotMapData.locationCoords |> Maybe.map Tuple.second |> Maybe.withDefault 0)
 
 
 {-| Parses the value of an `<input type="time">` ("HH:MM") into minutes
@@ -222,7 +221,8 @@ weekLength =
 
 {-| The conditions a run is pinned to: which day of the week it begins on
 (Monday-indexed, 0..6), what time of day, how fast travel between stops
-is, and how long is spent at each stop. Bundled together because they're
+is, how long is spent at each stop, and which locations (if any) the
+route must start and end at (`Nothing` = flexible). Bundled together because they're
 all snapshotted at the same moment — when a search (re)starts — so the
 energy function stays fixed for the life of that search.
 -}
@@ -231,7 +231,16 @@ type alias StartTime =
     , minutes : Int
     , metersPerMinute : Float
     , stopMinutes : Int
+    , startCity : Maybe Int
+    , endCity : Maybe Int
     }
+
+
+{-| Parses a start/end `<select>` value: a city index, or "" for flexible.
+-}
+parseCity : String -> Maybe Int
+parseCity raw =
+    String.toInt raw
 
 
 {-| `arrival` is minutes elapsed since the tour began; this converts that
@@ -267,9 +276,9 @@ waitForCity openWindows startTime arrival =
 
 
 
--- SOLUTION: a tour is a permutation of every non-finish city index,
--- visited in order. The first stop is wherever the route starts; `simulate`
--- appends the fixed finish (`endIndex`) as the last stop.
+-- SOLUTION: a tour is a permutation of every city index that isn't a fixed
+-- start or end, visited in order; `stops` puts the fixed ones (if any)
+-- around it.
 
 
 type alias Tour =
@@ -287,9 +296,17 @@ type alias Visit =
     }
 
 
-{-| Walk the tour in order starting at `startTime` from wherever the tour
-begins, carrying the clock forward leg by leg, then travel on to the fixed
-finish (`endIndex`). This is why the energy function can't just sum edge
+{-| The full visiting order: the fixed start (if any), the tour, then the
+fixed end (if any). If start and end are the same location, it's a round
+trip and that location appears at both ends.
+-}
+stops : StartTime -> Tour -> List Int
+stops startTime tour =
+    List.filterMap identity [ startTime.startCity ] ++ tour ++ List.filterMap identity [ startTime.endCity ]
+
+
+{-| Walk the `stops` in order starting at `startTime`, carrying the clock
+forward leg by leg. This is why the energy function can't just sum edge
 weights: whether (and how long) you wait at a city depends on the
 accumulated time — and now the day of the week — when you get there, not
 on the edge alone. Every stop, including the first and the finish, adds
@@ -297,7 +314,7 @@ on the edge alone. Every stop, including the first and the finish, adds
 -}
 simulate : StartTime -> Tour -> List Visit
 simulate startTime tour =
-    case tour of
+    case stops startTime tour of
         [] ->
             []
 
@@ -323,7 +340,7 @@ simulate startTime tour =
                     ( cityIndex, departure, { cityIndex = cityIndex, arrival = arrival, wait = wait, departure = departure } :: visits )
 
                 ( _, _, reversedVisits ) =
-                    List.foldl (\c acc -> visitCity acc c) ( first, firstVisit.departure, [] ) (rest ++ [ endIndex ])
+                    List.foldl (\c acc -> visitCity acc c) ( first, firstVisit.departure, [] ) rest
             in
             firstVisit :: List.reverse reversedVisits
 
@@ -341,21 +358,20 @@ totalMinutes startTime tour =
         |> Maybe.withDefault 0
 
 
-{-| Road distance for the tour's full route (including its fixed final leg
-to `endIndex`), in meters — unlike `totalMinutes`, this doesn't depend on
-pace or waiting, so it's the same regardless of the run's start settings.
+{-| Road distance for the full route (see `stops`), in meters — unlike
+`totalMinutes`, this doesn't depend on pace or waiting.
 -}
-totalDistanceMeters : Tour -> Int
-totalDistanceMeters tour =
+totalDistanceMeters : StartTime -> Tour -> Int
+totalDistanceMeters startTime tour =
     let
-        stops =
-            tour ++ [ endIndex ]
+        route =
+            stops startTime tour
     in
-    List.map2 distanceBetween stops (List.drop 1 stops) |> List.sum
+    List.map2 distanceBetween route (List.drop 1 route) |> List.sum
 
 
 {-| Reverse a random contiguous segment of the visiting order — a 2-opt move
-over the stops before the fixed final one.
+over the stops between any fixed start and end.
 -}
 twoOptNeighbor : Tour -> Random.Generator Tour
 twoOptNeighbor tour =
@@ -397,10 +413,10 @@ config startTime =
     }
 
 
-initialTour : Tour
-initialTour =
+initialTour : StartTime -> Tour
+initialTour startTime =
     List.range 0 (Array.length cities - 1)
-        |> List.filter (\i -> i /= endIndex)
+        |> List.filter (\i -> Just i /= startTime.startCity && Just i /= startTime.endCity)
 
 
 
@@ -416,6 +432,8 @@ type alias Model =
     , speedInput : String
     , stopInput : String
     , seedInput : String
+    , startCityInput : String
+    , endCityInput : String
     , activeStart : StartTime
     , mapVisible : Bool
     , tab : Tab
@@ -436,6 +454,8 @@ type Msg
     | SetSpeedInput String
     | SetStopInput String
     | SetSeedInput String
+    | SetStartCityInput String
+    | SetEndCityInput String
     | ToggleMapVisible
     | SelectTab Tab
 
@@ -453,10 +473,12 @@ startSearch model =
             , minutes = parseStartMinutes model.startTimeOfDay
             , metersPerMinute = metersPerMinuteFromPace (parseMinutesPerMile model.speedInput)
             , stopMinutes = parseStopMinutes model.stopInput
+            , startCity = parseCity model.startCityInput
+            , endCity = parseCity model.endCityInput
             }
     in
     { model
-        | saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed model.seedInput)) initialTour
+        | saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed model.seedInput)) (initialTour activeStart)
         , running = True
         , activeStart = activeStart
     }
@@ -484,14 +506,22 @@ init defaultStartDate =
         startTimeOfDay =
             "02:00"
 
+        startCityInput =
+            List.head northToSouth |> Maybe.map String.fromInt |> Maybe.withDefault ""
+
+        endCityInput =
+            List.Extra.last northToSouth |> Maybe.map String.fromInt |> Maybe.withDefault ""
+
         activeStart =
             { weekday = mondayIndexedWeekday startDate
             , minutes = parseStartMinutes startTimeOfDay
             , metersPerMinute = metersPerMinuteFromPace (parseMinutesPerMile speedInput)
             , stopMinutes = parseStopMinutes stopInput
+            , startCity = parseCity startCityInput
+            , endCity = parseCity endCityInput
             }
     in
-    ( { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) initialTour
+    ( { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) (initialTour activeStart)
       , running = True
       , stepsPerFrame = 1000
       , startDate = startDate
@@ -499,6 +529,8 @@ init defaultStartDate =
       , speedInput = speedInput
       , stopInput = stopInput
       , seedInput = seedInput
+      , startCityInput = startCityInput
+      , endCityInput = endCityInput
       , activeStart = activeStart
       , mapVisible = True
       , tab = MapTab
@@ -539,6 +571,12 @@ update msg model =
 
         SetSeedInput seed ->
             ( { model | seedInput = seed }, Cmd.none )
+
+        SetStartCityInput city ->
+            ( { model | startCityInput = city }, Cmd.none )
+
+        SetEndCityInput city ->
+            ( { model | endCityInput = city }, Cmd.none )
 
         ToggleMapVisible ->
             ( { model | mapVisible = not model.mapVisible }, Cmd.none )
@@ -619,7 +657,7 @@ view model =
             (case model.tab of
                 MapTab ->
                     if model.mapVisible then
-                        viewMap tour
+                        viewMap (stops model.activeStart tour)
 
                     else
                         Html.p [ Attr.style "color" "#666", Attr.style "margin" "0" ] [ Html.text "Map hidden." ]
@@ -641,8 +679,8 @@ view model =
             , readout "Temperature" (String.fromInt (round (SimulatedAnnealing.temperature (config model.activeStart) model.saState)))
             , readout "Current route time" (formatDuration (round (SimulatedAnnealing.currentEnergy model.saState)))
             , readout "Best route time" (formatDuration (round (SimulatedAnnealing.bestEnergy model.saState)))
-            , readout "Current distance" (formatMiles (totalDistanceMeters tour))
-            , readout "Best distance" (formatMiles (totalDistanceMeters (SimulatedAnnealing.best model.saState)))
+            , readout "Current distance" (formatMiles (totalDistanceMeters model.activeStart tour))
+            , readout "Best distance" (formatMiles (totalDistanceMeters model.activeStart (SimulatedAnnealing.best model.saState)))
             ]
         , box "Output"
             -- Disabled until there's a computed route to act on.
@@ -769,21 +807,16 @@ mapDisplayHeight =
     1093
 
 
-{-| One space-separated `lX-lY` token per leg of the tour (the open path,
-plus its fixed final leg to `endIndex`), where X and Y are real `mcd_id`s
+{-| One space-separated `lX-lY` token per leg of the route (see `stops`), where X and Y are real `mcd_id`s
 (see `MctrotMapData.mcdIds`) in ascending order — matching the class-token
 convention already baked into `MctrotMapData.routeEdges`. Setting this as an
 ancestor `data-active` attribute is what lets `css/mctrot-map.css` highlight
 exactly the streets the current tour uses, without Elm ever touching the
 (lazy, otherwise-static) SVG subtree itself.
 -}
-tourEdgeTokens : Tour -> String
-tourEdgeTokens tour =
-    let
-        stops =
-            tour ++ [ endIndex ]
-    in
-    List.map2 pairToken stops (List.drop 1 stops)
+tourEdgeTokens : List Int -> String
+tourEdgeTokens route =
+    List.map2 pairToken route (List.drop 1 route)
         |> String.join " "
 
 
@@ -836,9 +869,9 @@ viewMapStatic () =
         ]
 
 
-viewMap : Tour -> Html msg
-viewMap tour =
-    Html.div [ Attr.attribute "data-active" (tourEdgeTokens tour) ]
+viewMap : List Int -> Html msg
+viewMap route =
+    Html.div [ Attr.attribute "data-active" (tourEdgeTokens route) ]
         [ Html.Lazy.lazy viewMapStatic () ]
 
 
@@ -847,7 +880,8 @@ the week (that matters now, since about a fifth of the cities have real
 hours that vary by weekday), what time, and how fast travel between stops
 is (as a pace in minutes/mile — the units delivery routing usually gets
 quoted in — converted to meters/minute for `travelTime`), and how many
-minutes are spent at each stop (see `simulate`). Editing these
+minutes are spent at each stop (see `simulate`), and where the route
+starts and ends (see `stops`). Editing these
 fields only takes effect the next time the search (re)starts —
 `activeStart` is snapshotted at that point, so nudging any of them mid-run
 can't shift the energy landscape out from under an in-progress search.
@@ -895,6 +929,8 @@ viewRunSettings model =
                 ]
                 []
             ]
+        , viewCitySelect "Start location" model.startCityInput SetStartCityInput
+        , viewCitySelect "End location" model.endCityInput SetEndCityInput
         , Html.label []
             [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Seed" ]
             , Html.input
@@ -914,6 +950,27 @@ viewRunSettings model =
                         "Pick a valid date"
                 )
             ]
+        ]
+
+
+{-| A start/end location picker: "Flexible" (value "") first, then every
+location as "NICKNAME (address)", north to south (see `northToSouth`).
+Option values are city indices (see `parseCity`).
+-}
+viewCitySelect : String -> String -> (String -> Msg) -> Html Msg
+viewCitySelect label selectedValue toMsg =
+    let
+        option value text =
+            Html.option [ Attr.value value, Attr.selected (value == selectedValue) ] [ Html.text text ]
+    in
+    Html.label []
+        [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text label ]
+        , Html.select [ Events.onInput toMsg ]
+            (option "" "Flexible"
+                :: (northToSouth
+                        |> List.filterMap (\i -> Array.get i cities |> Maybe.map (\city -> option (String.fromInt i) (city.name ++ " (" ++ city.address ++ ")")))
+                   )
+            )
         ]
 
 
@@ -1056,7 +1113,7 @@ viewRow startTime viewMax rowIndex visit =
             toFloat rowIndex * rowHeight
 
         city =
-            Array.get visit.cityIndex cities |> Maybe.withDefault (City "?" [ ( 0, weekLength ) ] [])
+            Array.get visit.cityIndex cities |> Maybe.withDefault (City "?" "" [ ( 0, weekLength ) ] [])
 
         arrivalElapsed =
             toFloat (visit.arrival - startTime.minutes)

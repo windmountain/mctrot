@@ -48,12 +48,14 @@
           This simulator searches for a short route through every
           McDonald&rsquo;s in Manhattan using
           <a href="https://en.wikipedia.org/wiki/Simulated_annealing">simulated annealing</a>.
-          The route ends at 160 Broadway. Arriving at a closed restaurant
-          means waiting for it to open.
+          Arriving at a closed restaurant means waiting for it to open.
         </p>
         <p>
           Start date and time determine which restaurants are open when.
-          Pace converts walking distance to time. Seed fixes the random
+          Pace converts walking distance to time. Start and end locations
+          are either fixed or left flexible for the search to choose; by
+          default the route runs from the northernmost location to the
+          southernmost. Seed fixes the random
           choices, so the same inputs give the same result. Changes apply on
           restart. The result is one possible route, not a recommended or
           official one. See <a href="route.html">Route</a>.

@@ -26,7 +26,7 @@ This script transcodes the (merged) SVG into:
     location-pair, so Simulator.elm only ever needs to update a single
     `data-active` attribute at runtime to drive route highlighting.
 
-McdData.elm holds each location's nickname, its weekly open/closed windows
+McdData.elm holds each location's nickname, street address, its weekly open/closed windows
 (see `week_windows`), and the walking-distance matrix.
 
 Re-run this whenever any of those inputs change.
@@ -130,7 +130,10 @@ def week_windows(day_ranges):
 
 def write_mcd_elm(mcd_ids):
     with open(LOCATIONS_CSV, newline="") as f:
-        nicknames = {int(r["id"]): r["nickname"] for r in csv.DictReader(f)}
+        rows = list(csv.DictReader(f))
+    nicknames = {int(r["id"]): r["nickname"] for r in rows}
+    # Just the street line ("160 Broadway"), not ", New York, NY 10038".
+    addresses = {int(r["id"]): r["address"].split(",")[0].strip() for r in rows}
 
     day_ranges = {}
     with open(HOURS_CSV, newline="") as f:
@@ -160,7 +163,7 @@ def write_mcd_elm(mcd_ids):
         assert None not in ranges, f"mcd {mcd_id} is missing hours for some weekday"
         open_windows, closed_windows = week_windows(ranges)
         city_lines.append(
-            f"City {elm_string(nicknames[mcd_id])} {windows_elm(open_windows)} {windows_elm(closed_windows)}"
+            f"City {elm_string(nicknames[mcd_id])} {elm_string(addresses[mcd_id])} {windows_elm(open_windows)} {windows_elm(closed_windows)}"
         )
 
     row_lines = []
@@ -179,7 +182,8 @@ scripts/export_simulator_data.py (or just the generator) instead.
 import Array exposing (Array)
 
 
-{{-| `openWindows`/`closedWindows` are minutes-since-Monday-00:00 in a
+{{-| `address` is the street line only (e.g. "160 Broadway").
+`openWindows`/`closedWindows` are minutes-since-Monday-00:00 in a
 repeating 7-day ({WEEK}-minute) week, from the database's `mcd_hours` view --
 adjacent open days merged together, and any window that crosses the
 Sunday/Monday seam split. Always-open locations get a single `( 0, {WEEK} )`
@@ -189,6 +193,7 @@ has to compute a complement at runtime.
 -}}
 type alias City =
     {{ name : String
+    , address : String
     , openWindows : List ( Int, Int )
     , closedWindows : List ( Int, Int )
     }}
