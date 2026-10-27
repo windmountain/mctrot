@@ -80,6 +80,15 @@
   </footer>
 
   <script src="js/simulator.js"></script>
-  <script>Elm.Simulator.init({ node: document.getElementById("simulator") });</script>
+  <script>
+    // Local date, not toISOString(), which is UTC and can be off by a day.
+    var d = new Date();
+    var today = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, "0"),
+      String(d.getDate()).padStart(2, "0")
+    ].join("-");
+    Elm.Simulator.init({ node: document.getElementById("simulator"), flags: today });
+  </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 module Simulator exposing (main)
 
 {-| The interactive route simulator on simulator.html, mounted with
-`Elm.Simulator.init({ node })`.
+`Elm.Simulator.init({ node, flags: today })` (see `init`).
 
   - The energy function isn't a simple sum of edge weights — it has to walk
     the tour in order, carrying an accumulated clock forward, because
@@ -202,6 +202,29 @@ defaultMinutesPerMile =
     24
 
 
+{-| Parses the value of the stop time `<input type="number">` (whole
+minutes spent at each location). Falls back to the default if the field is
+ever empty, non-numeric, or negative.
+-}
+parseStopMinutes : String -> Int
+parseStopMinutes raw =
+    case String.toInt raw of
+        Just minutes ->
+            if minutes >= 0 then
+                minutes
+
+            else
+                defaultStopMinutes
+
+        Nothing ->
+            defaultStopMinutes
+
+
+defaultStopMinutes : Int
+defaultStopMinutes =
+    5
+
+
 metersPerMinuteFromPace : Float -> Float
 metersPerMinuteFromPace minutesPerMile =
     metersPerMile / minutesPerMile
@@ -325,15 +348,16 @@ weekLength =
 
 
 {-| The conditions a run is pinned to: which day of the week it begins on
-(Monday-indexed, 0..6), what time of day, and how fast travel between
-stops is. Bundled together because they're all snapshotted at the same
-moment — when a search (re)starts — so the energy function stays fixed for
-the life of that search.
+(Monday-indexed, 0..6), what time of day, how fast travel between stops
+is, and how long is spent at each stop. Bundled together because they're
+all snapshotted at the same moment — when a search (re)starts — so the
+energy function stays fixed for the life of that search.
 -}
 type alias StartTime =
     { weekday : Int
     , minutes : Int
     , metersPerMinute : Float
+    , stopMinutes : Int
     }
 
 
@@ -379,6 +403,9 @@ type alias Tour =
     List Int
 
 
+{-| `departure` is `arrival + wait + stopMinutes`: the stop starts once the
+restaurant is open.
+-}
 type alias Visit =
     { cityIndex : Int
     , arrival : Int
@@ -392,7 +419,8 @@ begins, carrying the clock forward leg by leg, then travel on to the fixed
 finish (`endIndex`). This is why the energy function can't just sum edge
 weights: whether (and how long) you wait at a city depends on the
 accumulated time — and now the day of the week — when you get there, not
-on the edge alone.
+on the edge alone. Every stop, including the first and the finish, adds
+`startTime.stopMinutes`.
 -}
 simulate : StartTime -> Tour -> List Visit
 simulate startTime tour =
@@ -406,7 +434,7 @@ simulate startTime tour =
                     waitForCity (openWindowsFor first) startTime 0
 
                 firstVisit =
-                    { cityIndex = first, arrival = startTime.minutes, wait = firstWait, departure = startTime.minutes + firstWait }
+                    { cityIndex = first, arrival = startTime.minutes, wait = firstWait, departure = startTime.minutes + firstWait + startTime.stopMinutes }
 
                 visitCity ( prevCity, clock, visits ) cityIndex =
                     let
@@ -417,7 +445,7 @@ simulate startTime tour =
                             waitForCity (openWindowsFor cityIndex) startTime (arrival - startTime.minutes)
 
                         departure =
-                            arrival + wait
+                            arrival + wait + startTime.stopMinutes
                     in
                     ( cityIndex, departure, { cityIndex = cityIndex, arrival = arrival, wait = wait, departure = departure } :: visits )
 
@@ -513,10 +541,17 @@ type alias Model =
     , startDate : String
     , startTimeOfDay : String
     , speedInput : String
+    , stopInput : String
     , seedInput : String
     , activeStart : StartTime
     , mapVisible : Bool
+    , tab : Tab
     }
+
+
+type Tab
+    = MapTab
+    | ScheduleTab
 
 
 type Msg
@@ -526,8 +561,10 @@ type Msg
     | SetStartDate String
     | SetStartTimeOfDay String
     | SetSpeedInput String
+    | SetStopInput String
     | SetSeedInput String
     | ToggleMapVisible
+    | SelectTab Tab
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -542,6 +579,7 @@ startSearch model =
             { weekday = mondayIndexedWeekday model.startDate
             , minutes = parseStartMinutes model.startTimeOfDay
             , metersPerMinute = metersPerMinuteFromPace (parseMinutesPerMile model.speedInput)
+            , stopMinutes = parseStopMinutes model.stopInput
             }
     in
     { model
@@ -551,17 +589,23 @@ startSearch model =
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+{-| `today` is the visitor's local date as `YYYY-MM-DD`, passed in as a flag
+by simulator.html, so the first run starts on the day they're looking at it.
+-}
+init : String -> ( Model, Cmd Msg )
+init today =
     let
         speedInput =
             String.fromFloat defaultMinutesPerMile
+
+        stopInput =
+            String.fromInt defaultStopMinutes
 
         seedInput =
             "1"
 
         startDate =
-            "2025-01-06"
+            today
 
         startTimeOfDay =
             "06:00"
@@ -570,6 +614,7 @@ init _ =
             { weekday = mondayIndexedWeekday startDate
             , minutes = parseStartMinutes startTimeOfDay
             , metersPerMinute = metersPerMinuteFromPace (parseMinutesPerMile speedInput)
+            , stopMinutes = parseStopMinutes stopInput
             }
     in
     ( { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) initialTour
@@ -578,9 +623,11 @@ init _ =
       , startDate = startDate
       , startTimeOfDay = startTimeOfDay
       , speedInput = speedInput
+      , stopInput = stopInput
       , seedInput = seedInput
       , activeStart = activeStart
       , mapVisible = True
+      , tab = MapTab
       }
     , Cmd.none
     )
@@ -613,11 +660,17 @@ update msg model =
         SetSpeedInput speed ->
             ( { model | speedInput = speed }, Cmd.none )
 
+        SetStopInput stop ->
+            ( { model | stopInput = stop }, Cmd.none )
+
         SetSeedInput seed ->
             ( { model | seedInput = seed }, Cmd.none )
 
         ToggleMapVisible ->
             ( { model | mapVisible = not model.mapVisible }, Cmd.none )
+
+        SelectTab tab ->
+            ( { model | tab = tab }, Cmd.none )
 
 
 
@@ -664,7 +717,7 @@ view model =
     in
     Html.div [ Attr.style "font-family" "sans-serif", Attr.style "max-width" "1100px" ]
         [ viewRunSettings model
-        , Html.div [ Attr.style "margin-top" "0.5rem", Attr.style "display" "flex", Attr.style "gap" "0.5rem" ]
+        , box "Controls"
             [ Html.button [ Events.onClick ToggleRunning, Attr.disabled done ]
                 [ Html.text
                     (if done then
@@ -688,26 +741,26 @@ view model =
                     )
                 ]
             ]
-        , Html.div [ Attr.style "display" "flex", Attr.style "gap" "1rem", Attr.style "align-items" "flex-start" ]
-            [ Html.div []
-                [ sectionHeading "Schedule"
-                , Html.p [ Attr.style "color" "#666", Attr.style "font-size" "0.85rem", Attr.style "margin" "0 0 0.5rem 0" ]
-                    [ Html.text "Pink bands are hours a restaurant is closed. Orange bars are time spent waiting for a restaurant to open." ]
-                , Svg.svg
-                    [ SvgAttr.width (String.fromFloat timelineWidth)
-                    , SvgAttr.height (String.fromFloat (rowHeight * toFloat (List.length visits) + 10))
-                    ]
-                    (List.indexedMap (viewRow model.activeStart viewMax) visits |> List.concat)
-                ]
-            , if model.mapVisible then
-                Html.div []
-                    [ sectionHeading "Map"
-                    , viewMap tour
-                    ]
+        , viewTabs model.tab
+            (case model.tab of
+                MapTab ->
+                    if model.mapVisible then
+                        viewMap tour
 
-              else
-                Html.text ""
-            ]
+                    else
+                        Html.p [ Attr.style "color" "#666", Attr.style "margin" "0" ] [ Html.text "Map hidden." ]
+
+                ScheduleTab ->
+                    Html.div []
+                        [ Html.p [ Attr.style "color" "#666", Attr.style "font-size" "0.85rem", Attr.style "margin" "0 0 0.5rem 0" ]
+                            [ Html.text "Pink bands are hours a restaurant is closed. Blue bars are time spent at a restaurant. Orange bars also include waiting for it to open." ]
+                        , Svg.svg
+                            [ SvgAttr.width (String.fromFloat timelineWidth)
+                            , SvgAttr.height (String.fromFloat (rowHeight * toFloat (List.length visits) + 10))
+                            ]
+                            (List.indexedMap (viewRow model.activeStart viewMax) visits |> List.concat)
+                        ]
+            )
         , Html.div [ Attr.style "margin-top" "0.5rem", Attr.style "display" "flex", Attr.style "gap" "1.5rem" ]
             [ readout "Iteration" (String.fromInt (SimulatedAnnealing.iteration model.saState))
             , readout "Temperature" (String.fromInt (round (SimulatedAnnealing.temperature (config model.activeStart) model.saState)))
@@ -716,12 +769,117 @@ view model =
             , readout "Current distance" (formatMiles (totalDistanceMeters tour))
             , readout "Best distance" (formatMiles (totalDistanceMeters (SimulatedAnnealing.best model.saState)))
             ]
-        , sectionHeading "Distance matrix"
-        , Html.details [ Attr.style "margin-top" "0" ]
-            [ Html.summary [ Attr.style "cursor" "pointer", Attr.style "color" "#666" ]
-                [ Html.text "Show table (meters)" ]
-            , viewCostMatrix
+        , box "Output"
+            -- Disabled until there's a computed route to act on.
+            [ Html.button [ Attr.disabled True ] [ Html.text "Print" ]
+            , Html.button [ Attr.disabled True ] [ Html.text "Download GPX" ]
+            , Html.details [ Attr.style "flex-basis" "100%" ]
+                [ Html.summary [ Attr.style "cursor" "pointer", Attr.style "color" "#666" ]
+                    [ Html.text "Distance matrix (meters)" ]
+                , viewCostMatrix
+                ]
             ]
+        ]
+
+
+{-| A titled group: a `<fieldset>` whose `<legend>` names it.
+-}
+box : String -> List (Html msg) -> Html msg
+box title children =
+    Html.fieldset
+        [ Attr.style "border" "1px solid #999"
+        , Attr.style "margin" "0.75rem 0"
+        , Attr.style "padding" "0.75rem"
+        , Attr.style "display" "flex"
+        , Attr.style "flex-wrap" "wrap"
+        , Attr.style "gap" "0.5rem 1rem"
+        , Attr.style "align-items" "flex-end"
+        ]
+        (Html.legend [ Attr.style "font-weight" "bold", Attr.style "padding" "0 0.25rem" ] [ Html.text title ]
+            :: children
+        )
+
+
+tabLabel : Tab -> String
+tabLabel tab =
+    case tab of
+        MapTab ->
+            "Map"
+
+        ScheduleTab ->
+            "Schedule"
+
+
+tabId : Tab -> String
+tabId tab =
+    "simulator-tab-" ++ String.toLower (tabLabel tab)
+
+
+{-| One bordered rectangle with Map/Schedule tabs along its top edge; only
+the selected tab's panel is rendered, so the hidden one costs nothing per
+frame.
+-}
+viewTabs : Tab -> Html Msg -> Html Msg
+viewTabs selected panel =
+    let
+        viewTab tab =
+            let
+                isSelected =
+                    tab == selected
+            in
+            Html.button
+                [ Attr.attribute "role" "tab"
+                , Attr.id (tabId tab)
+                , Attr.attribute "aria-selected"
+                    (if isSelected then
+                        "true"
+
+                     else
+                        "false"
+                    )
+                , Attr.attribute "aria-controls" "simulator-tabpanel"
+                , Events.onClick (SelectTab tab)
+                , Attr.style "font" "inherit"
+                , Attr.style "padding" "0.4rem 1rem"
+                , Attr.style "margin-bottom" "-1px"
+                , Attr.style "border" "1px solid #999"
+                , Attr.style "border-bottom-color"
+                    (if isSelected then
+                        "#fff"
+
+                     else
+                        "#999"
+                    )
+                , Attr.style "background"
+                    (if isSelected then
+                        "#fff"
+
+                     else
+                        "#eee"
+                    )
+                , Attr.style "font-weight"
+                    (if isSelected then
+                        "bold"
+
+                     else
+                        "normal"
+                    )
+                , Attr.style "cursor" "pointer"
+                ]
+                [ Html.text (tabLabel tab) ]
+    in
+    Html.div [ Attr.style "margin" "0.75rem 0" ]
+        [ Html.div [ Attr.attribute "role" "tablist", Attr.style "display" "flex", Attr.style "gap" "0.25rem", Attr.style "padding-left" "0.5rem" ]
+            (List.map viewTab [ MapTab, ScheduleTab ])
+        , Html.div
+            [ Attr.attribute "role" "tabpanel"
+            , Attr.id "simulator-tabpanel"
+            , Attr.attribute "aria-labelledby" (tabId selected)
+            , Attr.style "border" "1px solid #999"
+            , Attr.style "background" "#fff"
+            , Attr.style "padding" "0.75rem"
+            ]
+            [ panel ]
         ]
 
 
@@ -813,14 +971,15 @@ viewMap tour =
 the week (that matters now, since about a fifth of the cities have real
 hours that vary by weekday), what time, and how fast travel between stops
 is (as a pace in minutes/mile — the units delivery routing usually gets
-quoted in — converted to meters/minute for `travelTime`). Editing these
+quoted in — converted to meters/minute for `travelTime`), and how many
+minutes are spent at each stop (see `simulate`). Editing these
 fields only takes effect the next time the search (re)starts —
 `activeStart` is snapshotted at that point, so nudging any of them mid-run
 can't shift the energy landscape out from under an in-progress search.
 -}
 viewRunSettings : Model -> Html Msg
 viewRunSettings model =
-    Html.div [ Attr.style "display" "flex", Attr.style "gap" "1rem", Attr.style "align-items" "flex-end", Attr.style "margin-bottom" "0.75rem" ]
+    box "Parameters"
         [ Html.label []
             [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start date" ]
             , Html.input
@@ -851,6 +1010,17 @@ viewRunSettings model =
                 []
             ]
         , Html.label []
+            [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Location stop time (minutes)" ]
+            , Html.input
+                [ Attr.type_ "number"
+                , Attr.step "1"
+                , Attr.min "0"
+                , Attr.value model.stopInput
+                , Events.onInput SetStopInput
+                ]
+                []
+            ]
+        , Html.label []
             [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Seed" ]
             , Html.input
                 [ Attr.type_ "text"
@@ -870,11 +1040,6 @@ viewRunSettings model =
                 )
             ]
         ]
-
-
-sectionHeading : String -> Html msg
-sectionHeading text =
-    Html.h4 [ Attr.style "margin" "0.75rem 0 0.25rem 0" ] [ Html.text text ]
 
 
 readout : String -> String -> Html msg
@@ -1085,7 +1250,7 @@ formatMiles meters =
     String.fromInt (tenths // 10) ++ "." ++ String.fromInt (modBy 10 tenths) ++ " mi"
 
 
-main : Program () Model Msg
+main : Program String Model Msg
 main =
     Browser.element
         { init = init
