@@ -22,7 +22,7 @@ southernmost; see `stops`). Some locations are open 24 hours; the rest have real
 schedules — including days that are fully open, days that close at midnight,
 and one or two nights that run past midnight into the next calendar day —
 and arriving while closed means waiting for the next opening, which the UI's
-start date picker determines (see `weekdayName`). Travel time between stops
+start date picker determines (see `mondayIndexedWeekday`). Travel time between stops
 is the raw distance converted at a pace the UI also asks for, in
 minutes/mile (see `travelTime`).
 -}
@@ -186,19 +186,7 @@ parseDate isoDate =
 
 
 {-| Turns the value of an `<input type="date">` ("YYYY-MM-DD") into a
-weekday name, for display next to the picker.
--}
-weekdayName : String -> Maybe String
-weekdayName isoDate =
-    parseDate isoDate
-        |> Maybe.andThen
-            (\( year, month, day ) ->
-                [ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" ]
-                    |> List.Extra.getAt (sakamotoWeekday year month day)
-            )
-
-
-{-| Same date, but as a Monday-indexed 0..6 — matching the order each
+Monday-indexed 0..6 weekday — matching the order each
 city's weekly hours are listed in (Mon..Sun) — for feeding into
 `weekMinute`. Falls back to Monday if the date is invalid.
 -}
@@ -435,20 +423,38 @@ type alias Model =
     , startCityInput : String
     , endCityInput : String
     , activeStart : StartTime
-    , mapVisible : Bool
     , tab : Tab
+    , mapFit : MapFit
     }
 
 
 type Tab
-    = MapTab
-    | ScheduleTab
+    = ScheduleTab
+    | MapTab
+
+
+{-| How the map fills its box: `Normal` keeps its true proportions, `Stretch`
+stretches the whole map to the box's width, and `Superstretch` stretches
+just the locations and route paths to within `superstretchPadding` of each
+side (see `viewMapStatic`).
+-}
+type MapFit
+    = Normal
+    | Stretch
+    | Superstretch
+
+
+mapFits : List ( MapFit, String, String )
+mapFits =
+    [ ( Normal, "normal", "Normal" )
+    , ( Stretch, "stretch", "Stretch" )
+    , ( Superstretch, "superstretch", "Superstretch" )
+    ]
 
 
 type Msg
     = Tick
-    | ToggleRunning
-    | Restart
+    | Start
     | SetStartDate String
     | SetStartTimeOfDay String
     | SetSpeedInput String
@@ -456,8 +462,8 @@ type Msg
     | SetSeedInput String
     | SetStartCityInput String
     | SetEndCityInput String
-    | ToggleMapVisible
     | SelectTab Tab
+    | SetMapFit String
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -522,7 +528,7 @@ init defaultStartDate =
             }
     in
     ( { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) (initialTour activeStart)
-      , running = True
+      , running = False
       , stepsPerFrame = 1000
       , startDate = startDate
       , startTimeOfDay = startTimeOfDay
@@ -532,8 +538,8 @@ init defaultStartDate =
       , startCityInput = startCityInput
       , endCityInput = endCityInput
       , activeStart = activeStart
-      , mapVisible = True
-      , tab = MapTab
+      , tab = ScheduleTab
+      , mapFit = Stretch
       }
     , Cmd.none
     )
@@ -551,10 +557,7 @@ update msg model =
             , Cmd.none
             )
 
-        ToggleRunning ->
-            ( { model | running = not model.running }, Cmd.none )
-
-        Restart ->
+        Start ->
             ( startSearch model, Cmd.none )
 
         SetStartDate date ->
@@ -578,11 +581,18 @@ update msg model =
         SetEndCityInput city ->
             ( { model | endCityInput = city }, Cmd.none )
 
-        ToggleMapVisible ->
-            ( { model | mapVisible = not model.mapVisible }, Cmd.none )
-
         SelectTab tab ->
             ( { model | tab = tab }, Cmd.none )
+
+        SetMapFit value ->
+            ( { model
+                | mapFit =
+                    List.Extra.find (\( _, v, _ ) -> v == value) mapFits
+                        |> Maybe.map (\( fit, _, _ ) -> fit)
+                        |> Maybe.withDefault model.mapFit
+              }
+            , Cmd.none
+            )
 
 
 
@@ -602,8 +612,13 @@ subscriptions model =
 -- VIEW
 
 
-timelineWidth : Float
-timelineWidth =
+{-| Roughly how wide the schedule's timeline column renders. It actually
+stretches to fill whatever the location-name column leaves (see
+`viewSchedule`), so this only decides how densely `viewTimeAxis` labels
+hours.
+-}
+nominalTimelineWidth : Float
+nominalTimelineWidth =
     760
 
 
@@ -621,72 +636,39 @@ view model =
         visits =
             simulate model.activeStart tour
 
-        done =
-            SimulatedAnnealing.isDone (config model.activeStart) model.saState
-
         viewMax =
             max 600 (((totalMinutes model.activeStart tour // 60) + 1) * 60)
     in
     Html.div [ Attr.style "font-family" "sans-serif", Attr.style "max-width" "1100px" ]
         [ viewRunSettings model
-        , box "Controls"
-            [ Html.button [ Events.onClick ToggleRunning, Attr.disabled done ]
-                [ Html.text
-                    (if done then
-                        "Done"
-
-                     else if model.running then
-                        "Pause"
-
-                     else
-                        "Resume"
-                    )
-                ]
-            , Html.button [ Events.onClick Restart ] [ Html.text "Restart" ]
-            , Html.button [ Events.onClick ToggleMapVisible ]
-                [ Html.text
-                    (if model.mapVisible then
-                        "Hide map (faster)"
-
-                     else
-                        "Show map"
-                    )
-                ]
+        , box "Search"
+            [ Html.button [ Events.onClick Start ] [ Html.text "Start" ]
+            , readout "Iteration" (String.fromInt (SimulatedAnnealing.iteration model.saState))
+            , readout "Temperature" (String.fromInt (round (SimulatedAnnealing.temperature (config model.activeStart) model.saState)))
+            , readout "Current route time" (formatDuration (round (SimulatedAnnealing.currentEnergy model.saState)))
+            , readout "Current distance" (formatMiles (totalDistanceMeters model.activeStart tour))
             ]
         , viewTabs model.tab
             (case model.tab of
                 MapTab ->
-                    if model.mapVisible then
-                        viewMap (stops model.activeStart tour)
-
-                    else
-                        Html.p [ Attr.style "color" "#666", Attr.style "margin" "0" ] [ Html.text "Map hidden." ]
+                    viewMap model.mapFit (stops model.activeStart tour)
 
                 ScheduleTab ->
                     Html.div []
                         [ Html.p [ Attr.style "color" "#666", Attr.style "font-size" "0.85rem", Attr.style "margin" "0 0 0.5rem 0" ]
                             [ Html.text "Pink bands are hours a restaurant is closed. Blue bars are time spent at a restaurant. Orange bars also include waiting for it to open." ]
-                        , viewTimeAxis model.activeStart viewMax
-                        , Svg.svg
-                            [ SvgAttr.width (String.fromFloat timelineWidth)
-                            , SvgAttr.height (String.fromFloat (rowHeight * toFloat (List.length visits) + 10))
-                            ]
-                            (List.indexedMap (viewRow model.activeStart viewMax) visits |> List.concat)
+                        , viewSchedule model.activeStart viewMax visits
                         ]
             )
-        , Html.div [ Attr.style "margin-top" "0.5rem", Attr.style "display" "flex", Attr.style "gap" "1.5rem" ]
-            [ readout "Iteration" (String.fromInt (SimulatedAnnealing.iteration model.saState))
-            , readout "Temperature" (String.fromInt (round (SimulatedAnnealing.temperature (config model.activeStart) model.saState)))
-            , readout "Current route time" (formatDuration (round (SimulatedAnnealing.currentEnergy model.saState)))
-            , readout "Best route time" (formatDuration (round (SimulatedAnnealing.bestEnergy model.saState)))
-            , readout "Current distance" (formatMiles (totalDistanceMeters model.activeStart tour))
+        , box "Results"
+            [ readout "Best route time" (formatDuration (round (SimulatedAnnealing.bestEnergy model.saState)))
             , readout "Best distance" (formatMiles (totalDistanceMeters model.activeStart (SimulatedAnnealing.best model.saState)))
             ]
         , box "Output"
             -- Disabled until there's a computed route to act on.
             [ Html.button [ Attr.disabled True ] [ Html.text "Print" ]
             , Html.button [ Attr.disabled True ] [ Html.text "Download GPX" ]
-            , Html.details [ Attr.style "flex-basis" "100%" ]
+            , Html.details [ Attr.class "distance-matrix", Attr.style "flex-basis" "100%" ]
                 [ Html.summary [ Attr.style "cursor" "pointer", Attr.style "color" "#666" ]
                     [ Html.text "Distance matrix (meters)" ]
                 , viewCostMatrix
@@ -783,7 +765,7 @@ viewTabs selected panel =
     in
     Html.div [ Attr.style "margin" "0.75rem 0" ]
         [ Html.div [ Attr.attribute "role" "tablist", Attr.style "display" "flex", Attr.style "gap" "0.25rem", Attr.style "padding-left" "0.5rem" ]
-            (List.map viewTab [ MapTab, ScheduleTab ])
+            (List.map viewTab [ ScheduleTab, MapTab ])
         , Html.div
             [ Attr.attribute "role" "tabpanel"
             , Attr.id "simulator-tabpanel"
@@ -835,33 +817,114 @@ pairToken cityIndexA cityIndexB =
     "l" ++ String.fromInt (min a b) ++ "-l" ++ String.fromInt (max a b)
 
 
-{-| The borough silhouette, all real-street route segments, and every
-location dot — built once and never touched again. `viewMap` wraps this in
-`Html.Lazy.lazy` so Elm's virtual DOM skips diffing it on every animation
-frame; only the wrapping `data-active` attribute actually changes per tick.
+superstretchPadding : String
+superstretchPadding =
+    "10px"
+
+
+{-| The viewBox the map's layers share for each `MapFit`: `Superstretch`
+narrows it to `MctrotMapData.routeViewBox` and lets the borough spill into
+the padding, clipped at the box's edge.
 -}
-viewMapStatic : () -> Html msg
-viewMapStatic () =
+mapViewBoxFor : MapFit -> String
+mapViewBoxFor fit =
+    if fit == Superstretch then
+        MctrotMapData.routeViewBox
+
+    else
+        MctrotMapData.mapViewBox
+
+
+{-| One of the map's stacked layers: an SVG filling the map frame (see
+`viewMapFrame`) with the viewBox for `fit`. `Stretch` and `Superstretch`
+fill the frame horizontally (`preserveAspectRatio "none"`);
+css/mctrot-map.css keeps line widths and the round dots from stretching with
+it.
+-}
+mapLayer : MapFit -> List (Svg msg) -> Html msg
+mapLayer fit =
     Svg.svg
-        [ SvgAttr.viewBox MctrotMapData.mapViewBox
-        , SvgAttr.width (String.fromFloat mapDisplayWidth)
-        , SvgAttr.height (String.fromFloat mapDisplayHeight)
-        ]
-        [ Svg.path [ SvgAttr.class "borough", SvgAttr.d MctrotMapData.boroughPath ] []
-        , Svg.g []
-            (MctrotMapData.routeEdges
-                |> List.map (\edge -> Svg.path [ SvgAttr.class edge.classes, SvgAttr.d edge.d ] [])
+        [ SvgAttr.viewBox (mapViewBoxFor fit)
+        , SvgAttr.width "100%"
+        , SvgAttr.height "100%"
+        , SvgAttr.preserveAspectRatio
+            (if fit == Normal then
+                "xMidYMid meet"
+
+             else
+                "none"
             )
-        , Svg.g []
+        , Attr.style "position" "absolute"
+        , Attr.style "inset" "0"
+        , Attr.style "overflow" "visible"
+        ]
+
+
+{-| The box the layers stack in: `mapDisplayWidth` wide and centered for
+`Normal`, the full width otherwise (less `superstretchPadding` on each side
+for `Superstretch`).
+-}
+viewMapFrame : MapFit -> List (Html msg) -> Html msg
+viewMapFrame fit layers =
+    Html.div
+        [ Attr.style "padding"
+            (if fit == Superstretch then
+                "0 " ++ superstretchPadding
+
+             else
+                "0"
+            )
+        , Attr.style "overflow" "hidden"
+        ]
+        [ Html.div
+            [ Attr.style "position" "relative"
+            , Attr.style "height" (String.fromFloat mapDisplayHeight ++ "px")
+            , Attr.style "width"
+                (if fit == Normal then
+                    String.fromFloat mapDisplayWidth ++ "px"
+
+                 else
+                    "auto"
+                )
+            , Attr.style "margin" "0 auto"
+            ]
+            layers
+        ]
+
+
+{-| The borough silhouette — built once per `MapFit` and never touched
+again. `viewMap` wraps this and the other static layers in `Html.Lazy.lazy` so
+Elm's virtual DOM skips diffing them on every animation frame.
+-}
+viewBoroughLayer : MapFit -> Html msg
+viewBoroughLayer fit =
+    mapLayer fit [ Svg.path [ SvgAttr.class "borough", SvgAttr.d MctrotMapData.boroughPath ] [] ]
+
+
+{-| All real-street route segments — built once per `MapFit`; only the
+wrapping `data-active` attribute changes per tick (see `tourEdgeTokens`).
+-}
+viewRouteLayer : MapFit -> Html msg
+viewRouteLayer fit =
+    mapLayer fit
+        (MctrotMapData.routeEdges
+            |> List.map (\edge -> Svg.path [ SvgAttr.class edge.classes, SvgAttr.d edge.d ] [])
+        )
+
+
+{-| Every location dot — built once per `MapFit`, on top of everything else.
+-}
+viewLocationLayer : MapFit -> Html msg
+viewLocationLayer fit =
+    mapLayer fit
+        [ Svg.g []
             (MctrotMapData.locationCoords
                 |> Array.toList
                 |> List.map
                     (\( x, y ) ->
-                        Svg.circle
+                        Svg.path
                             [ SvgAttr.class "location"
-                            , SvgAttr.cx (String.fromFloat x)
-                            , SvgAttr.cy (String.fromFloat y)
-                            , SvgAttr.r "150"
+                            , SvgAttr.d ("M" ++ String.fromFloat x ++ " " ++ String.fromFloat y ++ "h0")
                             ]
                             []
                     )
@@ -869,10 +932,76 @@ viewMapStatic () =
         ]
 
 
-viewMap : List Int -> Html msg
-viewMap route =
-    Html.div [ Attr.attribute "data-active" (tourEdgeTokens route) ]
-        [ Html.Lazy.lazy viewMapStatic () ]
+{-| Diamonds over the route but under the location dots, at the first and
+last of `route` (see `stops`): green for the start, a 2x2 checkered flag for
+the finish. They're HTML, positioned by
+percentage within the map frame, so they keep their shape however the map
+is stretched. For a round trip the flag covers the start.
+-}
+viewEndpoints : MapFit -> List Int -> Html msg
+viewEndpoints fit route =
+    let
+        viewBox =
+            case String.split " " (mapViewBoxFor fit) |> List.filterMap String.toFloat of
+                [ x, y, w, h ] ->
+                    Just { x = x, y = y, w = w, h = h }
+
+                _ ->
+                    Nothing
+
+        diamond background cityIndex =
+            case ( viewBox, Array.get cityIndex MctrotMapData.locationCoords ) of
+                ( Just vb, Just ( x, y ) ) ->
+                    [ Html.div
+                        [ Attr.style "position" "absolute"
+                        , Attr.style "left" (String.fromFloat ((x - vb.x) / vb.w * 100) ++ "%")
+                        , Attr.style "top" (String.fromFloat ((y - vb.y) / vb.h * 100) ++ "%")
+                        , Attr.style "width" "14px"
+                        , Attr.style "height" "14px"
+                        , Attr.style "transform" "translate(-50%, -50%) rotate(45deg)"
+                        , Attr.style "background" background
+                        , Attr.style "border" "1px solid #fff"
+                        ]
+                        []
+                    ]
+
+                _ ->
+                    []
+
+        at background cityIndex =
+            Maybe.map (diamond background) cityIndex |> Maybe.withDefault []
+    in
+    Html.div [ Attr.style "position" "absolute", Attr.style "inset" "0", Attr.style "pointer-events" "none" ]
+        (at "#1a9e3a" (List.head route)
+            ++ at "conic-gradient(#000 0 25%, #fff 0 50%, #000 0 75%, #fff 0)" (List.Extra.last route)
+        )
+
+
+{-| The map with a `MapFit` dropdown pinned to its top right corner.
+-}
+viewMap : MapFit -> List Int -> Html Msg
+viewMap fit route =
+    Html.div [ Attr.style "position" "relative" ]
+        [ Html.div [ Attr.attribute "data-active" (tourEdgeTokens route) ]
+            [ viewMapFrame fit
+                [ Html.Lazy.lazy viewBoroughLayer fit
+                , Html.Lazy.lazy viewRouteLayer fit
+                , viewEndpoints fit route
+                , Html.Lazy.lazy viewLocationLayer fit
+                ]
+            ]
+        , Html.select
+            [ Attr.style "position" "absolute"
+            , Attr.style "top" "0"
+            , Attr.style "right" "0"
+            , Attr.attribute "aria-label" "Map fit"
+            , Events.onInput SetMapFit
+            ]
+            (List.map
+                (\( f, value, label ) -> Html.option [ Attr.value value, Attr.selected (f == fit) ] [ Html.text label ])
+                mapFits
+            )
+        ]
 
 
 {-| Lets you pick the conditions the next run starts under: which day of
@@ -889,67 +1018,77 @@ can't shift the energy landscape out from under an in-progress search.
 viewRunSettings : Model -> Html Msg
 viewRunSettings model =
     box "Parameters"
-        [ Html.label []
-            [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start date" ]
-            , Html.input
-                [ Attr.type_ "date"
-                , Attr.value model.startDate
-                , Events.onInput SetStartDate
+        [ paramRow
+            [ Html.label []
+                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start date" ]
+                , Html.input
+                    [ Attr.type_ "date"
+                    , Attr.value model.startDate
+                    , Events.onInput SetStartDate
+                    ]
+                    []
                 ]
-                []
-            ]
-        , Html.label []
-            [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start time" ]
-            , Html.input
-                [ Attr.type_ "time"
-                , Attr.value model.startTimeOfDay
-                , Events.onInput SetStartTimeOfDay
+            , Html.label []
+                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start time" ]
+                , Html.input
+                    [ Attr.type_ "time"
+                    , Attr.value model.startTimeOfDay
+                    , Events.onInput SetStartTimeOfDay
+                    ]
+                    []
                 ]
-                []
             ]
-        , Html.label []
-            [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Pace (min/mile)" ]
-            , Html.input
-                [ Attr.type_ "number"
-                , Attr.step "0.5"
-                , Attr.min "0.5"
-                , Attr.value model.speedInput
-                , Events.onInput SetSpeedInput
+        , paramRow
+            [ Html.label []
+                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Pace (min/mile)" ]
+                , Html.input
+                    [ Attr.type_ "number"
+                    , Attr.step "0.5"
+                    , Attr.min "0.5"
+                    , Attr.value model.speedInput
+                    , Events.onInput SetSpeedInput
+                    ]
+                    []
                 ]
-                []
-            ]
-        , Html.label []
-            [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Location stop time (minutes)" ]
-            , Html.input
-                [ Attr.type_ "number"
-                , Attr.step "1"
-                , Attr.min "0"
-                , Attr.value model.stopInput
-                , Events.onInput SetStopInput
+            , Html.label []
+                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Location stop time (minutes)" ]
+                , Html.input
+                    [ Attr.type_ "number"
+                    , Attr.step "1"
+                    , Attr.min "0"
+                    , Attr.value model.stopInput
+                    , Events.onInput SetStopInput
+                    ]
+                    []
                 ]
-                []
             ]
-        , viewCitySelect "Start location" model.startCityInput SetStartCityInput
-        , viewCitySelect "End location" model.endCityInput SetEndCityInput
-        , Html.label []
-            [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Seed" ]
-            , Html.input
-                [ Attr.type_ "text"
-                , Attr.value model.seedInput
-                , Events.onInput SetSeedInput
+        , paramRow [ viewCitySelect "Start location" model.startCityInput SetStartCityInput ]
+        , paramRow [ viewCitySelect "End location" model.endCityInput SetEndCityInput ]
+        , paramRow
+            [ Html.label []
+                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Seed" ]
+                , Html.input
+                    [ Attr.type_ "text"
+                    , Attr.value model.seedInput
+                    , Events.onInput SetSeedInput
+                    ]
+                    []
                 ]
-                []
             ]
-        , Html.div [ Attr.style "font-size" "0.8rem", Attr.style "color" "#666" ]
-            [ Html.text
-                (case weekdayName model.startDate of
-                    Just day ->
-                        "Starts " ++ day ++ " (changes apply on restart)"
+        ]
 
-                    Nothing ->
-                        "Pick a valid date"
-                )
-            ]
+
+{-| One full-width line inside a `box`, so related fields stay together and
+each group starts on its own line.
+-}
+paramRow : List (Html msg) -> Html msg
+paramRow =
+    Html.div
+        [ Attr.style "flex-basis" "100%"
+        , Attr.style "display" "flex"
+        , Attr.style "flex-wrap" "wrap"
+        , Attr.style "gap" "0.5rem 1rem"
+        , Attr.style "align-items" "flex-end"
         ]
 
 
@@ -982,9 +1121,29 @@ readout label value =
         ]
 
 
-xScale : Int -> Float -> Float
+{-| An elapsed time as an SVG x coordinate or width: a percentage of the
+timeline, which spans `viewMax` minutes across however wide it renders.
+-}
+xScale : Int -> Float -> String
 xScale viewMax elapsedMinutes =
-    elapsedMinutes * (timelineWidth / toFloat viewMax)
+    String.fromFloat (elapsedMinutes / toFloat viewMax * 100) ++ "%"
+
+
+{-| A two-column grid: location names down the left (as wide as the longest
+one), and the time axis and one timeline row per visit filling the rest.
+-}
+viewSchedule : StartTime -> Int -> List Visit -> Html msg
+viewSchedule startTime viewMax visits =
+    Html.div
+        [ Attr.style "display" "grid"
+        , Attr.style "grid-template-columns" "max-content 1fr"
+        , Attr.style "column-gap" "0.5rem"
+        , Attr.style "align-items" "center"
+        ]
+        (Html.div [] []
+            :: viewTimeAxis startTime viewMax
+            :: List.concatMap (viewRow startTime viewMax) visits
+        )
 
 
 timeAxisHeight : Float
@@ -1005,7 +1164,7 @@ viewTimeAxis startTime viewMax =
             44
 
         pixelsPerHour =
-            xScale viewMax 60
+            60 * nominalTimelineWidth / toFloat viewMax
 
         labelEveryHours =
             [ 1, 2, 3, 4, 6, 12, 24 ]
@@ -1028,12 +1187,12 @@ viewTimeAxis startTime viewMax =
                     modBy 60 clock == 0
 
                 x =
-                    xScale viewMax (toFloat elapsed)
+                    toFloat elapsed * nominalTimelineWidth / toFloat viewMax
 
                 tickLine =
                     Svg.line
-                        [ SvgAttr.x1 (String.fromFloat x)
-                        , SvgAttr.x2 (String.fromFloat x)
+                        [ SvgAttr.x1 (xScale viewMax (toFloat elapsed))
+                        , SvgAttr.x2 (xScale viewMax (toFloat elapsed))
                         , SvgAttr.y1 (String.fromFloat baseline)
                         , SvgAttr.y2
                             (String.fromFloat
@@ -1049,12 +1208,12 @@ viewTimeAxis startTime viewMax =
                         []
 
                 fitsLabel =
-                    x >= 16 && x <= timelineWidth - 16
+                    x >= 16 && x <= nominalTimelineWidth - 16
             in
             if isHour && modBy labelEveryHours (clock // 60) == 0 && fitsLabel then
                 [ tickLine
                 , Svg.text_
-                    [ SvgAttr.x (String.fromFloat x)
+                    [ SvgAttr.x (xScale viewMax (toFloat elapsed))
                     , SvgAttr.y (String.fromFloat (baseline - 11))
                     , SvgAttr.textAnchor "middle"
                     , SvgAttr.fontSize "11"
@@ -1067,13 +1226,13 @@ viewTimeAxis startTime viewMax =
                 [ tickLine ]
     in
     Svg.svg
-        [ SvgAttr.width (String.fromFloat timelineWidth)
+        [ SvgAttr.width "100%"
         , SvgAttr.height (String.fromFloat timeAxisHeight)
         , Attr.style "display" "block"
         ]
         (Svg.line
             [ SvgAttr.x1 "0"
-            , SvgAttr.x2 (String.fromFloat timelineWidth)
+            , SvgAttr.x2 "100%"
             , SvgAttr.y1 (String.fromFloat baseline)
             , SvgAttr.y2 (String.fromFloat baseline)
             , SvgAttr.stroke "#999"
@@ -1106,12 +1265,13 @@ formatHour hour =
            )
 
 
-viewRow : StartTime -> Int -> Int -> Visit -> List (Svg msg)
-viewRow startTime viewMax rowIndex visit =
+{-| One visit's two grid cells (see `viewSchedule`): its location name, and
+its timeline — closed hours in pink, then the time spent there (orange if
+it included waiting for it to open).
+-}
+viewRow : StartTime -> Int -> Visit -> List (Html msg)
+viewRow startTime viewMax visit =
     let
-        y =
-            toFloat rowIndex * rowHeight
-
         city =
             Array.get visit.cityIndex cities |> Maybe.withDefault (City "?" "" [ ( 0, weekLength ) ] [])
 
@@ -1123,64 +1283,66 @@ viewRow startTime viewMax rowIndex visit =
 
         label =
             city.name
-                ++ " — arr "
-                ++ formatClock visit.arrival
                 ++ (if visit.wait > 0 then
                         " (waited " ++ formatDuration visit.wait ++ ")"
 
                     else
                         ""
                    )
+
+        barHeight =
+            rowHeight - 4
+
+        visitColor =
+            if visit.wait > 0 then
+                "#e8871e"
+
+            else
+                "#1f6feb"
     in
-    [ Svg.rect
-        [ SvgAttr.x "0"
-        , SvgAttr.y (String.fromFloat y)
-        , SvgAttr.width (String.fromFloat timelineWidth)
-        , SvgAttr.height (String.fromFloat (rowHeight - 4))
-        , SvgAttr.fill "#fff"
-        , SvgAttr.stroke "#eee"
+    [ Html.div [ Attr.style "font-size" "11px", Attr.style "color" "#333", Attr.style "white-space" "nowrap" ]
+        [ Html.text label ]
+    , Svg.svg
+        [ SvgAttr.width "100%"
+        , SvgAttr.height (String.fromFloat rowHeight)
+        , Attr.style "display" "block"
         ]
-        []
-    ]
-        ++ (if not (List.isEmpty city.closedWindows) then
-                closedBandsElapsed city.closedWindows startTime viewMax
+        (Svg.rect
+            [ SvgAttr.x "0"
+            , SvgAttr.y "0"
+            , SvgAttr.width "100%"
+            , SvgAttr.height (String.fromFloat barHeight)
+            , SvgAttr.fill "#fff"
+            , SvgAttr.stroke "#eee"
+            ]
+            []
+            :: (closedBandsElapsed city.closedWindows startTime viewMax
                     |> List.map
                         (\( s, e ) ->
                             Svg.rect
-                                [ SvgAttr.x (String.fromFloat (xScale viewMax (toFloat s)))
-                                , SvgAttr.y (String.fromFloat y)
-                                , SvgAttr.width (String.fromFloat (xScale viewMax (toFloat (e - s))))
-                                , SvgAttr.height (String.fromFloat (rowHeight - 4))
+                                [ SvgAttr.x (xScale viewMax (toFloat s))
+                                , SvgAttr.y "0"
+                                , SvgAttr.width (xScale viewMax (toFloat (e - s)))
+                                , SvgAttr.height (String.fromFloat barHeight)
                                 , SvgAttr.fill "#fbdcdc"
                                 ]
                                 []
                         )
+               )
+            ++ [ Svg.rect
+                    [ SvgAttr.x (xScale viewMax arrivalElapsed)
+                    , SvgAttr.y "6"
+                    , SvgAttr.width (xScale viewMax (departureElapsed - arrivalElapsed))
+                    , SvgAttr.height (String.fromFloat (rowHeight - 16))
+                    , SvgAttr.fill visitColor
 
-            else
-                []
-           )
-        ++ [ Svg.rect
-                [ SvgAttr.x (String.fromFloat (xScale viewMax arrivalElapsed))
-                , SvgAttr.y (String.fromFloat (y + 6))
-                , SvgAttr.width (String.fromFloat (max 2 (xScale viewMax (departureElapsed - arrivalElapsed))))
-                , SvgAttr.height (String.fromFloat (rowHeight - 16))
-                , SvgAttr.fill
-                    (if visit.wait > 0 then
-                        "#e8871e"
-
-                     else
-                        "#1f6feb"
-                    )
-                ]
-                []
-           , Svg.text_
-                [ SvgAttr.x "4"
-                , SvgAttr.y (String.fromFloat (y + rowHeight - 8))
-                , SvgAttr.fontSize "11"
-                , SvgAttr.fill "#333"
-                ]
-                [ Svg.text label ]
-           ]
+                    -- A same-colored 1px outline keeps a very short visit at least 2px wide.
+                    , SvgAttr.stroke visitColor
+                    ]
+                    []
+               ]
+        )
+    ]
 
 
 {-| A city's `closedWindows` (minutes-since-Monday-00:00, one repeating
@@ -1264,27 +1426,6 @@ viewCostMatrix =
         , Attr.style "font-variant-numeric" "tabular-nums"
         ]
         (headerRow :: List.indexedMap bodyRow cityList)
-
-
-formatClock : Int -> String
-formatClock absoluteMinutes =
-    let
-        day =
-            absoluteMinutes // dayLength
-
-        clock =
-            modBy dayLength absoluteMinutes
-
-        hh =
-            clock // 60
-
-        mm =
-            modBy 60 clock
-
-        pad n =
-            String.padLeft 2 '0' (String.fromInt n)
-    in
-    "day " ++ String.fromInt day ++ " " ++ pad hh ++ ":" ++ pad mm
 
 
 formatDuration : Int -> String

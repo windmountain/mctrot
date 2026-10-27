@@ -317,6 +317,12 @@ table.records td {
   border: 0;
 }
 
+/* simulator */
+
+.distance-matrix {
+  display: none;
+}
+
 /* footer */
 
 .footer-inner {
