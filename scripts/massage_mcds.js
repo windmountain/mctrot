@@ -1,7 +1,9 @@
 import fs from 'fs';
 
-const downtownFile = fs.readFileSync('downtown-results.json')
-const uptownFile = fs.readFileSync('uptown-results.json')
+// Usage: node massage_mcds.js <uptown-raw.json> <downtown-raw.json>
+// Where the two searches overlap, the downtown copy of a location wins.
+const uptownFile = fs.readFileSync(process.argv[2])
+const downtownFile = fs.readFileSync(process.argv[3])
 
 const downtown = JSON.parse(downtownFile)
 const uptown = JSON.parse(uptownFile)
@@ -22,7 +24,6 @@ const toFeature = (location) => {
       "longDescription": location.properties.longDescription,
       "id": location.properties.id,
       "hasIndoorDining": location.properties.filterType.includes("INDOORDINING"),
-      "isTwentyFourHours": location.properties.filterType.includes("TWENTYFOURHOURS"),
       "addressLine1": location.properties.addressLine1,
       "addressLine2": location.properties.addressLine2,
       "addressLine3": location.properties.addressLine3,
@@ -37,7 +38,7 @@ const toFeature = (location) => {
       "restaurantHoursThursday":  location.properties.restauranthours?.hoursThursday,
       "restaurantHoursFriday":    location.properties.restauranthours?.hoursFriday,
       "restaurantHoursSaturday":  location.properties.restauranthours?.hoursSaturday,
-      "restaurantHoursSunday":    location.properties.restauranthours?.hoursMonday,
+      "restaurantHoursSunday":    location.properties.restauranthours?.hoursSunday,
       "nationalStoreNumber": location.properties.identifiers.storeIdentifier
         .find((i) => i.identifierType == "NATLSTRNUMBER")["identifierValue"],
       "entityId": location.properties.identifiers.storeIdentifier

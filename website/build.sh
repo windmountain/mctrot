@@ -2,7 +2,7 @@
 # Assembles the deployable site in build/: copies the public pages and
 # assets, and compiles the Elm simulator to build/js/simulator.js.
 # Run inside `devenv shell` (for elm and terser). Does not regenerate map
-# data; run data/generate_map_data.py by hand when data/mctrot_map.svg changes.
+# data; run scripts/export_simulator_data.py for that (see README).
 set -euo pipefail
 cd "$(dirname "$0")"
 

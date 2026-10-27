@@ -20,6 +20,8 @@ devenv.local.yaml
 # data
 data/*
 !data/.gitkeep
+# Nicknames are hand-made data (scripts/nickname_interview.py), not fetched
+!data/nicknames.json
 
 # output
 output/*
@@ -40,3 +42,6 @@ shoe-deal/*.log
 
 # elm
 elm-stuff/
+
+# Python bytecode
+__pycache__/

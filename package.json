@@ -1,9 +1,6 @@
 {
   "name": "mctrot",
   "type": "module",
-  "workspaces": [
-    "current-locations"
-  ],
   "dependencies": {
   }
 }

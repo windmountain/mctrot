@@ -5,7 +5,9 @@ Supports two NYC Open Data API versions:
   - SODA2 (/resource/): used for small datasets, paginated at 1000 rows
   - SODA3 (/api/v3/):   used for large datasets, requires API key from .env
 
-Resources without an API endpoint are skipped with a note.
+Resources with a "script" are produced by running that script (e.g. the
+McDonald's locations scrape). Resources with neither a script nor an API
+endpoint are skipped with a note.
 
 Usage:
     python fetch.py             # download missing files
@@ -16,6 +18,7 @@ import base64
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -151,6 +154,22 @@ def fetch_resource(resource, force=False):
     filepath = PACKAGE_DIR / resource["path"]
     sources = resource.get("sources", [])
     api_url = sources[0].get("api") if sources else None
+    script = resource.get("script")
+
+    if script:
+        if filepath.exists() and not force:
+            print(f"  {name}: exists (use --force to re-run {script})")
+            verify_hash(filepath, resource.get("hash"))
+            return True
+        print(f"  {name}: running {script}")
+        try:
+            subprocess.run(["bash", str(PACKAGE_DIR / script)], cwd=PACKAGE_DIR, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"    FAILED — {e}")
+            return False
+        print(f"    wrote {resource['path']}")
+        verify_hash(filepath, resource.get("hash"))
+        return True
 
     if not api_url:
         hint = sources[0].get("path", sources[0].get("title", "")) if sources else ""

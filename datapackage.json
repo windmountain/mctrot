@@ -80,6 +80,7 @@
       "title": "Manhattan McDonald's Locations",
       "description": "Current McDonald's restaurant locations in Manhattan, scraped from the McDonald's website/API.",
       "path": "data/manhattan-mcdonalds-locations.geojson",
+      "script": "scripts/fetch_mcds.sh",
       "format": "geojson",
       "mediatype": "application/geo+json",
       "sources": [

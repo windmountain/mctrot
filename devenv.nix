@@ -24,6 +24,71 @@
     git status
   '';
 
+  # Rebuild everything, in order: fetch data (always re-scraping McDonald's),
+  # load the database from scratch, solve, analyze, export the map and the
+  # website simulator's data, and build the website.
+  #
+  # Needs a local Postgres with PostGIS and pgRouting on 127.0.0.1:5432 (see
+  # README), and .env credentials for NYC Open Data if any data is missing.
+  #
+  # Not included: naming new locations (interactive; see nickname-interview
+  # below -- until then the simulator export uses their addresses), and
+  # updating the McDonald's resource's hash and "accessed" date in
+  # datapackage.json (fetch.py prints the new hash).
+  scripts.run-all.exec = ''
+    set -euo pipefail
+    cd "$DEVENV_ROOT"
+
+    step() { printf '\n==> %s\n' "$*"; }
+
+    step "Scrape current McDonald's locations"
+    bash scripts/fetch_mcds.sh
+
+    step "Fetch any other missing data"
+    uv run fetch.py
+
+    step "Load the database"
+    bash scripts/load.sh
+
+    step "Solve TSP and TSPTW"
+    bash scripts/solve_tsp.sh
+    bash scripts/solve_tsptw_single.sh
+    bash scripts/solve_tsptw_multi.sh
+
+    step "Post-solve route segments and analytics"
+    bash scripts/create_tsp_route_segments.sh
+    bash scripts/create_tsptw_single_route_segments.sh
+    bash scripts/create_tsptw_multi_route_segments.sh
+    bash scripts/create_tsptw_multi_analytics.sh
+    uv run scripts/chart_tsptw_multi_analytics.py
+
+    step "Export the map"
+    bash scripts/create_route_pair_segments.sh
+    uv run scripts/export_map_svg.py
+
+    step "Export the simulator's data"
+    uv run scripts/export_simulator_data.py
+
+    step "Build the website"
+    bash website/build.sh
+
+    step "Done"
+  '';
+
+  # Interactively name (or rename) locations, then save every nickname to
+  # data/nicknames.json -- committed, unlike the rest of data/, and not
+  # managed by datapackage.json/fetch.py. Needs a loaded database (run-all).
+  # Re-run run-all (or just the simulator export and website build) after.
+  scripts.nickname-interview.exec = ''
+    set -euo pipefail
+    cd "$DEVENV_ROOT"
+
+    uv run scripts/nickname_interview.py
+    uv run scripts/dump_nicknames.py > data/nicknames.json.tmp
+    mv data/nicknames.json.tmp data/nicknames.json
+    echo "Saved data/nicknames.json"
+  '';
+
   languages.javascript = {
     enable = true;
     npm = {

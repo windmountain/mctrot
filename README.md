@@ -18,6 +18,20 @@ This repo contains tools for:
 
 This repository manages its external dependencies (gdal, postgres, jq, etc.) with [devenv.sh](https://devenv.sh).
 
+# Running everything
+
+`devenv shell -- run-all` (or just `run-all` inside `devenv shell`) does every step below in order: re-scrape McDonald's, fetch any missing data, load the database from scratch, solve, analyze, export the map and the simulator's data, and build the website. It takes a while. The sections below explain each step and how to run them one at a time.
+
+## Nicknames
+
+Every location gets a nickname (e.g. MACYS, OCCUPY). They live in `data/nicknames.json`, which, unlike the rest of `data/`, is committed and isn't fetched or listed in datapackage.json. A location without a nickname (say, a new McDonald's) shows up by its street address. To name it, after `run-all` has loaded the database:
+
+```
+devenv shell -- nickname-interview   # asks for each location's nickname, then saves data/nicknames.json
+```
+
+Then re-run `run-all` (or just the simulator export and website build) to use the new names.
+
 # Fetching data
 
 The data dependencies of this map are listed in datapackage.json. Datapackage is a [specification](https://datapackage.org/standard/data-package/) for documenting where data came from, how it's licensed, etc.
@@ -31,6 +45,8 @@ For some of these dependencies, you will need an account with NYC Open Data. Fol
 - Fill in your .env file with your new API Key ID and Api Key Secret.
 
 Once set up, fetch the data by running the fetch.py Python script.
+
+Current McDonald's locations aren't open data: they're scraped from the McDonald's restaurant locator API by `scripts/fetch_mcds.sh`, which fetch.py runs for that resource (it's named as the resource's `script` in datapackage.json). It writes the raw API responses and the massaged `data/manhattan-mcdonalds-locations.geojson`. Hours change, so re-scrape with `python fetch.py --force` (which re-fetches everything) or by running the script directly, then update that resource's hash and `accessed` date in datapackage.json.
 
 # Postgres and QGIS
 
@@ -110,11 +126,13 @@ devenv shell -- website/build.sh   # copies public pages/assets, compiles Elm to
 
 Elm tests: `cd website && elm-test`.
 
-The simulator's map data is generated separately from `website/data/mctrot_map.svg` (a copy of an earlier `output/mctrot_map.svg` export):
+The simulator's data (locations, nicknames, hours, walking distances, and the map) comes from the database. After loading (and `scripts/export_map_svg.py`), export it:
 
 ```
-uv run website/data/generate_map_data.py   # writes website/src/MctrotMapData.elm and website/css/mctrot-map.css
+uv run scripts/export_simulator_data.py   # writes website/data/*.csv + mctrot_map.svg, then runs website/data/generate_elm_data.py
 ```
+
+That generator writes `website/src/MctrotMapData.elm`, `website/src/McdData.elm` and `website/css/mctrot-map.css`; rebuild the site afterwards.
 
 # A note on AI
 

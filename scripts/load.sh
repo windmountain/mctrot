@@ -4,6 +4,8 @@ set -euo pipefail
 . $(dirname "$0")/create_extensions.sh
 . $(dirname "$0")/load_boroughs.sh
 . $(dirname "$0")/load_mcds.sh
+. $(dirname "$0")/create_mcd_hours.sh
+. $(dirname "$0")/load_nicknames.sh
 . $(dirname "$0")/load_historical_locations.sh
 . $(dirname "$0")/create_mcislands.sh
 . $(dirname "$0")/load_sidewalk_centerlines.sh
