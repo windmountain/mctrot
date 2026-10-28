@@ -75,6 +75,15 @@
     step "Done"
   '';
 
+  # Just the last step of run-all: assemble the deployable site in
+  # website/build/ from what's already exported (see website/build.sh).
+  scripts.build-website.exec = ''
+    set -euo pipefail
+    cd "$DEVENV_ROOT"
+
+    bash website/build.sh
+  '';
+
   # Interactively name (or rename) locations, then save every nickname to
   # data/nicknames.json -- committed, unlike the rest of data/, and not
   # managed by datapackage.json/fetch.py. Needs a loaded database (run-all).

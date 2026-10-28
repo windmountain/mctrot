@@ -42,6 +42,55 @@ import SimulatedAnnealing exposing (Config, State)
 import SimulatedAnnealing.Schedule as Schedule
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
+import Task
+import Time
+
+
+
+-- TUNING
+--
+-- The annealing constants change what the search finds (see `config`); the
+-- scheduling constants change only how fast it runs (see `runChunk`).
+
+
+{-| Starting temperature of the cooling schedule, in the same units as the
+energy (minutes of total route time).
+-}
+initialTemperature : Float
+initialTemperature =
+    400
+
+
+{-| Per-step multiplier on the temperature. Closer to 1 cools more slowly,
+so the search runs more steps before stopping.
+-}
+coolingRate : Float
+coolingRate =
+    0.99995
+
+
+{-| `isDone` reports `True` once the temperature drops to or below this.
+-}
+stoppingTemperature : Float
+stoppingTemperature =
+    0.05
+
+
+{-| How many milliseconds of each animation frame go to the search, measured
+from when the frame's `Frame` message arrives. The rest of a 60 Hz frame
+(~16.7 ms) is left for `view`, layout, and paint.
+-}
+frameBudgetMillis : Int
+frameBudgetMillis =
+    10
+
+
+{-| Steps per chunk: the granularity at which `runChunk` checks the clock,
+and so roughly how far a frame can overshoot `frameBudgetMillis`.
+-}
+stepsPerChunk : Int
+stepsPerChunk =
+    100
 
 
 
@@ -396,8 +445,8 @@ config : StartTime -> Config Tour
 config startTime =
     { energy = toFloat << totalMinutes startTime
     , neighbor = twoOptNeighbor
-    , temperature = Schedule.exponential { initial = 400, alpha = 0.99995 }
-    , stoppingTemperature = 0.05
+    , temperature = Schedule.exponential { initial = initialTemperature, alpha = coolingRate }
+    , stoppingTemperature = stoppingTemperature
     }
 
 
@@ -414,7 +463,6 @@ initialTour startTime =
 type alias Model =
     { saState : State Tour
     , running : Bool
-    , stepsPerFrame : Int
     , startDate : String
     , startTimeOfDay : String
     , speedInput : String
@@ -453,7 +501,8 @@ mapFits =
 
 
 type Msg
-    = Tick
+    = Frame Time.Posix
+    | ChunkDone Time.Posix Time.Posix
     | Start
     | SetStartDate String
     | SetStartTimeOfDay String
@@ -529,7 +578,6 @@ init defaultStartDate =
     in
     ( { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) (initialTour activeStart)
       , running = False
-      , stepsPerFrame = 1000
       , startDate = startDate
       , startTimeOfDay = startTimeOfDay
       , speedInput = speedInput
@@ -549,13 +597,36 @@ init defaultStartDate =
 -- UPDATE
 
 
+searching : Model -> Bool
+searching model =
+    model.running && not (SimulatedAnnealing.isDone (config model.activeStart) model.saState)
+
+
+{-| Advances the search one chunk, then asks for the time so `ChunkDone` can
+decide whether this frame has budget for another. Elm only calls `view` once
+per animation frame, so the chunks between frames don't each re-render — the
+search runs at whatever rate the budget allows, independent of how expensive
+the current tab is to draw.
+-}
+runChunk : Time.Posix -> Model -> ( Model, Cmd Msg )
+runChunk frameStart model =
+    ( { model | saState = SimulatedAnnealing.stepN (config model.activeStart) stepsPerChunk model.saState }
+    , Task.perform (ChunkDone frameStart) Time.now
+    )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Tick ->
-            ( { model | saState = SimulatedAnnealing.stepN (config model.activeStart) model.stepsPerFrame model.saState }
-            , Cmd.none
-            )
+        Frame frameStart ->
+            runChunk frameStart model
+
+        ChunkDone frameStart now ->
+            if searching model && Time.posixToMillis now - Time.posixToMillis frameStart < frameBudgetMillis then
+                runChunk frameStart model
+
+            else
+                ( model, Cmd.none )
 
         Start ->
             ( startSearch model, Cmd.none )
@@ -601,8 +672,8 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.running && not (SimulatedAnnealing.isDone (config model.activeStart) model.saState) then
-        Browser.Events.onAnimationFrame (\_ -> Tick)
+    if searching model then
+        Browser.Events.onAnimationFrame Frame
 
     else
         Sub.none
