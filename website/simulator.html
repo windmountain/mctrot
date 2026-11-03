@@ -3,22 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simulator — McTrot</title>
-  <meta name="description" content="A simulated annealing search for a McTrot route, run in the browser.">
+  <title>McTrot Simulator</title>
+  <meta name="description" content="Searches for a McTrot route through every McDonald&rsquo;s in Manhattan, on foot, within their opening hours. Set the start time, pace, and stop length; print the result, export it as GPX, or share it as a link.">
+  <link rel="canonical" href="https://mctrot.nyc/simulator.html">
 
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/favicon.ico" sizes="32x32">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="manifest" href="/site.webmanifest">
+  <!-- The simulator's own icons, share image, and manifest (website/sim/;
+       see scripts/render_simulator_previews.mjs), not the site's. -->
+  <link rel="icon" href="/sim/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/sim/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/sim/apple-touch-icon.png">
+  <link rel="manifest" href="/sim/manifest.webmanifest">
   <meta name="theme-color" content="#FFD100">
+  <meta name="application-name" content="McTrot Simulator">
+  <meta name="apple-mobile-web-app-title" content="Simulator">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Simulator — McTrot">
-  <meta property="og:description" content="A simulated annealing search for a McTrot route.">
-  <meta property="og:image" content="https://mctrot.nyc/og-image.png">
+  <meta property="og:site_name" content="McTrot">
+  <meta property="og:title" content="McTrot Simulator">
+  <meta property="og:description" content="Searches for a route through every McDonald&rsquo;s in Manhattan, on foot, within their opening hours.">
   <meta property="og:url" content="https://mctrot.nyc/simulator.html">
+  <meta property="og:image" content="https://mctrot.nyc/sim/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A McTrot route, drawn in yellow with its stops circled, over a close-up of Manhattan&rsquo;s streets, beside the word Simulator.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://mctrot.nyc/og-image.png">
+  <meta name="twitter:title" content="McTrot Simulator">
+  <meta name="twitter:description" content="Searches for a route through every McDonald&rsquo;s in Manhattan, on foot, within their opening hours.">
+  <meta name="twitter:image" content="https://mctrot.nyc/sim/og.png">
+  <meta name="twitter:image:alt" content="A McTrot route, drawn in yellow with its stops circled, over a close-up of Manhattan&rsquo;s streets, beside the word Simulator.">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "McTrot Simulator",
+    "url": "https://mctrot.nyc/simulator.html",
+    "description": "Searches for a McTrot route through every McDonald’s in Manhattan, on foot, within their opening hours.",
+    "image": "https://mctrot.nyc/sim/og.png",
+    "applicationCategory": "TravelApplication",
+    "operatingSystem": "Any",
+    "browserRequirements": "Requires JavaScript",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "isPartOf": { "@type": "WebSite", "name": "McTrot", "url": "https://mctrot.nyc/" }
+  }
+  </script>
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/mctrot-map.css">
@@ -28,7 +58,8 @@
     <div id="simulator">
       <noscript>
         <p><a href="/">McTrot</a></p>
-        <h1>Simulator</h1>
+        <h1>McTrot Simulator</h1>
+        <p>The simulator searches for a route through every McDonald&rsquo;s in Manhattan, on foot, within their opening hours, for a chosen start time, pace, and stop length.</p>
         <p>The simulator requires JavaScript.</p>
       </noscript>
     </div>

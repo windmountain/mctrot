@@ -126,13 +126,11 @@ devenv shell -- website/build.sh   # copies public pages/assets, compiles Elm to
 
 Elm tests: `cd website && elm-test`.
 
-The simulator's data (locations, nicknames, hours, walking distances, the walking paths its GPX export follows, and the map) comes from the database. After loading (and `scripts/export_map_svg.py`), export it:
+The simulator has its own share image and icons in `website/sim/`. Their sources are hand-editable SVGs (`og.svg`, with each element grouped by name, plus `icon.svg` and `favicon.svg`); render the PNGs from them with headless Chrome:
 
 ```
-uv run scripts/export_simulator_data.py   # writes website/data/*.csv + mctrot_map.svg, then runs website/data/generate_elm_data.py
+node scripts/render_simulator_previews.mjs   # then website/build.sh to copy them into build/
 ```
-
-That generator writes `website/src/MctrotMapData.elm`, `website/src/McdData.elm`, `website/css/mctrot-map.css` and `website/geo/route-legs.json` (fetched by the simulator only for GPX export); rebuild the site afterwards.
 
 # A note on AI
 

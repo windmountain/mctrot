@@ -1,0 +1,14 @@
+{
+  "name": "McTrot Simulator",
+  "short_name": "Simulator",
+  "description": "Searches for a McTrot route through every McDonald’s in Manhattan, on foot, within their opening hours.",
+  "start_url": "/simulator.html",
+  "scope": "/simulator.html",
+  "icons": [
+    { "src": "/sim/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/sim/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "theme_color": "#FFD100",
+  "background_color": "#1C1B14",
+  "display": "standalone"
+}
