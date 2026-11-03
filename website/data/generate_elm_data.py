@@ -7,26 +7,19 @@ scripts/export_simulator_data.py) into Elm and CSS:
   - route_legs.csv -> ../geo/route-legs.json (fetched by the simulator only
     when it exports a GPX file, so it stays out of the page's script)
 
-mctrot_map.svg is the source of truth for the map (a real Manhattan silhouette, every
-McDonald's location, and a real-street routing layer where each road
-segment's `class` attribute lists every location-pair whose shortest route
-crosses it). The source SVG cuts that routing layer into one `<path>` per
-road-network node-to-node segment (2867 of them), but many neighboring
-segments -- ones that just happen to sit between the same two intersections
-along a street with no route ever forking there -- carry the exact same
-`lX-lY` membership. Since SVG lets one `<path>` hold several disconnected
-`M ... L ...` subpaths (rendered identically to separate elements, same
-stroke/class for all of them), `merge_edges` combines every group of edges
-that share an identical membership set into a single multi-subpath entry --
-2867 edges collapse to ~620, with no change to what's drawn or how the
-`data-active` CSS highlighting behaves.
+mctrot_map.svg is the source of truth for the map: a real Manhattan
+silhouette, every McDonald's location, a layer of every road segment any
+route uses (one `<path>` per road-network node-to-node segment), and a layer
+with one continuous `<path>` per location pair, walking that pair's shortest
+route. The simulator draws the road segments as one grey multi-subpath
+`<path>` (SVG renders the subpaths exactly like separate elements), and the
+current tour's legs over it, each as a single stroke so its corners join
+cleanly.
 
-This script transcodes the (merged) SVG into:
+This script transcodes the SVG into:
 
   - ../src/MctrotMapData.elm: pure Elm data (no logic) that Simulator.elm renders.
-  - ../css/mctrot-map.css: base layer styles plus one CSS rule per possible
-    location-pair, so Simulator.elm only ever needs to update a single
-    `data-active` attribute at runtime to drive route highlighting.
+  - ../css/mctrot-map.css: the map layers' styles.
 
 McdData.elm holds each location's nickname, street address, coordinates, its weekly open/closed windows
 (see `week_windows`), and the walking-distance matrix.
@@ -75,24 +68,27 @@ def main():
     locations.sort(key=lambda t: t[0])
     assert locations, "no location circles found"
 
-    edges = []
-    for path in root.findall(f".//{NS}g[@id='layer-routes']/{NS}path"):
-        edges.append((path.get("class"), path.get("d")))
+    edges = [path.get("d") for path in root.findall(f".//{NS}g[@id='layer-routes']/{NS}path")]
     assert edges, "no route-edge paths found"
 
-    merged_edges = merge_edges(edges)
-
-    write_elm(view_box, borough_d, locations, merged_edges)
-    write_css([mcd_id for mcd_id, _, _ in locations])
-
-    print(
-        f"wrote {ELM_OUT} ({len(locations)} locations, "
-        f"{len(edges)} route edges merged into {len(merged_edges)})"
-    )
-    n = len(locations)
-    print(f"wrote {CSS_OUT} ({n * (n - 1) // 2} highlight rules)")
+    legs = {}
+    for path in root.findall(f".//{NS}g[@id='layer-legs']/{NS}path"):
+        lo, hi = int(path.get("data-lo")), int(path.get("data-hi"))
+        assert lo < hi, f"leg {lo}-{hi} isn't keyed lower mcd_id first"
+        legs[(lo, hi)] = path.get("d")
 
     mcd_ids = [mcd_id for mcd_id, _, _ in locations]
+    n = len(mcd_ids)
+    assert len(legs) == n * (n - 1) // 2 and all(
+        (a, b) in legs for i, a in enumerate(mcd_ids) for b in mcd_ids[i + 1 :]
+    ), "mctrot_map.svg's layer-legs doesn't cover every location pair"
+
+    write_elm(view_box, borough_d, locations, edges, legs)
+    write_css()
+
+    print(f"wrote {ELM_OUT} ({len(locations)} locations, {len(edges)} route edges, {len(legs)} legs)")
+    print(f"wrote {CSS_OUT}")
+
     write_mcd_elm(mcd_ids)
     print(f"wrote {MCD_ELM_OUT} ({len(mcd_ids)} locations)")
 
@@ -246,51 +242,51 @@ distanceMeters =
     MCD_ELM_OUT.write_text(elm_source)
 
 
-def merge_edges(edges):
-    """Combines edges that share an identical `lX-lY` membership set into one
-    multi-subpath entry each (see the module docstring for why this is safe).
-    """
-    groups = {}
-    order = []
-    for classes, d in edges:
-        tokens = tuple(sorted(classes.split()[1:]))
-        if tokens not in groups:
-            groups[tokens] = []
-            order.append(tokens)
-        groups[tokens].append(d)
-
-    return [
-        ("route-edge " + " ".join(tokens), " ".join(groups[tokens]))
-        for tokens in order
-    ]
+def path_xs(d):
+    """Every point's absolute x in a path of `M`/`L` (absolute) and `l`
+    (relative) line moves, as ST_AsSVG writes them."""
+    xs = []
+    x = 0.0
+    relative = False
+    tokens = d.split()
+    i = 0
+    while i < len(tokens):
+        t = tokens[i]
+        if t in ("M", "L", "l"):
+            relative = t == "l"
+            i += 1
+            continue
+        x = x + float(t) if relative else float(t)
+        xs.append(x)
+        i += 2
+    return xs
 
 
 def route_view_box(view_box, locations, edges):
     """`view_box` narrowed horizontally to just the locations and route paths
     (full height kept), for the simulator's "stretch" map."""
     xs = [cx for _, cx, _ in locations]
-    for _, d in edges:
-        tokens = [t for t in d.split() if t not in ("M", "L")]
-        xs.extend(float(t) for t in tokens[0::2])
+    for d in edges:
+        xs.extend(path_xs(d))
     _, min_y, _, height = view_box.split()
     return f"{min(xs)} {min_y} {round(max(xs) - min(xs), 1)} {height}"
 
 
-def write_elm(view_box, borough_d, locations, edges):
+def write_elm(view_box, borough_d, locations, edges, legs):
     ids_list = ", ".join(str(mcd_id) for mcd_id, _, _ in locations)
     coords_list = ", ".join(f"( {cx}, {cy} )" for _, cx, cy in locations)
-    edges_list = ",\n    ".join(
-        f"{{ classes = {elm_string(classes)}, d = {elm_string(d)} }}"
-        for classes, d in edges
+    legs_list = "\n        , ".join(
+        f"( ( {lo}, {hi} ), {elm_string(d)} )" for (lo, hi), d in sorted(legs.items())
     )
 
-    elm_source = f"""module MctrotMapData exposing (boroughPath, locationCoords, mapViewBox, mcdIds, routeEdges, routeViewBox)
+    elm_source = f"""module MctrotMapData exposing (boroughPath, legPaths, locationCoords, mapViewBox, mcdIds, routeNetworkPath, routeViewBox)
 
 {{-| Generated by website/data/generate_elm_data.py from website/data/mctrot_map.svg.
 Do not hand-edit; re-run the script instead.
 -}}
 
 import Array exposing (Array)
+import Dict exposing (Dict)
 
 
 mapViewBox : String
@@ -331,47 +327,45 @@ locationCoords =
     Array.fromList [ {coords_list} ]
 
 
-{{-| Every real-street road segment in the routing layer, with adjacent
-segments that share an identical route membership already merged into one
-entry (see generate_elm_data.py's `merge_edges`) -- `d` may hold several
-disconnected `M ... L ...` subpaths, which render exactly like separate
-`<path>` elements would. Each `classes` string includes every `lX-lY` token
-(X, Y are `mcdIds` values) whose shortest route crosses that segment -- see
-mctrot-map.css for the `[data-active~="lX-lY"] .lX-lY` highlight rules these
-tokens drive.
+{{-| Every real-street road segment any route uses, as one path of
+disconnected `M ... L ...` subpaths.
 -}}
-routeEdges : List {{ classes : String, d : String }}
-routeEdges =
-    [ {edges_list}
-    ]
+routeNetworkPath : String
+routeNetworkPath =
+    {elm_string(" ".join(edges))}
+
+
+{{-| One continuous path per location pair, keyed by `( lo, hi )` `mcdIds`
+values with `lo < hi`, walking that pair's shortest route from `lo` to `hi`
+(relative moves, so each begins with an absolute `M`).
+-}}
+legPaths : Dict ( Int, Int ) String
+legPaths =
+    Dict.fromList
+        [ {legs_list}
+        ]
 """
     ELM_OUT.write_text(elm_source)
 
 
-def write_css(mcd_ids):
+def write_css():
     lines = [
         # The map is stretched non-uniformly to fill its box, so every stroke
         # is non-scaling and sized in screen pixels. Locations are zero-length
         # round-capped paths, which stay circular under the stretch.
-        # --route-active recolors the highlighted route. Location markers are
+        # Route legs are single strokes, round-joined so corners stay clean;
+        # --route-active recolors them. Location markers are
         # HTML over the map (see viewLocationLayer in src/Simulator.elm), so
         # they keep their shape too.
         ".borough { fill: #000; stroke: #999; stroke-width: 0.5px; vector-effect: non-scaling-stroke; }",
-        ".route-edge { fill: none; stroke: #ccc; stroke-width: 1px; vector-effect: non-scaling-stroke; transition: stroke 150ms ease, stroke-width 150ms ease; }",
+        ".route-edge { fill: none; stroke: #ccc; stroke-width: 1px; vector-effect: non-scaling-stroke; }",
+        ".route-leg { fill: none; stroke: var(--route-active, #FFD100); stroke-width: 8px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }",
         ".location { position: absolute; transform: translate(-50%, -50%); }",
         ".location-stop { width: 5px; height: 5px; border-radius: 50%; background: #FF0000; }",
         ".location-start, .location-finish { width: 14px; height: 14px; border: 1px solid #fff; transform: translate(-50%, -50%) rotate(45deg); }",
         ".location-start { background: #1a9e3a; }",
         ".location-finish { background: conic-gradient(#000 0 25%, #fff 0 50%, #000 0 75%, #fff 0); }",
-        "",
     ]
-    n = len(mcd_ids)
-    for i in range(n):
-        for j in range(i + 1, n):
-            token = f"l{mcd_ids[i]}-l{mcd_ids[j]}"
-            lines.append(
-                f'[data-active~="{token}"] .{token} {{ stroke: var(--route-active, #FFD100); stroke-width: 8px; }}'
-            )
     CSS_OUT.write_text("\n".join(lines) + "\n")
 
 

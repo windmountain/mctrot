@@ -50,6 +50,7 @@ import SimulatedAnnealing exposing (Config, State)
 import SimulatedAnnealing.Schedule as Schedule
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
+import Svg.Keyed
 import Task
 import Time
 
@@ -1405,32 +1406,26 @@ mapDisplayHeight =
     1093
 
 
-{-| One space-separated `lX-lY` token per leg of the route (see `stops`), where X and Y are real `mcd_id`s
-(see `MctrotMapData.mcdIds`) in ascending order — matching the class-token
-convention already baked into `MctrotMapData.routeEdges`. Setting this as an
-ancestor `data-active` attribute is what lets `css/mctrot-map.css` highlight
-exactly the streets the current tour uses, without Elm ever touching the
-(lazy, otherwise-static) SVG subtree itself.
+{-| Each leg of the route (see `stops`) as its `( lo, hi )` pair of real
+`mcd_id`s (see `MctrotMapData.mcdIds`), the key `MctrotMapData.legPaths` uses.
 -}
-tourEdgeTokens : List Int -> String
-tourEdgeTokens route =
-    List.map2 pairToken route (List.drop 1 route)
-        |> String.join " "
-
-
-pairToken : Int -> Int -> String
-pairToken cityIndexA cityIndexB =
+tourLegs : List Int -> List ( Int, Int )
+tourLegs route =
     let
         mcdIdFor cityIndex =
             Array.get cityIndex MctrotMapData.mcdIds |> Maybe.withDefault 0
 
-        a =
-            mcdIdFor cityIndexA
+        leg cityIndexA cityIndexB =
+            let
+                a =
+                    mcdIdFor cityIndexA
 
-        b =
-            mcdIdFor cityIndexB
+                b =
+                    mcdIdFor cityIndexB
+            in
+            ( min a b, max a b )
     in
-    "l" ++ String.fromInt (min a b) ++ "-l" ++ String.fromInt (max a b)
+    List.map2 leg route (List.drop 1 route)
 
 
 stretchPadding : String
@@ -1517,15 +1512,36 @@ viewBoroughLayer fit =
     mapLayer fit [ Svg.path [ SvgAttr.class "borough", SvgAttr.d MctrotMapData.boroughPath ] [] ]
 
 
-{-| All real-street route segments — built once per `MapFit`; only the
-wrapping `data-active` attribute changes per tick (see `tourEdgeTokens`).
+{-| Every real-street segment any route uses, in grey — built once per
+`MapFit`.
 -}
 viewRouteLayer : MapFit -> Html msg
 viewRouteLayer fit =
+    mapLayer fit [ Svg.path [ SvgAttr.class "route-edge", SvgAttr.d MctrotMapData.routeNetworkPath ] [] ]
+
+
+{-| The current tour's legs, each one continuous stroke (see
+`MctrotMapData.legPaths`) so the route turns its corners cleanly. Keyed by
+leg, so a tick that swaps a few legs only touches those paths.
+-}
+viewLegLayer : MapFit -> List ( Int, Int ) -> Html msg
+viewLegLayer fit legs =
     mapLayer fit
-        (MctrotMapData.routeEdges
-            |> List.map (\edge -> Svg.path [ SvgAttr.class edge.classes, SvgAttr.d edge.d ] [])
-        )
+        [ Svg.Keyed.node "g"
+            []
+            (legs
+                |> List.filterMap
+                    (\(( lo, hi ) as leg) ->
+                        Dict.get leg MctrotMapData.legPaths
+                            |> Maybe.map
+                                (\d ->
+                                    ( String.fromInt lo ++ "-" ++ String.fromInt hi
+                                    , Svg.path [ SvgAttr.class "route-leg", SvgAttr.d d ] []
+                                    )
+                                )
+                    )
+            )
+        ]
 
 
 {-| What a location's marker shows: where the route starts, where it
@@ -1607,11 +1623,12 @@ streets highlighted and its ends marked.
 -}
 viewMapLayers : MapFit -> String -> List Int -> Html msg
 viewMapLayers fit height route =
-    Html.div [ Attr.attribute "data-active" (tourEdgeTokens route) ]
+    Html.div []
         [ viewMapFrame fit
             height
             [ Html.Lazy.lazy viewBoroughLayer fit
             , Html.Lazy.lazy viewRouteLayer fit
+            , viewLegLayer fit (tourLegs route)
             , Html.Lazy.lazy3 viewLocationLayer fit (List.head route) (List.Extra.last route)
             ]
         ]

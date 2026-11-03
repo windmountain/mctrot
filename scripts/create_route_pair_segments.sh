@@ -4,9 +4,10 @@ set -euo pipefail
 #
 # Unlike route_segment (which only dissolves route_dijkstra edges to
 # distinct geometry for QGIS labeling), this preserves which location-pair(s)
-# traverse each edge, so the exported SVG can tag each edge with a CSS class
-# per pair and a frontend can toggle one pair's route without duplicating
-# geometry.
+# traverse each edge. export_map_svg.py draws these edges as the map's grey
+# street network; the highlighted route legs come straight from
+# route_dijkstra, one continuous path per pair, so pair_classes is no longer
+# exported.
 
 psql -h 127.0.0.1 -p 5432 -d mctrot << 'SQL'
 

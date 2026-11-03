@@ -62,14 +62,53 @@ location_rows = conn.execute(
 edge_rows = conn.execute(
     """
     WITH e AS (
-      SELECT id, pair_classes, ST_Rotate(
+      SELECT id, ST_Rotate(
         ST_Transform(the_geom, 2263),
         radians(%(rotation)s),
         ST_GeomFromText(%(center)s, 2263)
       ) AS g
       FROM route_segment_pairs
     )
-    SELECT id, pair_classes, ST_AsSVG(g, 0, 1) FROM e ORDER BY id
+    SELECT id, ST_AsSVG(g, 1, 0) FROM e ORDER BY id
+    """,
+    params,
+).fetchall()
+
+# One continuous path per unordered location pair, walking from the lower
+# mcd_id to the higher, so a highlighted route is drawn as a single stroke
+# with real joins at every corner. Each route_dijkstra step's `node` is the
+# vertex it leaves from, always one end of its edge, so an edge drawn the
+# other way is reversed to keep the points in walking order (the same
+# stitching as export_simulator_data.py's route_legs.csv). Simplified to
+# within 3 ft and written as relative whole-foot moves to keep the
+# simulator's script small.
+leg_rows = conn.execute(
+    """
+    WITH steps AS (
+      SELECT src.mcd_id AS lo, dst.mcd_id AS hi, rd.path_seq,
+             CASE WHEN rd.node = sr.source THEN sr.the_geom ELSE ST_Reverse(sr.the_geom) END AS g
+      FROM route_dijkstra rd
+      JOIN mcd_routing_node src ON rd.start_vid = src.vertex_id
+      JOIN mcd_routing_node dst ON rd.end_vid = dst.vertex_id
+      JOIN sidewalk_routing sr ON sr.id = rd.edge
+      WHERE src.mcd_id < dst.mcd_id AND rd.edge <> -1
+    ), points AS (
+      SELECT lo, hi, path_seq, (ST_DumpPoints(g)).path[1] AS i, (ST_DumpPoints(g)).geom AS p
+      FROM steps
+    ), legs AS (
+      SELECT lo, hi, ST_RemoveRepeatedPoints(ST_MakeLine(p ORDER BY path_seq, i)) AS g
+      FROM points
+      GROUP BY lo, hi
+    )
+    SELECT lo, hi, ST_AsSVG(
+      ST_Simplify(
+        ST_Rotate(ST_Transform(g, 2263), radians(%(rotation)s), ST_GeomFromText(%(center)s, 2263)),
+        3
+      ),
+      1, 0
+    )
+    FROM legs
+    ORDER BY lo, hi
     """,
     params,
 ).fetchall()
@@ -87,14 +126,20 @@ location_elements = "\n".join(
 )
 
 edge_elements = "\n".join(
-    f'      <path id="edge-{edge_id}" class="route-edge {" ".join(pair_classes)}" d="{svg}"/>'
-    for edge_id, pair_classes, svg in edge_rows
+    f'      <path id="edge-{edge_id}" class="route-edge" d="{svg}"/>'
+    for edge_id, svg in edge_rows
+)
+
+leg_elements = "\n".join(
+    f'      <path id="leg-{lo}-{hi}" class="route-leg" data-lo="{lo}" data-hi="{hi}" d="{svg}"/>'
+    for lo, hi, svg in leg_rows
 )
 
 svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_x:.1f} {view_y:.1f} {view_w:.1f} {view_h:.1f}">
   <style>
     .borough {{ fill: #000; stroke: #999; stroke-width: 20; }}
     .route-edge {{ fill: none; stroke: #ccc; stroke-width: 55; }}
+    .route-leg {{ display: none; fill: none; stroke: #FFD100; stroke-width: 55; stroke-linejoin: round; stroke-linecap: round; }}
     .location {{ fill: #FFD100; stroke: #fff; stroke-width: 4; }}
   </style>
   <g id="layer-borough">
@@ -102,6 +147,9 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_x:.1f} {view_y:
   </g>
   <g id="layer-routes">
 {edge_elements}
+  </g>
+  <g id="layer-legs">
+{leg_elements}
   </g>
   <g id="layer-locations">
 {location_elements}
