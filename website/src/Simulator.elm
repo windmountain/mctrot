@@ -33,7 +33,6 @@ import Browser.Dom
 import Browser.Events
 import Calendar
 import Dict exposing (Dict)
-import File.Download
 import Gpx
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -601,6 +600,13 @@ init defaultStartDate =
 port print : () -> Cmd msg
 
 
+{-| Hands a GPX file to simulator.html, which opens the share sheet on
+touch devices that can share files (so the visitor can send it straight to
+a map app) and downloads it everywhere else.
+-}
+port saveGpx : { filename : String, gpx : String } -> Cmd msg
+
+
 searching : Model -> Bool
 searching model =
     model.running && not (SimulatedAnnealing.isDone (config model.activeStart) model.saState)
@@ -721,7 +727,9 @@ fetchLegs =
         }
 
 
-{-| Saves the best route as `mctrot-YYYY-MM-DD.gpx` (see `Gpx.build`).
+{-| Shares or saves the best route as `mctrot-YYYY-MM-DD.gpx` (see
+`Gpx.build`, `saveGpx`). Safari only shares in direct response to a tap,
+which is why the legs are fetched ahead of time, when the search starts.
 -}
 downloadGpx : Model -> Dict String String -> Cmd msg
 downloadGpx model legs =
@@ -745,15 +753,16 @@ downloadGpx model legs =
                         }
                     )
     in
-    File.Download.string ("mctrot-" ++ dateText ++ ".gpx")
-        "application/gpx+xml"
-        (Gpx.build
-            { name = "McTrot route" ++ (Maybe.map (\d -> ", " ++ Calendar.formatLong d) startTime.date |> Maybe.withDefault "")
-            , date = startTime.date
-            , legs = legs
-            , stops = List.filterMap toStop (simulate startTime (SimulatedAnnealing.best model.saState))
-            }
-        )
+    saveGpx
+        { filename = "mctrot-" ++ dateText ++ ".gpx"
+        , gpx =
+            Gpx.build
+                { name = "McTrot route" ++ (Maybe.map (\d -> ", " ++ Calendar.formatLong d) startTime.date |> Maybe.withDefault "")
+                , date = startTime.date
+                , legs = legs
+                , stops = List.filterMap toStop (simulate startTime (SimulatedAnnealing.best model.saState))
+                }
+        }
 
 
 focus : String -> Cmd Msg

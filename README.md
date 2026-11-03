@@ -126,13 +126,13 @@ devenv shell -- website/build.sh   # copies public pages/assets, compiles Elm to
 
 Elm tests: `cd website && elm-test`.
 
-The simulator's data (locations, nicknames, hours, walking distances, and the map) comes from the database. After loading (and `scripts/export_map_svg.py`), export it:
+The simulator's data (locations, nicknames, hours, walking distances, the walking paths its GPX export follows, and the map) comes from the database. After loading (and `scripts/export_map_svg.py`), export it:
 
 ```
 uv run scripts/export_simulator_data.py   # writes website/data/*.csv + mctrot_map.svg, then runs website/data/generate_elm_data.py
 ```
 
-That generator writes `website/src/MctrotMapData.elm`, `website/src/McdData.elm` and `website/css/mctrot-map.css`; rebuild the site afterwards.
+That generator writes `website/src/MctrotMapData.elm`, `website/src/McdData.elm`, `website/css/mctrot-map.css` and `website/geo/route-legs.json` (fetched by the simulator only for GPX export); rebuild the site afterwards.
 
 # A note on AI
 
