@@ -1255,16 +1255,16 @@ viewExport done legs copied =
                 (case legs of
                     Loading { thenDownload } ->
                         if thenDownload then
-                            "Export GPX…"
+                            "GPX…"
 
                         else
-                            "Export GPX"
+                            "GPX"
 
                     Failed ->
-                        "Retry export"
+                        "Retry GPX"
 
                     _ ->
-                        "Export GPX"
+                        "GPX"
                 )
             ]
         , Html.button [ Attr.class "key", Attr.disabled (not done), Events.onClick Share ]
