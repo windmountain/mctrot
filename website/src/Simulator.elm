@@ -29,12 +29,14 @@ minutes/mile (see `travelTime`).
 
 import Array exposing (Array)
 import Browser
+import Browser.Dom
 import Browser.Events
 import Calendar
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Lazy
+import Json.Decode as Decode
 import List.Extra
 import McdData exposing (City, cities, distanceMeters)
 import MctrotMapData
@@ -444,6 +446,7 @@ type alias Model =
     , activeStart : StartTime
     , tab : Tab
     , mapFit : MapFit
+    , settingsOpen : Bool
     }
 
 
@@ -452,22 +455,20 @@ type Tab
     | MapTab
 
 
-{-| How the map fills its box: `Normal` keeps its true proportions, `Stretch`
-stretches the whole map to the box's width, and `Superstretch` stretches
-just the locations and route paths to within `superstretchPadding` of each
+{-| How the map fills its box: `Normal` keeps its true proportions, and
+`Stretch` stretches just the locations and route paths to within
+`stretchPadding` of each
 side (see `viewMapStatic`).
 -}
 type MapFit
     = Normal
     | Stretch
-    | Superstretch
 
 
 mapFits : List ( MapFit, String, String )
 mapFits =
     [ ( Normal, "normal", "Normal" )
     , ( Stretch, "stretch", "Stretch" )
-    , ( Superstretch, "superstretch", "Superstretch" )
     ]
 
 
@@ -485,6 +486,9 @@ type Msg
     | SelectTab Tab
     | SetMapFit String
     | Print
+    | OpenSettings
+    | CloseSettings
+    | NoOp
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -560,8 +564,9 @@ init defaultStartDate =
       , startCityInput = startCityInput
       , endCityInput = endCityInput
       , activeStart = activeStart
-      , tab = ScheduleTab
+      , tab = MapTab
       , mapFit = Stretch
+      , settingsOpen = False
       }
     , Cmd.none
     )
@@ -609,7 +614,7 @@ update msg model =
                 ( model, Cmd.none )
 
         Start ->
-            ( startSearch model, Cmd.none )
+            ( startSearch { model | settingsOpen = False }, Cmd.none )
 
         SetStartDate date ->
             ( { model | startDate = date }, Cmd.none )
@@ -648,6 +653,20 @@ update msg model =
         Print ->
             ( model, print () )
 
+        OpenSettings ->
+            ( { model | settingsOpen = True }, focus settingsCloseId )
+
+        CloseSettings ->
+            ( { model | settingsOpen = False }, focus settingsOpenerId )
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+focus : String -> Cmd Msg
+focus id =
+    Task.attempt (\_ -> NoOp) (Browser.Dom.focus id)
+
 
 
 -- SUBSCRIPTIONS
@@ -666,14 +685,15 @@ subscriptions model =
 -- VIEW
 
 
-{-| Roughly how wide the schedule's timeline column renders. It actually
+{-| Roughly how wide the schedule's timeline column renders: the page is
+one column at most 30rem wide, less the location names. It actually
 stretches to fill whatever the location-name column leaves (see
 `viewSchedule`), so this only decides how densely `viewTimeAxis` labels
 hours.
 -}
 nominalTimelineWidth : Float
 nominalTimelineWidth =
-    760
+    220
 
 
 rowHeight : Float
@@ -699,62 +719,269 @@ view model =
         ]
 
 
+{-| The whole page, mobile first (styled in css/style.css under "simulator
+app"): a link home, then either the START button over a summary of the
+settings (before the first run), or the screen — readouts over the map or
+schedule — above a bar of keys and RESTART. The settings open in a sheet
+over everything; the export keys appear only once the search is done.
+-}
 viewScreen : Model -> Tour -> List Visit -> Int -> Html Msg
 viewScreen model tour visits viewMax =
-    Html.div [ Attr.class "simulator-screen", Attr.style "font-family" "sans-serif", Attr.style "max-width" "1100px" ]
-        [ viewRunSettings model
-        , box "Search"
-            [ Html.button [ Events.onClick Start ] [ Html.text "Start" ]
-            , readout "Iteration" (String.fromInt (SimulatedAnnealing.iteration model.saState))
-            , readout "Temperature" (String.fromInt (round (SimulatedAnnealing.temperature (config model.activeStart) model.saState)))
-            , readout "Current route time" (formatDuration (round (SimulatedAnnealing.currentEnergy model.saState)))
-            , readout "Current distance" (formatMiles (totalDistanceMeters model.activeStart tour))
+    let
+        done =
+            model.running && SimulatedAnnealing.isDone (config model.activeStart) model.saState
+    in
+    Html.div [ Attr.class "simulator-screen sim" ]
+        (List.concat
+            [ [ Html.h1 [ Attr.class "sr-only" ] [ Html.text "McTrot Simulator" ]
+              , viewTopBar model.running done
+              ]
+            , if model.running then
+                [ viewDisplay model tour visits viewMax done
+                , viewControls model.tab done
+                ]
+
+              else
+                [ viewIdle model ]
+            , if model.settingsOpen then
+                viewSettingsSheet model
+
+              else
+                []
             ]
-        , viewTabs model.tab
-            (case model.tab of
+        )
+
+
+viewTopBar : Bool -> Bool -> Html msg
+viewTopBar running done =
+    Html.div [ Attr.class "sim-top" ]
+        [ Html.a [ Attr.class "sim-home", Attr.href "/" ] [ Html.text "← McTrot" ]
+        , Html.p [ Attr.class "sim-status", Attr.attribute "aria-live" "polite" ]
+            [ Html.text
+                (if not running then
+                    ""
+
+                 else if done then
+                    "Done"
+
+                 else
+                    "Searching…"
+                )
+            ]
+        ]
+
+
+{-| Before the first run: START in the thumb zone, over a summary of the
+settings that opens the settings sheet.
+-}
+viewIdle : Model -> Html Msg
+viewIdle model =
+    Html.div [ Attr.class "sim-idle" ]
+        [ viewStartButton "start-big" "Start"
+        , Html.button
+            [ Attr.class "summary"
+            , Attr.id settingsOpenerId
+            , Attr.attribute "aria-haspopup" "dialog"
+            , Events.onClick OpenSettings
+            ]
+            (List.map (\line -> Html.span [ Attr.class "summary-line" ] [ Html.text line ]) (settingsSummary model)
+                ++ [ Html.span [ Attr.class "summary-edit" ] [ Html.text "Change settings" ] ]
+            )
+        ]
+
+
+{-| The settings as the next Start will read them (see `startSearch`).
+-}
+settingsSummary : Model -> List String
+settingsSummary model =
+    let
+        dateText =
+            Calendar.parseDate model.startDate |> Maybe.map Calendar.formatShort |> Maybe.withDefault model.startDate
+
+        cityName raw =
+            parseCity raw |> Maybe.andThen (\i -> Array.get i cities) |> Maybe.map .name |> Maybe.withDefault "Flexible"
+    in
+    [ dateText ++ " · " ++ formatClock (parseStartMinutes model.startTimeOfDay)
+    , String.fromFloat (parseMinutesPerMile model.speedInput) ++ " min/mi · " ++ String.fromInt (parseStopMinutes model.stopInput) ++ " min stops"
+    , cityName model.startCityInput ++ " → " ++ cityName model.endCityInput ++ " · seed " ++ String.fromInt (parseSeed model.seedInput)
+    ]
+
+
+{-| The screen: readouts, then the selected tab's panel, which scrolls on
+its own while the page stays put.
+-}
+viewDisplay : Model -> Tour -> List Visit -> Int -> Bool -> Html Msg
+viewDisplay model tour visits viewMax done =
+    let
+        iterations =
+            formatCount (SimulatedAnnealing.iteration model.saState)
+
+        hudRow label time meters =
+            Html.div [ Attr.class "hud-row" ]
+                [ Html.span [ Attr.class "hud-label" ] [ Html.text label ]
+                , Html.span [ Attr.class "hud-value" ] [ Html.text (formatDuration time) ]
+                , Html.span [ Attr.class "hud-value" ] [ Html.text (formatMiles meters) ]
+                ]
+    in
+    Html.section [ Attr.class "bezel", Attr.attribute "aria-label" "Search" ]
+        [ Html.div [ Attr.class "hud" ]
+            (hudRow "Best" (round (SimulatedAnnealing.bestEnergy model.saState)) (totalDistanceMeters model.activeStart (SimulatedAnnealing.best model.saState))
+                :: (if done then
+                        [ Html.p [ Attr.class "hud-meta" ] [ Html.text (iterations ++ " iterations") ] ]
+
+                    else
+                        [ hudRow "Now" (round (SimulatedAnnealing.currentEnergy model.saState)) (totalDistanceMeters model.activeStart tour)
+                        , Html.p [ Attr.class "hud-meta" ]
+                            [ Html.text ("iter " ++ iterations ++ " · temp " ++ String.fromInt (round (SimulatedAnnealing.temperature (config model.activeStart) model.saState))) ]
+                        ]
+                   )
+            )
+        , Html.div
+            [ Attr.attribute "role" "tabpanel"
+            , Attr.id "simulator-tabpanel"
+            , Attr.attribute "aria-labelledby" (tabId model.tab)
+            , Attr.class "tabpanel"
+            ]
+            [ case model.tab of
                 MapTab ->
                     viewMap model.mapFit (stops model.activeStart tour)
 
                 ScheduleTab ->
                     Html.div []
-                        [ Html.p [ Attr.style "color" "#666", Attr.style "font-size" "0.85rem", Attr.style "margin" "0 0 0.5rem 0" ]
-                            [ Html.text "Pink bands are hours a restaurant is closed. Blue bars are time spent at a restaurant. Orange bars also include waiting for it to open." ]
+                        [ Html.ul [ Attr.class "sched-key" ]
+                            [ keyItem "swatch-closed" "Closed"
+                            , keyItem "swatch-visit" "At stop"
+                            , keyItem "swatch-wait" "Waited to open"
+                            ]
                         , viewSchedule model.activeStart viewMax visits
                         ]
-            )
-        , box "Results"
-            [ readout "Best route time" (formatDuration (round (SimulatedAnnealing.bestEnergy model.saState)))
-            , readout "Best distance" (formatMiles (totalDistanceMeters model.activeStart (SimulatedAnnealing.best model.saState)))
-            ]
-        , box "Output"
-            -- Disabled until a search has produced a route to act on.
-            [ Html.button [ Attr.disabled (not model.running), Events.onClick Print ] [ Html.text "Print" ]
-            , Html.button [ Attr.disabled True ] [ Html.text "Download GPX" ]
-            , Html.details [ Attr.class "distance-matrix", Attr.style "flex-basis" "100%" ]
-                [ Html.summary [ Attr.style "cursor" "pointer", Attr.style "color" "#666" ]
-                    [ Html.text "Distance matrix (meters)" ]
-                , viewCostMatrix
-                ]
             ]
         ]
 
 
-{-| A titled group: a `<fieldset>` whose `<legend>` names it.
+{-| 179800 → "179,800"
 -}
-box : String -> List (Html msg) -> Html msg
-box title children =
-    Html.fieldset
-        [ Attr.style "border" "1px solid #999"
-        , Attr.style "margin" "0.75rem 0"
-        , Attr.style "padding" "0.75rem"
-        , Attr.style "display" "flex"
-        , Attr.style "flex-wrap" "wrap"
-        , Attr.style "gap" "0.5rem 1rem"
-        , Attr.style "align-items" "flex-end"
+formatCount : Int -> String
+formatCount n =
+    String.fromInt n
+        |> String.reverse
+        |> String.toList
+        |> List.Extra.greedyGroupsOf 3
+        |> List.map String.fromList
+        |> String.join ","
+        |> String.reverse
+
+
+keyItem : String -> String -> Html msg
+keyItem swatchClass label =
+    Html.li [] [ Html.span [ Attr.class ("swatch " ++ swatchClass) ] [], Html.text label ]
+
+
+{-| The bar under the screen: view keys, the settings key, the export keys
+once the search is done, and RESTART.
+-}
+viewControls : Tab -> Bool -> Html Msg
+viewControls tab done =
+    Html.div [ Attr.class "sim-controls" ]
+        [ Html.div [ Attr.class "sim-keys" ]
+            [ viewTabList tab
+            , Html.button
+                [ Attr.class "key key-icon"
+                , Attr.id settingsOpenerId
+                , Attr.attribute "aria-haspopup" "dialog"
+                , Attr.attribute "aria-label" "Settings"
+                , Events.onClick OpenSettings
+                ]
+                [ Html.text "⚙\u{FE0E}" ]
+            , if done then
+                viewExport
+
+              else
+                Html.text ""
+            ]
+        , viewStartButton "start-small" "Restart"
         ]
-        (Html.legend [ Attr.style "font-weight" "bold", Attr.style "padding" "0 0.25rem" ] [ Html.text title ]
-            :: children
-        )
+
+
+{-| `size` is "start-big", "start-small", or "start-sheet" (see css).
+-}
+viewStartButton : String -> String -> Html Msg
+viewStartButton size label =
+    Html.div [ Attr.class ("start-well " ++ size) ]
+        [ Html.button [ Attr.class "start-button", Events.onClick Start ] [ Html.text label ] ]
+
+
+viewExport : Html Msg
+viewExport =
+    Html.div [ Attr.class "export" ]
+        [ Html.button [ Attr.class "key", Events.onClick Print ] [ Html.text "Print" ]
+        , Html.button [ Attr.class "key", Attr.disabled True ] [ Html.text "GPX" ]
+        , Html.details [ Attr.class "distance-matrix" ]
+            [ Html.summary [] [ Html.text "Distance matrix (meters)" ]
+            , viewCostMatrix
+            ]
+        ]
+
+
+{-| Only one opener is on the page at a time (the summary before the first
+run, the settings key after), so they share an id for returning focus.
+-}
+settingsOpenerId : String
+settingsOpenerId =
+    "settings-open"
+
+
+settingsCloseId : String
+settingsCloseId =
+    "settings-close"
+
+
+{-| A modal sheet from the bottom: a backdrop that closes it, and the
+settings with their own START, so changing them and starting is one step.
+Escape closes it too.
+-}
+viewSettingsSheet : Model -> List (Html Msg)
+viewSettingsSheet model =
+    let
+        closeOnEscape =
+            Decode.field "key" Decode.string
+                |> Decode.andThen
+                    (\key ->
+                        if key == "Escape" then
+                            Decode.succeed CloseSettings
+
+                        else
+                            Decode.fail "not Escape"
+                    )
+    in
+    [ Html.div [ Attr.class "sheet-backdrop", Events.onClick CloseSettings ] []
+    , Html.div
+        [ Attr.class "sheet"
+        , Attr.attribute "role" "dialog"
+        , Attr.attribute "aria-modal" "true"
+        , Attr.attribute "aria-labelledby" "settings-title"
+        , Events.on "keydown" closeOnEscape
+        ]
+        [ Html.div [ Attr.class "sheet-head" ]
+            [ Html.h2 [ Attr.id "settings-title" ] [ Html.text "Settings" ]
+            , Html.button
+                [ Attr.class "key key-icon"
+                , Attr.id settingsCloseId
+                , Attr.attribute "aria-label" "Close settings"
+                , Events.onClick CloseSettings
+                ]
+                [ Html.text "✕\u{FE0E}" ]
+            ]
+        , viewRunSettings model
+        , viewStartButton "start-sheet"
+            (if model.running then
+                "Restart"
+
+             else
+                "Start"
+            )
+        ]
+    ]
 
 
 tabLabel : Tab -> String
@@ -772,72 +999,32 @@ tabId tab =
     "simulator-tab-" ++ String.toLower (tabLabel tab)
 
 
-{-| One bordered rectangle with Map/Schedule tabs along its top edge; only
-the selected tab's panel is rendered, so the hidden one costs nothing per
-frame.
+{-| The Map/Schedule keys. Only the selected tab's panel is rendered (see
+`viewDisplay`), so the hidden one costs nothing per frame.
 -}
-viewTabs : Tab -> Html Msg -> Html Msg
-viewTabs selected panel =
+viewTabList : Tab -> Html Msg
+viewTabList selected =
     let
         viewTab tab =
-            let
-                isSelected =
-                    tab == selected
-            in
             Html.button
                 [ Attr.attribute "role" "tab"
                 , Attr.id (tabId tab)
                 , Attr.attribute "aria-selected"
-                    (if isSelected then
+                    (if tab == selected then
                         "true"
 
                      else
                         "false"
                     )
                 , Attr.attribute "aria-controls" "simulator-tabpanel"
+                , Attr.class "key"
                 , Events.onClick (SelectTab tab)
-                , Attr.style "font" "inherit"
-                , Attr.style "padding" "0.4rem 1rem"
-                , Attr.style "margin-bottom" "-1px"
-                , Attr.style "border" "1px solid #999"
-                , Attr.style "border-bottom-color"
-                    (if isSelected then
-                        "#fff"
-
-                     else
-                        "#999"
-                    )
-                , Attr.style "background"
-                    (if isSelected then
-                        "#fff"
-
-                     else
-                        "#eee"
-                    )
-                , Attr.style "font-weight"
-                    (if isSelected then
-                        "bold"
-
-                     else
-                        "normal"
-                    )
-                , Attr.style "cursor" "pointer"
                 ]
                 [ Html.text (tabLabel tab) ]
     in
-    Html.div [ Attr.style "margin" "0.75rem 0" ]
-        [ Html.div [ Attr.attribute "role" "tablist", Attr.style "display" "flex", Attr.style "gap" "0.25rem", Attr.style "padding-left" "0.5rem" ]
-            (List.map viewTab [ ScheduleTab, MapTab ])
-        , Html.div
-            [ Attr.attribute "role" "tabpanel"
-            , Attr.id "simulator-tabpanel"
-            , Attr.attribute "aria-labelledby" (tabId selected)
-            , Attr.style "border" "1px solid #999"
-            , Attr.style "background" "#fff"
-            , Attr.style "padding" "0.75rem"
-            ]
-            [ panel ]
-        ]
+    Html.div [ Attr.attribute "role" "tablist", Attr.attribute "aria-label" "View", Attr.class "tabs" ]
+        (List.map viewTab [ MapTab, ScheduleTab ])
+
 
 
 mapDisplayWidth : Float
@@ -879,18 +1066,18 @@ pairToken cityIndexA cityIndexB =
     "l" ++ String.fromInt (min a b) ++ "-l" ++ String.fromInt (max a b)
 
 
-superstretchPadding : String
-superstretchPadding =
+stretchPadding : String
+stretchPadding =
     "10px"
 
 
-{-| The viewBox the map's layers share for each `MapFit`: `Superstretch`
+{-| The viewBox the map's layers share for each `MapFit`: `Stretch`
 narrows it to `MctrotMapData.routeViewBox` and lets the borough spill into
 the padding, clipped at the box's edge.
 -}
 mapViewBoxFor : MapFit -> String
 mapViewBoxFor fit =
-    if fit == Superstretch then
+    if fit == Stretch then
         MctrotMapData.routeViewBox
 
     else
@@ -898,8 +1085,8 @@ mapViewBoxFor fit =
 
 
 {-| One of the map's stacked layers: an SVG filling the map frame (see
-`viewMapFrame`) with the viewBox for `fit`. `Stretch` and `Superstretch`
-fill the frame horizontally (`preserveAspectRatio "none"`);
+`viewMapFrame`) with the viewBox for `fit`. `Stretch` fills
+the frame horizontally (`preserveAspectRatio "none"`);
 css/mctrot-map.css keeps line widths and the round dots from stretching with
 it.
 -}
@@ -923,15 +1110,15 @@ mapLayer fit =
 
 
 {-| The box the layers stack in, `height` tall: `mapDisplayWidth` wide and
-centered for `Normal`, the full width otherwise (less `superstretchPadding`
-on each side for `Superstretch`).
+centered for `Normal`, the full width otherwise (less `stretchPadding`
+on each side).
 -}
 viewMapFrame : MapFit -> String -> List (Html msg) -> Html msg
 viewMapFrame fit height layers =
     Html.div
         [ Attr.style "padding"
-            (if fit == Superstretch then
-                "0 " ++ superstretchPadding
+            (if fit == Stretch then
+                "0 " ++ stretchPadding
 
              else
                 "0"
@@ -1176,9 +1363,7 @@ viewMap fit route =
     Html.div [ Attr.style "position" "relative" ]
         [ viewMapLayers fit (String.fromFloat mapDisplayHeight ++ "px") route
         , Html.select
-            [ Attr.style "position" "absolute"
-            , Attr.style "top" "0"
-            , Attr.style "right" "0"
+            [ Attr.class "map-fit"
             , Attr.attribute "aria-label" "Map fit"
             , Events.onInput SetMapFit
             ]
@@ -1202,79 +1387,34 @@ can't shift the energy landscape out from under an in-progress search.
 -}
 viewRunSettings : Model -> Html Msg
 viewRunSettings model =
-    box "Parameters"
-        [ paramRow
-            [ Html.label []
-                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start date" ]
-                , Html.input
-                    [ Attr.type_ "date"
-                    , Attr.value model.startDate
-                    , Events.onInput SetStartDate
-                    ]
-                    []
-                ]
-            , Html.label []
-                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Start time" ]
-                , Html.input
-                    [ Attr.type_ "time"
-                    , Attr.value model.startTimeOfDay
-                    , Events.onInput SetStartTimeOfDay
-                    ]
-                    []
-                ]
-            ]
-        , paramRow
-            [ Html.label []
-                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Pace (min/mile)" ]
-                , Html.input
-                    [ Attr.type_ "number"
-                    , Attr.step "0.5"
-                    , Attr.min "0.5"
-                    , Attr.value model.speedInput
-                    , Events.onInput SetSpeedInput
-                    ]
-                    []
-                ]
-            , Html.label []
-                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Location stop time (minutes)" ]
-                , Html.input
-                    [ Attr.type_ "number"
-                    , Attr.step "1"
-                    , Attr.min "0"
-                    , Attr.value model.stopInput
-                    , Events.onInput SetStopInput
-                    ]
-                    []
-                ]
-            ]
-        , paramRow [ viewCitySelect "Start location" model.startCityInput SetStartCityInput ]
-        , paramRow [ viewCitySelect "End location" model.endCityInput SetEndCityInput ]
-        , paramRow
-            [ Html.label []
-                [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text "Seed" ]
-                , Html.input
-                    [ Attr.type_ "text"
-                    , Attr.value model.seedInput
-                    , Events.onInput SetSeedInput
-                    ]
-                    []
-                ]
-            ]
+    Html.div [ Attr.class "settings" ]
+        [ field ""
+            "Start date"
+            (Html.input [ Attr.type_ "date", Attr.value model.startDate, Events.onInput SetStartDate ] [])
+        , field ""
+            "Start time"
+            (Html.input [ Attr.type_ "time", Attr.value model.startTimeOfDay, Events.onInput SetStartTimeOfDay ] [])
+        , field ""
+            "Pace (min/mile)"
+            (Html.input [ Attr.type_ "number", Attr.step "0.5", Attr.min "0.5", Attr.value model.speedInput, Events.onInput SetSpeedInput ] [])
+        , field ""
+            "Stop time (min)"
+            (Html.input [ Attr.type_ "number", Attr.step "1", Attr.min "0", Attr.value model.stopInput, Events.onInput SetStopInput ] [])
+        , viewCitySelect "Start location" model.startCityInput SetStartCityInput
+        , viewCitySelect "End location" model.endCityInput SetEndCityInput
+        , field ""
+            "Seed"
+            (Html.input [ Attr.type_ "text", Attr.attribute "inputmode" "numeric", Attr.value model.seedInput, Events.onInput SetSeedInput ] [])
         ]
 
 
-{-| One full-width line inside a `box`, so related fields stay together and
-each group starts on its own line.
+{-| One labeled control in the settings tray; `extraClass` widens it
+("field-wide") or is "".
 -}
-paramRow : List (Html msg) -> Html msg
-paramRow =
-    Html.div
-        [ Attr.style "flex-basis" "100%"
-        , Attr.style "display" "flex"
-        , Attr.style "flex-wrap" "wrap"
-        , Attr.style "gap" "0.5rem 1rem"
-        , Attr.style "align-items" "flex-end"
-        ]
+field : String -> String -> Html msg -> Html msg
+field extraClass label control =
+    Html.label [ Attr.class (String.trim ("field " ++ extraClass)) ]
+        [ Html.span [ Attr.class "field-label" ] [ Html.text label ], control ]
 
 
 {-| A start/end location picker: "Flexible" (value "") first, then every
@@ -1287,22 +1427,22 @@ viewCitySelect label selectedValue toMsg =
         option value text =
             Html.option [ Attr.value value, Attr.selected (value == selectedValue) ] [ Html.text text ]
     in
-    Html.label []
-        [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text label ]
-        , Html.select [ Events.onInput toMsg ]
+    field "field-wide"
+        label
+        (Html.select [ Events.onInput toMsg ]
             (option "" "Flexible"
                 :: (northToSouth
                         |> List.filterMap (\i -> Array.get i cities |> Maybe.map (\city -> option (String.fromInt i) (city.name ++ " (" ++ city.address ++ ")")))
                    )
             )
-        ]
+        )
 
 
 readout : String -> String -> Html msg
 readout label value =
-    Html.div []
-        [ Html.div [ Attr.style "font-size" "0.75rem", Attr.style "color" "#666" ] [ Html.text label ]
-        , Html.div [ Attr.style "font-variant-numeric" "tabular-nums" ] [ Html.text value ]
+    Html.div [ Attr.class "readout" ]
+        [ Html.div [ Attr.class "readout-label" ] [ Html.text label ]
+        , Html.div [ Attr.class "readout-value" ] [ Html.text value ]
         ]
 
 
@@ -1388,7 +1528,7 @@ viewTimeAxis startTime viewMax =
                                     baseline - 4
                                 )
                             )
-                        , SvgAttr.stroke "#999"
+                        , SvgAttr.class "sched-axis"
                         ]
                         []
 
@@ -1401,8 +1541,7 @@ viewTimeAxis startTime viewMax =
                     [ SvgAttr.x (xScale viewMax (toFloat elapsed))
                     , SvgAttr.y (String.fromFloat (baseline - 11))
                     , SvgAttr.textAnchor "middle"
-                    , SvgAttr.fontSize "11"
-                    , SvgAttr.fill "#333"
+                    , SvgAttr.class "sched-axis-label"
                     ]
                     [ Svg.text (formatHour (clock // 60)) ]
                 ]
@@ -1420,7 +1559,7 @@ viewTimeAxis startTime viewMax =
             , SvgAttr.x2 "100%"
             , SvgAttr.y1 (String.fromFloat baseline)
             , SvgAttr.y2 (String.fromFloat baseline)
-            , SvgAttr.stroke "#999"
+            , SvgAttr.class "sched-axis"
             ]
             []
             :: (List.range 0 ((viewMax - firstQuarter) // 15)
@@ -1478,14 +1617,14 @@ viewRow startTime viewMax visit =
         barHeight =
             rowHeight - 4
 
-        visitColor =
+        visitClass =
             if visit.wait > 0 then
-                "#e8871e"
+                "sched-wait"
 
             else
-                "#1f6feb"
+                "sched-visit"
     in
-    [ Html.div [ Attr.style "font-size" "11px", Attr.style "color" "#333", Attr.style "white-space" "nowrap" ]
+    [ Html.div [ Attr.class "sched-label" ]
         [ Html.text label ]
     , Svg.svg
         [ SvgAttr.width "100%"
@@ -1497,8 +1636,7 @@ viewRow startTime viewMax visit =
             , SvgAttr.y "0"
             , SvgAttr.width "100%"
             , SvgAttr.height (String.fromFloat barHeight)
-            , SvgAttr.fill "#fff"
-            , SvgAttr.stroke "#eee"
+            , SvgAttr.class "sched-track"
             ]
             []
             :: (closedBandsElapsed city.closedWindows startTime viewMax
@@ -1509,7 +1647,7 @@ viewRow startTime viewMax visit =
                                 , SvgAttr.y "0"
                                 , SvgAttr.width (xScale viewMax (toFloat (e - s)))
                                 , SvgAttr.height (String.fromFloat barHeight)
-                                , SvgAttr.fill "#fbdcdc"
+                                , SvgAttr.class "sched-closed"
                                 ]
                                 []
                         )
@@ -1519,10 +1657,9 @@ viewRow startTime viewMax visit =
                     , SvgAttr.y "6"
                     , SvgAttr.width (xScale viewMax (departureElapsed - arrivalElapsed))
                     , SvgAttr.height (String.fromFloat (rowHeight - 16))
-                    , SvgAttr.fill visitColor
-
-                    -- A same-colored 1px outline keeps a very short visit at least 2px wide.
-                    , SvgAttr.stroke visitColor
+                    -- css/style.css gives it a same-colored 1px outline, which
+                    -- keeps a very short visit at least 2px wide.
+                    , SvgAttr.class visitClass
                     ]
                     []
                ]

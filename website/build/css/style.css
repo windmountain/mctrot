@@ -317,52 +317,513 @@ table.records td {
   border: 0;
 }
 
-/* simulator */
+/* simulator app (see viewScreen in website/src/Simulator.elm)
+
+   simulator.html is a full-page, mobile-first app: no header or footer,
+   one column (at most 30rem, centered on wider screens) exactly one
+   viewport tall. The page is the yellow surface; the parts you touch are
+   physical. One light source, top-left, for everything:
+   - raised parts (buttons, keys) get a light inset bevel top-left, a dark
+     inset bevel bottom-right, and a hard black cast shadow bottom-right;
+   - recessed parts (screen, slots, tray, wells) get the reverse bevels and
+     no cast shadow;
+   - a pressed button drops into its own cast shadow, instantly (no
+     transition), so it clacks.
+   Hard edges only: no blur, no gradients. The colors stay the same in
+   dark mode, like a physical object. */
+
+body.sim-page {
+  background: #FFD100;
+}
+
+.sim-page main {
+  padding: 0;
+}
+
+.sim {
+  --shell: #FFD100;
+  --shell-hi: #FFEA70;
+  --shell-lo: #C9A400;
+  --tray: #F2C700;
+  --screen: #1C1B14;
+  --screen-edge: #3A382C;
+  --screen-ink: #FFD100;
+  --screen-text: #E8E4CC;
+  --screen-dim: #A8A28A;
+  --start: #C8102E;
+  --start-hi: #F25A5A;
+  --start-lo: #7E0A12;
+  --key: #3A382C;
+  --key-hi: #6A6754;
+  --key-lo: #16150F;
+  --cast: #0D0D08;
+
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  color: var(--cast);
+}
+
+/* top bar: the one link off the page, and the search status */
+
+.sim-top {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.25rem 0 0.75rem;
+}
+
+.sim-home {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--cast);
+  text-decoration: none;
+}
+
+.sim-home:hover {
+  text-decoration: underline;
+}
+
+.sim-status {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* before the first run */
+
+.sim-idle {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2.5rem;
+}
+
+.sim-idle .start-well {
+  align-self: center;
+}
+
+.summary {
+  display: block;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  padding: 0.9rem 1rem;
+  color: var(--screen-ink);
+  background: var(--screen);
+  border: 2px solid var(--cast);
+  border-radius: 10px;
+  box-shadow: inset 4px 4px 0 #000, inset -2px -2px 0 var(--screen-edge);
+  cursor: pointer;
+}
+
+.summary-line {
+  display: block;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-edit {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--screen-dim);
+}
+
+.summary:focus-visible {
+  outline: 3px solid var(--cast);
+  outline-offset: 3px;
+}
+
+/* the screen */
+
+.bezel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem 0.9rem 0;
+  color: var(--screen-text);
+  background: var(--screen);
+  border: 3px solid var(--cast);
+  border-radius: 12px;
+  box-shadow: inset 5px 5px 0 #000, inset -3px -3px 0 var(--screen-edge);
+}
+
+.hud {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: baseline;
+  gap: 0.15rem 1rem;
+  padding: 0 0.15rem 0.75rem;
+  border-bottom: 2px solid var(--screen-edge);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-row {
+  display: contents;
+}
+
+.hud-label,
+.hud-meta {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--screen-dim);
+}
+
+.hud-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--screen-ink);
+}
+
+.hud-meta {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0;
+  letter-spacing: 0.06em;
+}
+
+.tabpanel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 0 0.9rem;
+}
+
+/* schedule, on the screen */
+
+.sched-key {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--screen-text);
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.4em;
+  vertical-align: -0.1em;
+}
+
+.swatch-closed { background: #6B1C16; }
+.swatch-visit  { background: #fff; }
+.swatch-wait   { background: var(--screen-ink); }
+
+.sched-label {
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--screen-text);
+}
+
+.sched-track      { fill: #2A2920; }
+.sched-closed     { fill: #6B1C16; }
+.sched-visit      { fill: #fff; stroke: #fff; }
+.sched-wait       { fill: var(--screen-ink); stroke: var(--screen-ink); }
+.sched-axis       { stroke: #6E6A55; }
+.sched-axis-label { fill: var(--screen-text); font-size: 11px; }
+
+.map-fit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.3rem 0.45rem;
+  color: var(--screen-ink);
+  background: var(--screen);
+  border: 2px solid var(--screen-edge);
+  border-radius: 6px;
+  color-scheme: dark;
+}
+
+.bezel select:focus-visible {
+  outline: 2px solid var(--screen-ink);
+  outline-offset: 2px;
+}
+
+/* the bar under the screen */
+
+.sim-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+.sim-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem 0.75rem;
+}
+
+.tabs,
+.export {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.key {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.95rem;
+  color: #fff;
+  background: var(--key);
+  border: 2px solid var(--cast);
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: inset 2px 2px 0 var(--key-hi), inset -2px -2px 0 var(--key-lo), 4px 4px 0 var(--cast);
+}
+
+.key-icon {
+  font-size: 1rem;
+  padding: 0.35rem 0.7rem;
+  letter-spacing: 0;
+}
+
+.key:active:not(:disabled),
+.key[aria-selected="true"] {
+  transform: translate(4px, 4px);
+  box-shadow: inset 2px 2px 0 var(--key-hi), inset -2px -2px 0 var(--key-lo);
+}
+
+.key[aria-selected="true"] {
+  color: var(--cast);
+  background: #fff;
+  box-shadow: inset 2px 2px 0 #fff, inset -2px -2px 0 #BDBAA6;
+}
+
+.key:disabled {
+  color: #A8A28A;
+  cursor: not-allowed;
+}
+
+.key:focus-visible,
+.start-button:focus-visible {
+  outline: 3px solid var(--cast);
+  outline-offset: 4px;
+}
 
 .distance-matrix {
   display: none;
 }
 
-/* footer */
+/* START: a red button in a recessed well. --depth is how far it stands
+   up, so how far it drops when pressed. */
 
-.footer-inner {
-  padding: 1.75rem 0 2.5rem;
-  display: grid;
-  gap: calc(var(--rhythm) * 0.5);
+.start-well {
+  --depth: 8px;
+  flex: none;
+  padding: 10px calc(10px + var(--depth)) calc(10px + var(--depth)) 10px;
+  border-radius: 50%;
+  box-shadow: inset 5px 5px 0 var(--shell-lo), inset -4px -4px 0 var(--shell-hi);
 }
 
-.boilerplate {
-  margin: 0;
-  max-width: var(--measure);
-  font-size: 0.9375rem;
-  color: var(--ink-2);
+.start-button {
+  display: block;
+  width: 10rem;
+  height: 10rem;
+  border-radius: 50%;
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--start-lo);
+  background: var(--start);
+  border: 3px solid var(--cast);
+  cursor: pointer;
+  box-shadow:
+    inset 7px 7px 0 var(--start-hi),
+    inset -7px -7px 0 var(--start-lo),
+    var(--depth) var(--depth) 0 var(--cast);
 }
 
-.boilerplate a {
-  color: var(--ink-2);
-  text-decoration: underline;
+.start-button:active {
+  transform: translate(var(--depth), var(--depth));
+  box-shadow: inset 7px 7px 0 var(--start-hi), inset -7px -7px 0 var(--start-lo);
 }
 
-.footer-links {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.start-small {
+  --depth: 5px;
+  padding: 6px calc(6px + var(--depth)) calc(6px + var(--depth)) 6px;
+}
+
+.start-small .start-button {
+  width: 5.75rem;
+  height: 5.75rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  box-shadow:
+    inset 5px 5px 0 var(--start-hi),
+    inset -5px -5px 0 var(--start-lo),
+    var(--depth) var(--depth) 0 var(--cast);
+}
+
+.start-small .start-button:active {
+  box-shadow: inset 5px 5px 0 var(--start-hi), inset -5px -5px 0 var(--start-lo);
+}
+
+.start-sheet {
+  --depth: 5px;
+  margin-top: 1.25rem;
+  border-radius: 999px;
+  padding: 6px calc(6px + var(--depth)) calc(6px + var(--depth)) 6px;
+}
+
+.start-sheet .start-button {
+  width: 100%;
+  height: 3.5rem;
+  border-radius: 999px;
+  font-size: 1.125rem;
+  box-shadow:
+    inset 4px 4px 0 var(--start-hi),
+    inset -4px -4px 0 var(--start-lo),
+    var(--depth) var(--depth) 0 var(--cast);
+}
+
+.start-sheet .start-button:active {
+  box-shadow: inset 4px 4px 0 var(--start-hi), inset -4px -4px 0 var(--start-lo);
+}
+
+/* settings sheet */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(13, 13, 8, 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  max-width: 30rem;
+  max-height: 92dvh;
+  margin: 0 auto;
+  overflow-y: auto;
+  padding: 1rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+  background: var(--shell);
+  border: 3px solid var(--cast);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  box-shadow: inset 5px 5px 0 var(--shell-hi), inset -5px 0 0 var(--shell-lo);
+}
+
+.sheet-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.25rem;
-  font-size: 0.9375rem;
-  color: var(--ink-2);
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 1rem;
 }
 
-.footer-links a {
-  color: var(--ink-2);
-  text-decoration: underline;
+.sheet-head h2 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition: none !important;
+.settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+  padding: 1rem;
+  background: var(--tray);
+  border-radius: 12px;
+  box-shadow: inset 4px 4px 0 var(--shell-lo), inset -4px -4px 0 var(--shell-hi);
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+.field-label {
+  display: block;
+  margin: 0 0 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem; /* 16px+ so iOS doesn't zoom on focus */
+  font-variant-numeric: tabular-nums;
+  padding: 0.45rem 0.55rem;
+  color: var(--screen-ink);
+  background: var(--screen);
+  border: 2px solid var(--cast);
+  border-radius: 6px;
+  box-shadow: inset 3px 3px 0 #000;
+  color-scheme: dark;
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 2px solid var(--cast);
+  outline-offset: 2px;
+}
+
+/* Shadows disappear under forced colors; real borders keep every part's
+   edges, and the selected key gets the system highlight. */
+@media (forced-colors: active) {
+  .bezel,
+  .settings,
+  .summary,
+  .sheet,
+  .start-button,
+  .key {
+    border: 2px solid CanvasText;
+  }
+
+  .key[aria-selected="true"] {
+    outline: 3px solid Highlight;
   }
 }
 
@@ -379,7 +840,8 @@ table.records td {
     display: none;
   }
 
-  body {
+  body,
+  body.sim-page {
     background: #fff;
     color: #000;
   }
@@ -391,7 +853,6 @@ table.records td {
   }
 
   body:has(.print-sheet) > header,
-  body:has(.print-sheet) .page-head,
   .simulator-screen {
     display: none;
   }

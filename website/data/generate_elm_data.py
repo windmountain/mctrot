@@ -243,7 +243,7 @@ def merge_edges(edges):
 
 def route_view_box(view_box, locations, edges):
     """`view_box` narrowed horizontally to just the locations and route paths
-    (full height kept), for the simulator's "superstretch" map."""
+    (full height kept), for the simulator's "stretch" map."""
     xs = [cx for _, cx, _ in locations]
     for _, d in edges:
         tokens = [t for t in d.split() if t not in ("M", "L")]
