@@ -624,7 +624,7 @@ body.sim-page {
 }
 
 /* START: a red button in a recessed well. --depth is how far it stands
-   up, so how far it drops when pressed. RESTART (start-small) is the same
+   up, so how far it drops when pressed. TWEAK (start-small) is the same
    button made square with big rounded corners. */
 
 .start-well {

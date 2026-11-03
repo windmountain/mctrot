@@ -1092,8 +1092,8 @@ view model =
 
 {-| The whole page, mobile first (styled in css/style.css under "simulator
 app"): a link home, then — once a search has started — the screen
-(readouts over the map or schedule) above a bar of keys and RESTART. The
-settings sheet sits over everything; it's open on load and RESTART reopens
+(readouts over the map or schedule) above a bar of keys and TWEAK. The
+settings sheet sits over everything; it's open on load and TWEAK reopens
 it, so every search starts from the sheet's START. The export keys appear
 from the start but are disabled until the search is done.
 -}
@@ -1222,7 +1222,7 @@ keyItem swatchClass label =
 
 
 {-| The bar under the screen: view keys, the export keys (disabled until
-the search is done), and RESTART, which opens the settings.
+the search is done), and TWEAK, which opens the settings.
 -}
 viewControls : Tab -> Legs -> Bool -> Bool -> Html Msg
 viewControls tab legs copied done =
@@ -1231,7 +1231,7 @@ viewControls tab legs copied done =
             [ viewTabList tab
             , viewExport done legs copied
             ]
-        , viewStartButton "start-small" [ Attr.id settingsOpenerId, Attr.attribute "aria-haspopup" "dialog" ] OpenSettings "Restart"
+        , viewStartButton "start-small" [ Attr.id settingsOpenerId, Attr.attribute "aria-haspopup" "dialog" ] OpenSettings "Tweak"
         ]
 
 
@@ -1283,7 +1283,7 @@ viewExport done legs copied =
         ]
 
 
-{-| RESTART in the bar, which opens the settings sheet and where focus
+{-| TWEAK in the bar, which opens the settings sheet and where focus
 returns when it closes.
 -}
 settingsOpenerId : String
