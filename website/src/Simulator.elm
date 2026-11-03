@@ -583,7 +583,7 @@ init defaultStartDate =
       , activeStart = activeStart
       , tab = MapTab
       , mapFit = Stretch
-      , settingsOpen = False
+      , settingsOpen = True
       , legs = NotLoaded
       }
     , Cmd.none
@@ -690,7 +690,12 @@ update msg model =
             ( { model | settingsOpen = True }, focus settingsCloseId )
 
         CloseSettings ->
-            ( { model | settingsOpen = False }, focus settingsOpenerId )
+            -- Before the first search there is nothing behind the sheet.
+            if model.running then
+                ( { model | settingsOpen = False }, focus settingsOpenerId )
+
+            else
+                ( model, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -822,10 +827,11 @@ view model =
 
 
 {-| The whole page, mobile first (styled in css/style.css under "simulator
-app"): a link home, then either the START button over a summary of the
-settings (before the first run), or the screen — readouts over the map or
-schedule — above a bar of keys and RESTART. The settings open in a sheet
-over everything; the export keys appear only once the search is done.
+app"): a link home, then — once a search has started — the screen
+(readouts over the map or schedule) above a bar of keys and RESTART. The
+settings sheet sits over everything; it's open on load and RESTART reopens
+it, so every search starts from the sheet's START. The export keys appear
+only once the search is done.
 -}
 viewScreen : Model -> Tour -> List Visit -> Int -> Html Msg
 viewScreen model tour visits viewMax =
@@ -844,7 +850,7 @@ viewScreen model tour visits viewMax =
                 ]
 
               else
-                [ viewIdle model ]
+                []
             , if model.settingsOpen then
                 viewSettingsSheet model
 
@@ -871,42 +877,6 @@ viewTopBar running done =
                 )
             ]
         ]
-
-
-{-| Before the first run: START in the thumb zone, over a summary of the
-settings that opens the settings sheet.
--}
-viewIdle : Model -> Html Msg
-viewIdle model =
-    Html.div [ Attr.class "sim-idle" ]
-        [ viewStartButton "start-big" "Start"
-        , Html.button
-            [ Attr.class "summary"
-            , Attr.id settingsOpenerId
-            , Attr.attribute "aria-haspopup" "dialog"
-            , Events.onClick OpenSettings
-            ]
-            (List.map (\line -> Html.span [ Attr.class "summary-line" ] [ Html.text line ]) (settingsSummary model)
-                ++ [ Html.span [ Attr.class "summary-edit" ] [ Html.text "Change settings" ] ]
-            )
-        ]
-
-
-{-| The settings as the next Start will read them (see `startSearch`).
--}
-settingsSummary : Model -> List String
-settingsSummary model =
-    let
-        dateText =
-            Calendar.parseDate model.startDate |> Maybe.map Calendar.formatShort |> Maybe.withDefault model.startDate
-
-        cityName raw =
-            parseCity raw |> Maybe.andThen (\i -> Array.get i cities) |> Maybe.map .name |> Maybe.withDefault "Flexible"
-    in
-    [ dateText ++ " · " ++ formatClock (parseStartMinutes model.startTimeOfDay)
-    , String.fromFloat (parseMinutesPerMile model.speedInput) ++ " min/mi · " ++ String.fromInt (parseStopMinutes model.stopInput) ++ " min stops"
-    , cityName model.startCityInput ++ " → " ++ cityName model.endCityInput ++ " · seed " ++ String.fromInt (parseSeed model.seedInput)
-    ]
 
 
 {-| The screen: readouts, then the selected tab's panel, which scrolls on
@@ -1001,16 +971,16 @@ viewControls tab legs done =
               else
                 Html.text ""
             ]
-        , viewStartButton "start-small" "Restart"
+        , viewStartButton "start-small" [ Attr.attribute "aria-haspopup" "dialog" ] OpenSettings "Restart"
         ]
 
 
-{-| `size` is "start-big", "start-small", or "start-sheet" (see css).
+{-| `size` is "start-small" or "start-sheet" (see css).
 -}
-viewStartButton : String -> String -> Html Msg
-viewStartButton size label =
+viewStartButton : String -> List (Html.Attribute Msg) -> Msg -> String -> Html Msg
+viewStartButton size attrs msg label =
     Html.div [ Attr.class ("start-well " ++ size) ]
-        [ Html.button [ Attr.class "start-button", Events.onClick Start ] [ Html.text label ] ]
+        [ Html.button (Attr.class "start-button" :: Events.onClick msg :: attrs) [ Html.text label ] ]
 
 
 viewExport : Legs -> Html Msg
@@ -1041,8 +1011,8 @@ viewExport legs =
         ]
 
 
-{-| Only one opener is on the page at a time (the summary before the first
-run, the settings key after), so they share an id for returning focus.
+{-| The settings key, where focus returns when the sheet closes. (RESTART
+also opens the sheet, but focus returning to the key is fine.)
 -}
 settingsOpenerId : String
 settingsOpenerId =
@@ -1056,7 +1026,8 @@ settingsCloseId =
 
 {-| A modal sheet from the bottom: a backdrop that closes it, and the
 settings with their own START, so changing them and starting is one step.
-Escape closes it too.
+Escape closes it too. Before the first search it can't be closed (see
+`CloseSettings`), so it has no ✕.
 -}
 viewSettingsSheet : Model -> List (Html Msg)
 viewSettingsSheet model =
@@ -1082,16 +1053,22 @@ viewSettingsSheet model =
         ]
         [ Html.div [ Attr.class "sheet-head" ]
             [ Html.h2 [ Attr.id "settings-title" ] [ Html.text "Settings" ]
-            , Html.button
-                [ Attr.class "key key-icon"
-                , Attr.id settingsCloseId
-                , Attr.attribute "aria-label" "Close settings"
-                , Events.onClick CloseSettings
-                ]
-                [ Html.text "✕\u{FE0E}" ]
+            , if model.running then
+                Html.button
+                    [ Attr.class "key key-icon"
+                    , Attr.id settingsCloseId
+                    , Attr.attribute "aria-label" "Close settings"
+                    , Events.onClick CloseSettings
+                    ]
+                    [ Html.text "✕\u{FE0E}" ]
+
+              else
+                Html.text ""
             ]
         , viewRunSettings model
         , viewStartButton "start-sheet"
+            []
+            Start
             (if model.running then
                 "Restart"
 

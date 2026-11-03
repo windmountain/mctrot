@@ -398,57 +398,6 @@ body.sim-page {
   text-transform: uppercase;
 }
 
-/* before the first run */
-
-.sim-idle {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 2.5rem;
-}
-
-.sim-idle .start-well {
-  align-self: center;
-}
-
-.summary {
-  display: block;
-  width: 100%;
-  font: inherit;
-  text-align: left;
-  padding: 0.9rem 1rem;
-  color: var(--screen-ink);
-  background: var(--screen);
-  border: 2px solid var(--cast);
-  border-radius: 10px;
-  box-shadow: inset 4px 4px 0 #000, inset -2px -2px 0 var(--screen-edge);
-  cursor: pointer;
-}
-
-.summary-line {
-  display: block;
-  font-size: 0.9375rem;
-  line-height: 1.45;
-  font-variant-numeric: tabular-nums;
-}
-
-.summary-edit {
-  display: block;
-  margin-top: 0.5rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--screen-dim);
-}
-
-.summary:focus-visible {
-  outline: 3px solid var(--cast);
-  outline-offset: 3px;
-}
-
 /* the screen */
 
 .bezel {
@@ -815,7 +764,6 @@ body.sim-page {
 @media (forced-colors: active) {
   .bezel,
   .settings,
-  .summary,
   .sheet,
   .start-button,
   .key {
