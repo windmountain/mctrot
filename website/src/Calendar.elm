@@ -1,4 +1,4 @@
-module Calendar exposing (Date, addDays, formatLong, formatShort, parseDate, sakamotoWeekday)
+module Calendar exposing (Date, addDays, formatIso, formatLong, formatShort, isoUtcFromNewYork, newYorkUtcOffset, parseDate, sakamotoWeekday)
 
 {-| Gregorian calendar dates as `( year, month, day )`, month and day
 1-based, for the simulator's start date and the printed schedule (see
@@ -150,3 +150,74 @@ formatLong (( year, month, day ) as date) =
 formatShort : Date -> String
 formatShort (( _, month, day ) as date) =
     String.left 3 (weekdayName date) ++ " " ++ String.left 3 (monthName month) ++ " " ++ String.fromInt day
+
+
+{-| "2026-11-21"
+-}
+formatIso : Date -> String
+formatIso ( year, month, day ) =
+    String.fromInt year ++ "-" ++ pad2 month ++ "-" ++ pad2 day
+
+
+pad2 : Int -> String
+pad2 n =
+    String.padLeft 2 '0' (String.fromInt n)
+
+
+{-| New York's offset from UTC, in minutes (-240 in daylight time, -300 in
+standard time), at `minuteOfDay` (0..1439) on wall-calendar `date`. US daylight
+time runs from 2:00 AM on the second Sunday in March to 2:00 AM on the first
+Sunday in November. The skipped hour in March counts as daylight time; the
+repeated hour in November (1:00-2:00 AM) is taken as its first, daylight,
+occurrence.
+-}
+newYorkUtcOffset : Date -> Int -> Int
+newYorkUtcOffset (( year, _, _ ) as date) minuteOfDay =
+    let
+        nthSunday month n =
+            ( year, month, 1 + modBy 7 (7 - sakamotoWeekday year month 1) + 7 * (n - 1) )
+
+        startsAt =
+            ( daysFromCivil (nthSunday 3 2), 120 )
+
+        endsAt =
+            ( daysFromCivil (nthSunday 11 1), 120 )
+
+        now =
+            ( daysFromCivil date, minuteOfDay )
+
+        isDaylight =
+            compare now startsAt /= LT && compare now endsAt == LT
+    in
+    if isDaylight then
+        -240
+
+    else
+        -300
+
+
+{-| A New York wall-clock time, `minutes` (0 or more, possibly past a day)
+after midnight beginning `date`, as an ISO 8601 UTC timestamp:
+`isoUtcFromNewYork ( 2026, 11, 21 ) 120` is "2026-11-21T07:00:00Z".
+-}
+isoUtcFromNewYork : Date -> Int -> String
+isoUtcFromNewYork date minutes =
+    let
+        localDate =
+            addDays (minutes // 1440) date
+
+        minuteOfDay =
+            modBy 1440 minutes
+
+        utcMinutes =
+            minuteOfDay - newYorkUtcOffset localDate minuteOfDay
+
+        utcMinuteOfDay =
+            modBy 1440 utcMinutes
+    in
+    formatIso (addDays (utcMinutes // 1440) localDate)
+        ++ "T"
+        ++ pad2 (utcMinuteOfDay // 60)
+        ++ ":"
+        ++ pad2 (modBy 60 utcMinuteOfDay)
+        ++ ":00Z"

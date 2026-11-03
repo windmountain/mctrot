@@ -32,10 +32,14 @@ import Browser
 import Browser.Dom
 import Browser.Events
 import Calendar
+import Dict exposing (Dict)
+import File.Download
+import Gpx
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Lazy
+import Http
 import Json.Decode as Decode
 import List.Extra
 import McdData exposing (City, cities, distanceMeters)
@@ -447,7 +451,19 @@ type alias Model =
     , tab : Tab
     , mapFit : MapFit
     , settingsOpen : Bool
+    , legs : Legs
     }
+
+
+{-| The walking legs for the GPX export (see `Gpx.legKey`), fetched from
+geo/route-legs.json when a search starts, so it never weighs on page load.
+`thenDownload` remembers a GPX request made while the fetch is in flight.
+-}
+type Legs
+    = NotLoaded
+    | Loading { thenDownload : Bool }
+    | Loaded (Dict String String)
+    | Failed
 
 
 type Tab
@@ -489,6 +505,8 @@ type Msg
     | OpenSettings
     | CloseSettings
     | NoOp
+    | ExportGpx
+    | GotLegs (Result Http.Error (Dict String String))
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -567,6 +585,7 @@ init defaultStartDate =
       , tab = MapTab
       , mapFit = Stretch
       , settingsOpen = False
+      , legs = NotLoaded
       }
     , Cmd.none
     )
@@ -614,7 +633,15 @@ update msg model =
                 ( model, Cmd.none )
 
         Start ->
-            ( startSearch { model | settingsOpen = False }, Cmd.none )
+            case model.legs of
+                Loaded _ ->
+                    ( startSearch { model | settingsOpen = False }, Cmd.none )
+
+                Loading _ ->
+                    ( startSearch { model | settingsOpen = False }, Cmd.none )
+
+                _ ->
+                    ( startSearch { model | settingsOpen = False, legs = Loading { thenDownload = False } }, fetchLegs )
 
         SetStartDate date ->
             ( { model | startDate = date }, Cmd.none )
@@ -661,6 +688,72 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+        ExportGpx ->
+            case model.legs of
+                Loaded legs ->
+                    ( model, downloadGpx model legs )
+
+                Loading _ ->
+                    ( { model | legs = Loading { thenDownload = True } }, Cmd.none )
+
+                _ ->
+                    ( { model | legs = Loading { thenDownload = True } }, fetchLegs )
+
+        GotLegs (Ok legs) ->
+            ( { model | legs = Loaded legs }
+            , if model.legs == Loading { thenDownload = True } then
+                downloadGpx model legs
+
+              else
+                Cmd.none
+            )
+
+        GotLegs (Err _) ->
+            ( { model | legs = Failed }, Cmd.none )
+
+
+fetchLegs : Cmd Msg
+fetchLegs =
+    Http.get
+        { url = "geo/route-legs.json"
+        , expect = Http.expectJson GotLegs (Decode.dict Decode.string)
+        }
+
+
+{-| Saves the best route as `mctrot-YYYY-MM-DD.gpx` (see `Gpx.build`).
+-}
+downloadGpx : Model -> Dict String String -> Cmd msg
+downloadGpx model legs =
+    let
+        startTime =
+            model.activeStart
+
+        dateText =
+            Maybe.map Calendar.formatIso startTime.date |> Maybe.withDefault "route"
+
+        toStop visit =
+            Array.get visit.cityIndex cities
+                |> Maybe.map
+                    (\city ->
+                        { mcdId = Array.get visit.cityIndex MctrotMapData.mcdIds |> Maybe.withDefault 0
+                        , name = city.name
+                        , desc = city.address ++ " · arrive " ++ arrivalText startTime visit
+                        , lat = city.lat
+                        , lon = city.lon
+                        , arrival = visit.arrival
+                        }
+                    )
+    in
+    File.Download.string ("mctrot-" ++ dateText ++ ".gpx")
+        "application/gpx+xml"
+        (Gpx.build
+            { name = "McTrot route" ++ (Maybe.map (\d -> ", " ++ Calendar.formatLong d) startTime.date |> Maybe.withDefault "")
+            , date = startTime.date
+            , legs = legs
+            , stops = List.filterMap toStop (simulate startTime (SimulatedAnnealing.best model.saState))
+            }
+        )
 
 
 focus : String -> Cmd Msg
@@ -738,7 +831,7 @@ viewScreen model tour visits viewMax =
               ]
             , if model.running then
                 [ viewDisplay model tour visits viewMax done
-                , viewControls model.tab done
+                , viewControls model.tab model.legs done
                 ]
 
               else
@@ -880,8 +973,8 @@ keyItem swatchClass label =
 {-| The bar under the screen: view keys, the settings key, the export keys
 once the search is done, and RESTART.
 -}
-viewControls : Tab -> Bool -> Html Msg
-viewControls tab done =
+viewControls : Tab -> Legs -> Bool -> Html Msg
+viewControls tab legs done =
     Html.div [ Attr.class "sim-controls" ]
         [ Html.div [ Attr.class "sim-keys" ]
             [ viewTabList tab
@@ -894,7 +987,7 @@ viewControls tab done =
                 ]
                 [ Html.text "⚙\u{FE0E}" ]
             , if done then
-                viewExport
+                viewExport legs
 
               else
                 Html.text ""
@@ -911,11 +1004,27 @@ viewStartButton size label =
         [ Html.button [ Attr.class "start-button", Events.onClick Start ] [ Html.text label ] ]
 
 
-viewExport : Html Msg
-viewExport =
+viewExport : Legs -> Html Msg
+viewExport legs =
     Html.div [ Attr.class "export" ]
         [ Html.button [ Attr.class "key", Events.onClick Print ] [ Html.text "Print" ]
-        , Html.button [ Attr.class "key", Attr.disabled True ] [ Html.text "GPX" ]
+        , Html.button [ Attr.class "key", Events.onClick ExportGpx ]
+            [ Html.text
+                (case legs of
+                    Loading { thenDownload } ->
+                        if thenDownload then
+                            "GPX…"
+
+                        else
+                            "GPX"
+
+                    Failed ->
+                        "Retry GPX"
+
+                    _ ->
+                        "GPX"
+                )
+            ]
         , Html.details [ Attr.class "distance-matrix" ]
             [ Html.summary [] [ Html.text "Distance matrix (meters)" ]
             , viewCostMatrix
@@ -1287,7 +1396,7 @@ viewPrintSchedule startTime visits =
         dayOf visit =
             visit.arrival // dayLength
 
-        arrivalText previousDay visit =
+        arrivalCell previousDay visit =
             let
                 dateText =
                     case ( startTime.date, dayOf visit /= previousDay ) of
@@ -1296,15 +1405,8 @@ viewPrintSchedule startTime visits =
 
                         _ ->
                             ""
-
-                waitText =
-                    if visit.wait > 0 then
-                        " (opens " ++ formatClock (visit.arrival + visit.wait) ++ ")"
-
-                    else
-                        ""
             in
-            dateText ++ formatClock visit.arrival ++ waitText
+            dateText ++ clockWithWait visit
 
         row i previousDay visit =
             let
@@ -1315,7 +1417,7 @@ viewPrintSchedule startTime visits =
                 [ Html.td [ Attr.class "print-num" ] [ Html.text (String.fromInt (i + 1)) ]
                 , Html.td [] [ Html.text (Maybe.map .name city |> Maybe.withDefault "") ]
                 , Html.td [] [ Html.text (Maybe.map .address city |> Maybe.withDefault "") ]
-                , Html.td [] [ Html.text (arrivalText previousDay visit) ]
+                , Html.td [] [ Html.text (arrivalCell previousDay visit) ]
                 ]
 
         previousDays =
@@ -1332,6 +1434,34 @@ viewPrintSchedule startTime visits =
             ]
         , Html.tbody [] (List.map3 row (List.range 0 (List.length visits - 1)) previousDays visits)
         ]
+
+
+{-| "2:05 AM", plus " (opens 6:00 AM)" if the visit waited.
+-}
+clockWithWait : Visit -> String
+clockWithWait visit =
+    formatClock visit.arrival
+        ++ (if visit.wait > 0 then
+                " (opens " ++ formatClock (visit.arrival + visit.wait) ++ ")"
+
+            else
+                ""
+           )
+
+
+{-| A visit's arrival with its date ("Sun Nov 22, 2:05 AM"), for the GPX
+waypoints, which (unlike the printout) have no page header to name the day.
+-}
+arrivalText : StartTime -> Visit -> String
+arrivalText startTime visit =
+    (case startTime.date of
+        Just date ->
+            Calendar.formatShort (Calendar.addDays (visit.arrival // dayLength) date) ++ ", "
+
+        Nothing ->
+            ""
+    )
+        ++ clockWithWait visit
 
 
 {-| Minutes since some midnight as a 12-hour time of day: "2:05 AM".
@@ -1597,7 +1727,7 @@ viewRow : StartTime -> Int -> Visit -> List (Html msg)
 viewRow startTime viewMax visit =
     let
         city =
-            Array.get visit.cityIndex cities |> Maybe.withDefault (City "?" "" [ ( 0, weekLength ) ] [])
+            Array.get visit.cityIndex cities |> Maybe.withDefault (City "?" "" 0 0 [ ( 0, weekLength ) ] [])
 
         arrivalElapsed =
             toFloat (visit.arrival - startTime.minutes)

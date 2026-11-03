@@ -4,6 +4,8 @@ scripts/export_simulator_data.py) into Elm and CSS:
 
   - mctrot_map.svg -> ../src/MctrotMapData.elm and ../css/mctrot-map.css
   - mcd_locations.csv, mcd_hours.csv, route_summary.csv -> ../src/McdData.elm
+  - route_legs.csv -> ../geo/route-legs.json (fetched by the simulator only
+    when it exports a GPX file, so it stays out of the page's script)
 
 mctrot_map.svg is the source of truth for the map (a real Manhattan silhouette, every
 McDonald's location, and a real-street routing layer where each road
@@ -26,12 +28,13 @@ This script transcodes the (merged) SVG into:
     location-pair, so Simulator.elm only ever needs to update a single
     `data-active` attribute at runtime to drive route highlighting.
 
-McdData.elm holds each location's nickname, street address, its weekly open/closed windows
+McdData.elm holds each location's nickname, street address, coordinates, its weekly open/closed windows
 (see `week_windows`), and the walking-distance matrix.
 
 Re-run this whenever any of those inputs change.
 """
 import csv
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -40,6 +43,8 @@ SVG_PATH = HERE / "mctrot_map.svg"
 LOCATIONS_CSV = HERE / "mcd_locations.csv"
 HOURS_CSV = HERE / "mcd_hours.csv"
 ROUTES_CSV = HERE / "route_summary.csv"
+LEGS_CSV = HERE / "route_legs.csv"
+LEGS_OUT = HERE.parent / "geo" / "route-legs.json"
 ELM_OUT = HERE.parent / "src" / "MctrotMapData.elm"
 MCD_ELM_OUT = HERE.parent / "src" / "McdData.elm"
 CSS_OUT = HERE.parent / "css" / "mctrot-map.css"
@@ -91,6 +96,21 @@ def main():
     write_mcd_elm(mcd_ids)
     print(f"wrote {MCD_ELM_OUT} ({len(mcd_ids)} locations)")
 
+    n_legs = write_legs_json(mcd_ids)
+    print(f"wrote {LEGS_OUT} ({n_legs} legs)")
+
+
+def write_legs_json(mcd_ids):
+    """`{"lo-hi": polyline}`, keyed by real mcd_ids with lo < hi; each
+    polyline runs from lo to hi (see Simulator's GPX export)."""
+    with open(LEGS_CSV, newline="") as f:
+        legs = {f"{r['lo_mcd_id']}-{r['hi_mcd_id']}": r["polyline"] for r in csv.DictReader(f)}
+    n = len(mcd_ids)
+    assert len(legs) == n * (n - 1) // 2, "route_legs.csv doesn't cover every location pair"
+    LEGS_OUT.parent.mkdir(exist_ok=True)
+    LEGS_OUT.write_text(json.dumps(legs, separators=(",", ":"), sort_keys=True) + "\n")
+    return len(legs)
+
 
 def week_windows(day_ranges):
     """Turns seven per-day (open_minute, close_minute) ranges (Monday first;
@@ -134,6 +154,7 @@ def write_mcd_elm(mcd_ids):
     nicknames = {int(r["id"]): r["nickname"] for r in rows}
     # Just the street line ("160 Broadway"), not ", New York, NY 10038".
     addresses = {int(r["id"]): r["address"].split(",")[0].strip() for r in rows}
+    coords = {int(r["id"]): (float(r["lat"]), float(r["lon"])) for r in rows}
 
     day_ranges = {}
     with open(HOURS_CSV, newline="") as f:
@@ -163,7 +184,7 @@ def write_mcd_elm(mcd_ids):
         assert None not in ranges, f"mcd {mcd_id} is missing hours for some weekday"
         open_windows, closed_windows = week_windows(ranges)
         city_lines.append(
-            f"City {elm_string(nicknames[mcd_id])} {elm_string(addresses[mcd_id])} {windows_elm(open_windows)} {windows_elm(closed_windows)}"
+            f"City {elm_string(nicknames[mcd_id])} {elm_string(addresses[mcd_id])} {coords[mcd_id][0]} {coords[mcd_id][1]} {windows_elm(open_windows)} {windows_elm(closed_windows)}"
         )
 
     row_lines = []
@@ -182,7 +203,8 @@ scripts/export_simulator_data.py (or just the generator) instead.
 import Array exposing (Array)
 
 
-{{-| `address` is the street line only (e.g. "160 Broadway").
+{{-| `address` is the street line only (e.g. "160 Broadway"). `lat`/`lon`
+are WGS 84 degrees.
 `openWindows`/`closedWindows` are minutes-since-Monday-00:00 in a
 repeating 7-day ({WEEK}-minute) week, from the database's `mcd_hours` view --
 adjacent open days merged together, and any window that crosses the
@@ -194,6 +216,8 @@ has to compute a complement at runtime.
 type alias City =
     {{ name : String
     , address : String
+    , lat : Float
+    , lon : Float
     , openWindows : List ( Int, Int )
     , closedWindows : List ( Int, Int )
     }}

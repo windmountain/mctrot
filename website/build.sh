@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Assembles the deployable site in build/: copies the public pages and
-# assets, and compiles the Elm simulator to build/js/simulator.js.
+# assets (including geo/route-legs.json, which the simulator fetches for its
+# GPX export), and compiles the Elm simulator to build/js/simulator.js.
 # Run inside `devenv shell` (for elm and terser). Does not regenerate map
 # data; run scripts/export_simulator_data.py for that (see README).
 set -euo pipefail
@@ -14,7 +15,7 @@ for page in *.html; do
   cp "$page" build/
 done
 
-cp -R css build/
+cp -R css geo build/
 cp favicon.svg favicon.ico favicon-16.png favicon-32.png favicon-48.png \
   apple-touch-icon.png icon-192.png icon-512.png \
   site.webmanifest og-image.png build/
