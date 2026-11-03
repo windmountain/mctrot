@@ -40,9 +40,11 @@ import Html.Events as Events
 import Html.Lazy
 import Http
 import Json.Decode as Decode
+import Link
 import List.Extra
 import McdData exposing (City, cities, distanceMeters)
 import MctrotMapData
+import Process
 import Random
 import SimulatedAnnealing exposing (Config, State)
 import SimulatedAnnealing.Schedule as Schedule
@@ -452,6 +454,9 @@ type alias Model =
     , settingsOpen : Bool
     , legs : Legs
     , autoscroll : Maybe Autoscroll
+    , activeSettings : Link.Settings
+    , linkCopied : Bool
+    , copiedCount : Int
     }
 
 
@@ -520,6 +525,9 @@ type Msg
     | ExportGpx
     | GotLegs (Result Http.Error (Dict String String))
     | StopAutoscroll
+    | Share
+    | LinkCopied
+    | ClearCopied Int
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -547,12 +555,35 @@ startSearch model =
     }
 
 
-{-| `defaultStartDate` is the next Nov 21 (today or later) in the visitor's
-local time, as `YYYY-MM-DD`, passed in as a flag by simulator.html — the
-year depends on the visitor's clock, which Elm can't read synchronously.
+{-| What simulator.html passes in. `defaultStartDate` is the next Nov 21
+(today or later) in the visitor's local time, as `YYYY-MM-DD` — the year
+depends on the visitor's clock, which Elm can't read synchronously.
+`query` is the page's decoded query parameters (see `Link`).
 -}
-init : String -> ( Model, Cmd Msg )
-init defaultStartDate =
+type alias Flags =
+    { defaultStartDate : String
+    , query : List ( String, String )
+    }
+
+
+{-| Opens on the settings sheet, filled in from the URL's settings if it
+carries any (a shared link; see `Link`), so START runs that search.
+-}
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    let
+        model =
+            initialModel flags.defaultStartDate
+    in
+    ( Link.fromQuery (currentSettings model) flags.query
+        |> Maybe.map (\settings -> applySettings settings model)
+        |> Maybe.withDefault model
+    , Cmd.none
+    )
+
+
+initialModel : String -> Model
+initialModel defaultStartDate =
     let
         speedInput =
             String.fromFloat defaultMinutesPerMile
@@ -585,7 +616,7 @@ init defaultStartDate =
             , endCity = parseCity endCityInput
             }
     in
-    ( { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) (initialTour activeStart)
+    { saState = SimulatedAnnealing.init (config activeStart) (Random.initialSeed (parseSeed seedInput)) (initialTour activeStart)
       , running = False
       , startDate = startDate
       , startTimeOfDay = startTimeOfDay
@@ -600,9 +631,85 @@ init defaultStartDate =
       , settingsOpen = True
       , legs = NotLoaded
       , autoscroll = Nothing
+      , activeSettings =
+            { date = startDate
+            , minutes = parseStartMinutes startTimeOfDay
+            , pace = parseMinutesPerMile speedInput
+            , stop = parseStopMinutes stopInput
+            , seed = parseSeed seedInput
+            , from = parseCity startCityInput
+            , to = parseCity endCityInput
+            }
+      , linkCopied = False
+      , copiedCount = 0
       }
-    , Cmd.none
-    )
+
+
+{-| The settings as typed into the sheet, read the way `startSearch` reads
+them.
+-}
+currentSettings : Model -> Link.Settings
+currentSettings model =
+    { date = model.startDate
+    , minutes = parseStartMinutes model.startTimeOfDay
+    , pace = parseMinutesPerMile model.speedInput
+    , stop = parseStopMinutes model.stopInput
+    , seed = parseSeed model.seedInput
+    , from = parseCity model.startCityInput
+    , to = parseCity model.endCityInput
+    }
+
+
+{-| Fills the sheet's fields from a link's settings.
+-}
+applySettings : Link.Settings -> Model -> Model
+applySettings settings model =
+    let
+        cityInput =
+            Maybe.map String.fromInt >> Maybe.withDefault ""
+    in
+    { model
+        | startDate = settings.date
+        , startTimeOfDay = Link.formatTime settings.minutes
+        , speedInput = String.fromFloat settings.pace
+        , stopInput = String.fromInt settings.stop
+        , seedInput = String.fromInt settings.seed
+        , startCityInput = cityInput settings.from
+        , endCityInput = cityInput settings.to
+    }
+
+
+{-| Closes the sheet and starts a search from its settings (see
+`startSearch`), remembering them for SHARE, and fetches the GPX legs if they
+aren't already.
+-}
+beginSearch : Model -> ( Model, Cmd Msg )
+beginSearch model =
+    let
+        -- Every search autoscrolls the map from the top (see
+        -- `scrollMap`), unless it starts on the schedule.
+        started =
+            startSearch
+                { model
+                    | settingsOpen = False
+                    , activeSettings = currentSettings model
+                    , autoscroll =
+                        if model.tab == MapTab then
+                            Just { position = 0, velocity = 0, lastFrame = 0, lastProgress = 0 }
+
+                        else
+                            Nothing
+                }
+    in
+    case model.legs of
+        Loaded _ ->
+            ( started, Cmd.none )
+
+        Loading _ ->
+            ( started, Cmd.none )
+
+        _ ->
+            ( { started | legs = Loading { thenDownload = False } }, fetchLegs )
 
 
 
@@ -618,6 +725,24 @@ port print : () -> Cmd msg
 {-| Hands a GPX file to simulator.html, which downloads it.
 -}
 port saveGpx : { filename : String, gpx : String } -> Cmd msg
+
+
+{-| Clears the address bar's query string, without adding a history
+entry, when a search starts from START: a shared link's settings no longer
+describe what's on screen.
+-}
+port clearQuery : () -> Cmd msg
+
+
+{-| Puts the given query string (see `Link.toQuery`) in the address bar,
+without adding a history entry, and shares the page's URL (simulator.html):
+the share sheet on touch devices that have one, otherwise a copy to the
+clipboard, which it reports back through `linkCopied`.
+-}
+port share : String -> Cmd msg
+
+
+port linkCopied : (() -> msg) -> Sub msg
 
 
 searching : Model -> Bool
@@ -660,30 +785,7 @@ update msg model =
                 ( model, Cmd.none )
 
         Start ->
-            let
-                -- Every search autoscrolls the map from the top (see
-                -- `scrollMap`), unless it starts on the schedule.
-                started =
-                    startSearch
-                        { model
-                            | settingsOpen = False
-                            , autoscroll =
-                                if model.tab == MapTab then
-                                    Just { position = 0, velocity = 0, lastFrame = 0, lastProgress = 0 }
-
-                                else
-                                    Nothing
-                        }
-            in
-            case model.legs of
-                Loaded _ ->
-                    ( started, Cmd.none )
-
-                Loading _ ->
-                    ( started, Cmd.none )
-
-                _ ->
-                    ( { started | legs = Loading { thenDownload = False } }, fetchLegs )
+            beginSearch model |> Tuple.mapSecond (\cmd -> Cmd.batch [ cmd, clearQuery () ])
 
         SetStartDate date ->
             ( { model | startDate = date }, Cmd.none )
@@ -771,6 +873,25 @@ update msg model =
 
         GotLegs (Err _) ->
             ( { model | legs = Failed }, Cmd.none )
+
+        Share ->
+            ( model, share (Link.toQuery model.activeSettings) )
+
+        LinkCopied ->
+            let
+                count =
+                    model.copiedCount + 1
+            in
+            ( { model | linkCopied = True, copiedCount = count }
+            , Process.sleep 2000 |> Task.perform (\_ -> ClearCopied count)
+            )
+
+        ClearCopied count ->
+            if count == model.copiedCount then
+                ( { model | linkCopied = False }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
 
 
 fetchLegs : Cmd Msg
@@ -921,11 +1042,14 @@ focus id =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if searching model || model.autoscroll /= Nothing then
-        Browser.Events.onAnimationFrame Frame
+    Sub.batch
+        [ linkCopied (\_ -> LinkCopied)
+        , if searching model || model.autoscroll /= Nothing then
+            Browser.Events.onAnimationFrame Frame
 
-    else
-        Sub.none
+          else
+            Sub.none
+        ]
 
 
 
@@ -986,7 +1110,7 @@ viewScreen model tour visits viewMax =
               ]
             , if model.running then
                 [ viewDisplay model tour visits viewMax done
-                , viewControls model.tab model.legs done
+                , viewControls model.tab model.legs model.linkCopied done
                 ]
 
               else
@@ -1100,12 +1224,12 @@ keyItem swatchClass label =
 {-| The bar under the screen: view keys, the export keys (disabled until
 the search is done), and RESTART, which opens the settings.
 -}
-viewControls : Tab -> Legs -> Bool -> Html Msg
-viewControls tab legs done =
+viewControls : Tab -> Legs -> Bool -> Bool -> Html Msg
+viewControls tab legs copied done =
     Html.div [ Attr.class "sim-controls" ]
         [ Html.div [ Attr.class "sim-keys" ]
             [ viewTabList tab
-            , viewExport done legs
+            , viewExport done legs copied
             ]
         , viewStartButton "start-small" [ Attr.id settingsOpenerId, Attr.attribute "aria-haspopup" "dialog" ] OpenSettings "Restart"
         ]
@@ -1119,10 +1243,11 @@ viewStartButton size attrs msg label =
         [ Html.button (Attr.class "start-button" :: Events.onClick msg :: attrs) [ Html.text label ] ]
 
 
-{-| The export keys, disabled until the search is `done`.
+{-| The export keys, disabled until the search is `done`. SHARE reads
+"Copied" for a moment after copying the link (see `LinkCopied`).
 -}
-viewExport : Bool -> Legs -> Html Msg
-viewExport done legs =
+viewExport : Bool -> Legs -> Bool -> Html Msg
+viewExport done legs copied =
     Html.div [ Attr.class "export" ]
         [ Html.button [ Attr.class "key", Attr.disabled (not done), Events.onClick Print ] [ Html.text "Print" ]
         , Html.button [ Attr.class "key", Attr.disabled (not done), Events.onClick ExportGpx ]
@@ -1140,6 +1265,15 @@ viewExport done legs =
 
                     _ ->
                         "Export GPX"
+                )
+            ]
+        , Html.button [ Attr.class "key", Attr.disabled (not done), Events.onClick Share ]
+            [ Html.text
+                (if copied then
+                    "Copied"
+
+                 else
+                    "Share"
                 )
             ]
         , Html.details [ Attr.class "distance-matrix" ]
@@ -2018,7 +2152,7 @@ formatMiles meters =
     String.fromInt (tenths // 10) ++ "." ++ String.fromInt (modBy 10 tenths) ++ " mi"
 
 
-main : Program String Model Msg
+main : Program Flags Model Msg
 main =
     Browser.element
         { init = init

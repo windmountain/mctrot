@@ -45,7 +45,10 @@
     }
     var app = Elm.Simulator.init({
       node: document.getElementById("simulator"),
-      flags: year + "-11-21"
+      flags: {
+        defaultStartDate: year + "-11-21",
+        query: Array.from(new URLSearchParams(window.location.search))
+      }
     });
     // iOS Safari applies :active (the keys' pressed look) only on pages
     // with a touchstart listener.
@@ -66,6 +69,41 @@
       a.click();
       a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    });
+
+    // Starting a search from START drops a shared link's settings.
+    app.ports.clearQuery.subscribe(function () {
+      history.replaceState(null, "", window.location.pathname);
+    });
+
+    // SHARE: put the search's settings in the address bar (see Link.elm),
+    // then open the share sheet on touch devices that have one (cancelling
+    // it does nothing); otherwise, or if sharing fails, copy the link.
+    app.ports.share.subscribe(function (query) {
+      history.replaceState(null, "", query);
+      var url = window.location.href;
+
+      function copy() {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(
+            function () { app.ports.linkCopied.send(null); },
+            function () { window.prompt("Copy this link:", url); }
+          );
+        } else {
+          window.prompt("Copy this link:", url);
+        }
+      }
+
+      var touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (touch && navigator.share) {
+        navigator.share({ title: document.title, url: url }).catch(function (err) {
+          if (err.name !== "AbortError") {
+            copy();
+          }
+        });
+      } else {
+        copy();
+      }
     });
   </script>
 </body>
