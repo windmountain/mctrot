@@ -128,7 +128,7 @@ parseMinutesPerMile raw =
 
 defaultMinutesPerMile : Float
 defaultMinutesPerMile =
-    24
+    20
 
 
 {-| Parses the value of the stop time `<input type="number">` (whole
@@ -451,6 +451,19 @@ type alias Model =
     , mapFit : MapFit
     , settingsOpen : Bool
     , legs : Legs
+    , autoscroll : Maybe Autoscroll
+    }
+
+
+{-| Where autoscroll has the map (`position`, 0 to 1 of the way down; see
+`scrollMap`), how fast it's moving (`velocity`, progress per millisecond),
+and the frame time and search progress it last saw.
+-}
+type alias Autoscroll =
+    { position : Float
+    , velocity : Float
+    , lastFrame : Int
+    , lastProgress : Float
     }
 
 
@@ -506,6 +519,7 @@ type Msg
     | NoOp
     | ExportGpx
     | GotLegs (Result Http.Error (Dict String String))
+    | StopAutoscroll
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -553,7 +567,7 @@ init defaultStartDate =
             defaultStartDate
 
         startTimeOfDay =
-            "02:00"
+            "05:00"
 
         startCityInput =
             List.head northToSouth |> Maybe.map String.fromInt |> Maybe.withDefault ""
@@ -585,6 +599,7 @@ init defaultStartDate =
       , mapFit = Stretch
       , settingsOpen = True
       , legs = NotLoaded
+      , autoscroll = Nothing
       }
     , Cmd.none
     )
@@ -629,7 +644,15 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Frame frameStart ->
-            runChunk frameStart model
+            let
+                ( scrolled, scrollCmd ) =
+                    stepAutoscroll frameStart model
+            in
+            if searching scrolled then
+                runChunk frameStart scrolled |> Tuple.mapSecond (\cmd -> Cmd.batch [ scrollCmd, cmd ])
+
+            else
+                ( scrolled, scrollCmd )
 
         ChunkDone frameStart now ->
             if searching model && Time.posixToMillis now - Time.posixToMillis frameStart < frameBudgetMillis then
@@ -639,15 +662,30 @@ update msg model =
                 ( model, Cmd.none )
 
         Start ->
+            let
+                -- Every search autoscrolls the map from the top (see
+                -- `scrollMap`), unless it starts on the schedule.
+                started =
+                    startSearch
+                        { model
+                            | settingsOpen = False
+                            , autoscroll =
+                                if model.tab == MapTab then
+                                    Just { position = 0, velocity = 0, lastFrame = 0, lastProgress = 0 }
+
+                                else
+                                    Nothing
+                        }
+            in
             case model.legs of
                 Loaded _ ->
-                    ( startSearch { model | settingsOpen = False }, Cmd.none )
+                    ( started, Cmd.none )
 
                 Loading _ ->
-                    ( startSearch { model | settingsOpen = False }, Cmd.none )
+                    ( started, Cmd.none )
 
                 _ ->
-                    ( startSearch { model | settingsOpen = False, legs = Loading { thenDownload = False } }, fetchLegs )
+                    ( { started | legs = Loading { thenDownload = False } }, fetchLegs )
 
         SetStartDate date ->
             ( { model | startDate = date }, Cmd.none )
@@ -671,7 +709,20 @@ update msg model =
             ( { model | endCityInput = city }, Cmd.none )
 
         SelectTab tab ->
-            ( { model | tab = tab }, Cmd.none )
+            ( { model
+                | tab = tab
+                , autoscroll =
+                    if tab == MapTab then
+                        model.autoscroll
+
+                    else
+                        Nothing
+              }
+            , Cmd.none
+            )
+
+        StopAutoscroll ->
+            ( { model | autoscroll = Nothing }, Cmd.none )
 
         SetMapFit value ->
             ( { model
@@ -770,6 +821,97 @@ downloadGpx model legs =
         }
 
 
+{-| How many steps the cooling schedule takes to reach
+`stoppingTemperature`: the first `n` with `initialTemperature * coolingRate ^ n`
+at or below it (see `config`).
+-}
+totalSteps : Int
+totalSteps =
+    ceiling (logBase coolingRate (stoppingTemperature / initialTemperature))
+
+
+{-| How far through `totalSteps` the search is, 0 to 1.
+-}
+searchProgress : Model -> Float
+searchProgress model =
+    clamp 0 1 (toFloat (SimulatedAnnealing.iteration model.saState) / toFloat totalSteps)
+
+
+{-| Moves autoscroll on by one animation frame (at `now`) and scrolls the
+map there. Scrolling straight to `searchProgress` judders, since the steps
+each frame gets vary with how long the last one took to draw. So it glides
+at the search's average rate (`velocity`, smoothed over many frames) and
+eases toward the true progress. After the search is done it keeps easing
+down to the bottom, then stops.
+-}
+stepAutoscroll : Time.Posix -> Model -> ( Model, Cmd Msg )
+stepAutoscroll now model =
+    case model.autoscroll of
+        Nothing ->
+            ( model, Cmd.none )
+
+        Just auto ->
+            let
+                nowMillis =
+                    Time.posixToMillis now
+
+                -- The first frame has no previous one; cap long gaps
+                -- (a background tab) so they can't fling the map.
+                dt =
+                    if auto.lastFrame == 0 then
+                        0
+
+                    else
+                        toFloat (clamp 0 100 (nowMillis - auto.lastFrame))
+
+                progress =
+                    searchProgress model
+
+                velocity =
+                    if dt > 0 then
+                        auto.velocity + ((progress - auto.lastProgress) / dt - auto.velocity) * 0.05
+
+                    else
+                        auto.velocity
+
+                glided =
+                    auto.position + velocity * dt
+
+                position =
+                    clamp auto.position 1 (glided + (progress - glided) * (1 - e ^ (-dt / 400)))
+            in
+            if not (searching model) && position > 0.999 then
+                ( { model | autoscroll = Nothing }, scrollMap 1 )
+
+            else
+                ( { model | autoscroll = Just { position = position, velocity = velocity, lastFrame = nowMillis, lastProgress = progress } }
+                , scrollMap position
+                )
+
+
+{-| Autoscroll: during each search started on the Map tab, the map
+scrolls with the search's progress (0 to 1, see `stepAutoscroll`), from
+the top (uptown) when it starts to the bottom (lower Manhattan) when it's
+done. Any wheel, touch, click, or key in the panel stops it for the rest of
+that search (`StopAutoscroll`, see `viewDisplay`), as does switching to the
+schedule. The panel's own `scroll` event isn't used,
+since this scrolling fires it too.
+-}
+scrollMap : Float -> Cmd Msg
+scrollMap progress =
+    Browser.Dom.getViewportOf tabPanelId
+        |> Task.andThen
+            (\{ scene, viewport } ->
+                Browser.Dom.setViewportOf tabPanelId 0 (progress * max 0 (scene.height - viewport.height))
+            )
+        |> Task.attempt (\_ -> NoOp)
+
+
+tabPanelId : String
+tabPanelId =
+    "simulator-tabpanel"
+
+
 focus : String -> Cmd Msg
 focus id =
     Task.attempt (\_ -> NoOp) (Browser.Dom.focus id)
@@ -781,7 +923,7 @@ focus id =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if searching model then
+    if searching model || model.autoscroll /= Nothing then
         Browser.Events.onAnimationFrame Frame
 
     else
@@ -831,7 +973,7 @@ app"): a link home, then — once a search has started — the screen
 (readouts over the map or schedule) above a bar of keys and RESTART. The
 settings sheet sits over everything; it's open on load and RESTART reopens
 it, so every search starts from the sheet's START. The export keys appear
-only once the search is done.
+from the start but are disabled until the search is done.
 -}
 viewScreen : Model -> Tour -> List Visit -> Int -> Html Msg
 viewScreen model tour visits viewMax =
@@ -865,16 +1007,16 @@ viewTopBar running done =
     Html.div [ Attr.class "sim-top" ]
         [ Html.a [ Attr.class "sim-home", Attr.href "/" ] [ Html.text "← McTrot" ]
         , Html.p [ Attr.class "sim-status", Attr.attribute "aria-live" "polite" ]
-            [ Html.text
-                (if not running then
-                    ""
+            -- Blank once done, except to screen readers, which still
+            -- hear that it finished.
+            [ if not running then
+                Html.text ""
 
-                 else if done then
-                    "Done"
+              else if done then
+                Html.span [ Attr.class "sr-only" ] [ Html.text "Search done" ]
 
-                 else
-                    "Searching…"
-                )
+              else
+                Html.text "Searching…"
             ]
         ]
 
@@ -909,11 +1051,19 @@ viewDisplay model tour visits viewMax done =
                    )
             )
         , Html.div
-            [ Attr.attribute "role" "tabpanel"
-            , Attr.id "simulator-tabpanel"
-            , Attr.attribute "aria-labelledby" (tabId model.tab)
-            , Attr.class "tabpanel"
-            ]
+            ([ Attr.attribute "role" "tabpanel"
+             , Attr.id tabPanelId
+             , Attr.attribute "aria-labelledby" (tabId model.tab)
+             , Attr.class "tabpanel"
+             ]
+                ++ (if model.autoscroll /= Nothing then
+                        List.map (\event -> Events.on event (Decode.succeed StopAutoscroll))
+                            [ "wheel", "touchstart", "mousedown", "keydown" ]
+
+                    else
+                        []
+                   )
+            )
             [ case model.tab of
                 MapTab ->
                     viewMap model.mapFit (stops model.activeStart tour)
@@ -949,29 +1099,17 @@ keyItem swatchClass label =
     Html.li [] [ Html.span [ Attr.class ("swatch " ++ swatchClass) ] [], Html.text label ]
 
 
-{-| The bar under the screen: view keys, the settings key, the export keys
-once the search is done, and RESTART.
+{-| The bar under the screen: view keys, the export keys (disabled until
+the search is done), and RESTART, which opens the settings.
 -}
 viewControls : Tab -> Legs -> Bool -> Html Msg
 viewControls tab legs done =
     Html.div [ Attr.class "sim-controls" ]
         [ Html.div [ Attr.class "sim-keys" ]
             [ viewTabList tab
-            , Html.button
-                [ Attr.class "key key-icon"
-                , Attr.id settingsOpenerId
-                , Attr.attribute "aria-haspopup" "dialog"
-                , Attr.attribute "aria-label" "Settings"
-                , Events.onClick OpenSettings
-                ]
-                [ Html.text "⚙\u{FE0E}" ]
-            , if done then
-                viewExport legs
-
-              else
-                Html.text ""
+            , viewExport done legs
             ]
-        , viewStartButton "start-small" [ Attr.attribute "aria-haspopup" "dialog" ] OpenSettings "Restart"
+        , viewStartButton "start-small" [ Attr.id settingsOpenerId, Attr.attribute "aria-haspopup" "dialog" ] OpenSettings "Restart"
         ]
 
 
@@ -983,11 +1121,13 @@ viewStartButton size attrs msg label =
         [ Html.button (Attr.class "start-button" :: Events.onClick msg :: attrs) [ Html.text label ] ]
 
 
-viewExport : Legs -> Html Msg
-viewExport legs =
+{-| The export keys, disabled until the search is `done`.
+-}
+viewExport : Bool -> Legs -> Html Msg
+viewExport done legs =
     Html.div [ Attr.class "export" ]
-        [ Html.button [ Attr.class "key", Events.onClick Print ] [ Html.text "Print" ]
-        , Html.button [ Attr.class "key", Events.onClick ExportGpx ]
+        [ Html.button [ Attr.class "key", Attr.disabled (not done), Events.onClick Print ] [ Html.text "Print" ]
+        , Html.button [ Attr.class "key", Attr.disabled (not done), Events.onClick ExportGpx ]
             [ Html.text
                 (case legs of
                     Loading { thenDownload } ->
@@ -1011,8 +1151,8 @@ viewExport legs =
         ]
 
 
-{-| The settings key, where focus returns when the sheet closes. (RESTART
-also opens the sheet, but focus returning to the key is fine.)
+{-| RESTART in the bar, which opens the settings sheet and where focus
+returns when it closes.
 -}
 settingsOpenerId : String
 settingsOpenerId =
@@ -1111,7 +1251,7 @@ viewTabList selected =
                      else
                         "false"
                     )
-                , Attr.attribute "aria-controls" "simulator-tabpanel"
+                , Attr.attribute "aria-controls" tabPanelId
                 , Attr.class "key"
                 , Events.onClick (SelectTab tab)
                 ]

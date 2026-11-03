@@ -47,6 +47,10 @@
       node: document.getElementById("simulator"),
       flags: year + "-11-21"
     });
+    // iOS Safari applies :active (the keys' pressed look) only on pages
+    // with a touchstart listener.
+    document.addEventListener("touchstart", function () {}, { passive: true });
+
     app.ports.print.subscribe(function () {
       window.print();
     });

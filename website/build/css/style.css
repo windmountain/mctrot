@@ -327,8 +327,8 @@ table.records td {
      inset bevel bottom-right, and a hard black cast shadow bottom-right;
    - recessed parts (screen, slots, tray, wells) get the reverse bevels and
      no cast shadow;
-   - a pressed button drops into its own cast shadow, instantly (no
-     transition), so it clacks.
+   - a pressed button drops into its own cast shadow almost instantly and
+     springs back with a small overshoot on release (see "Pressing").
    Hard edges only: no blur, no gradients. The colors stay the same in
    dark mode, like a physical object. */
 
@@ -555,6 +555,33 @@ body.sim-page {
   box-shadow: inset 2px 2px 0 var(--key-hi), inset -2px -2px 0 var(--key-lo), 4px 4px 0 var(--cast);
 }
 
+/* Pressing: every key and START drops into its shadow the instant it's
+   touched and springs back up, overshooting a little, when let go. (iOS
+   only applies :active with a touchstart listener; see simulator.html.) */
+.key,
+.start-button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 160ms cubic-bezier(0.3, 1.8, 0.6, 1),
+    box-shadow 160ms cubic-bezier(0.3, 1.8, 0.6, 1);
+}
+
+.key:active:not(:disabled),
+.start-button:active {
+  transition-duration: 30ms;
+  transition-timing-function: ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .key,
+  .start-button,
+  .key:active:not(:disabled),
+  .start-button:active {
+    transition: none;
+  }
+}
+
 .key-icon {
   font-size: 1rem;
   padding: 0.35rem 0.7rem;
@@ -573,6 +600,14 @@ body.sim-page {
   box-shadow: inset 2px 2px 0 #fff, inset -2px -2px 0 #BDBAA6;
 }
 
+/* The export keys are a lighter gray than the view keys, to set the two
+   groups apart. */
+.export .key {
+  --key: #6A6754;
+  --key-hi: #908C76;
+  --key-lo: #3A382C;
+}
+
 .key:disabled {
   color: #A8A28A;
   cursor: not-allowed;
@@ -589,7 +624,8 @@ body.sim-page {
 }
 
 /* START: a red button in a recessed well. --depth is how far it stands
-   up, so how far it drops when pressed. */
+   up, so how far it drops when pressed. RESTART (start-small) is the same
+   button made square with big rounded corners. */
 
 .start-well {
   --depth: 8px;
@@ -628,11 +664,13 @@ body.sim-page {
 .start-small {
   --depth: 5px;
   padding: 6px calc(6px + var(--depth)) calc(6px + var(--depth)) 6px;
+  border-radius: 28px;
 }
 
 .start-small .start-button {
   width: 5.75rem;
   height: 5.75rem;
+  border-radius: 22px;
   font-size: 0.875rem;
   letter-spacing: 0.08em;
   box-shadow:
@@ -673,7 +711,9 @@ body.sim-page {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: rgba(13, 13, 8, 0.55);
+  /* Clear: dimming the yellow turns it (and iOS Safari's toolbar, which
+     samples it) a muddy brown. It's only here to catch taps outside. */
+  background: transparent;
 }
 
 .sheet {
@@ -751,6 +791,21 @@ body.sim-page {
   border-radius: 6px;
   box-shadow: inset 3px 3px 0 #000;
   color-scheme: dark;
+}
+
+/* Native date/time inputs (notably iOS Safari) have an intrinsic minimum
+   width that ignores width/min-width, so they overflow their grid cell and
+   swallow the column gap. Dropping the native appearance lets them shrink. */
+.field input[type="date"],
+.field input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-height: calc(1.5em + 0.9rem + 4px); /* match the other fields' height when empty */
+}
+
+.field input::-webkit-date-and-time-value {
+  text-align: left;
 }
 
 .field input:focus-visible,
