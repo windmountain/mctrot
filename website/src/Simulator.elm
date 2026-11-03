@@ -1,4 +1,4 @@
-module Simulator exposing (main)
+port module Simulator exposing (main)
 
 {-| The interactive route simulator on simulator.html, mounted with
 `Elm.Simulator.init({ node, flags: defaultStartDate })` (see `init`).
@@ -30,6 +30,7 @@ minutes/mile (see `travelTime`).
 import Array exposing (Array)
 import Browser
 import Browser.Events
+import Calendar
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -202,38 +203,6 @@ parseSeed raw =
     String.toInt raw |> Maybe.withDefault 0
 
 
-{-| Sakamoto's algorithm for the day of the week of a Gregorian date:
-0 = Sunday .. 6 = Saturday.
--}
-sakamotoWeekday : Int -> Int -> Int -> Int
-sakamotoWeekday year month day =
-    let
-        offsets =
-            [ 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 ]
-
-        y =
-            if month < 3 then
-                year - 1
-
-            else
-                year
-
-        offset =
-            List.Extra.getAt (month - 1) offsets |> Maybe.withDefault 0
-    in
-    modBy 7 (y + y // 4 - y // 100 + y // 400 + offset + day)
-
-
-parseDate : String -> Maybe ( Int, Int, Int )
-parseDate isoDate =
-    case String.split "-" isoDate |> List.map String.toInt of
-        [ Just year, Just month, Just day ] ->
-            Just ( year, month, day )
-
-        _ ->
-            Nothing
-
-
 {-| Turns the value of an `<input type="date">` ("YYYY-MM-DD") into a
 Monday-indexed 0..6 weekday — matching the order each
 city's weekly hours are listed in (Mon..Sun) — for feeding into
@@ -241,8 +210,8 @@ city's weekly hours are listed in (Mon..Sun) — for feeding into
 -}
 mondayIndexedWeekday : String -> Int
 mondayIndexedWeekday isoDate =
-    parseDate isoDate
-        |> Maybe.map (\( year, month, day ) -> modBy 7 (sakamotoWeekday year month day + 6))
+    Calendar.parseDate isoDate
+        |> Maybe.map (\( year, month, day ) -> modBy 7 (Calendar.sakamotoWeekday year month day + 6))
         |> Maybe.withDefault 0
 
 
@@ -257,7 +226,8 @@ weekLength =
 
 
 {-| The conditions a run is pinned to: which day of the week it begins on
-(Monday-indexed, 0..6), what time of day, how fast travel between stops
+(Monday-indexed, 0..6) and the calendar date that is (`Nothing` if the
+date input is invalid; only the printout uses it), what time of day, how fast travel between stops
 is, how long is spent at each stop, and which locations (if any) the
 route must start and end at (`Nothing` = flexible). Bundled together because they're
 all snapshotted at the same moment — when a search (re)starts — so the
@@ -265,6 +235,7 @@ energy function stays fixed for the life of that search.
 -}
 type alias StartTime =
     { weekday : Int
+    , date : Maybe Calendar.Date
     , minutes : Int
     , metersPerMinute : Float
     , stopMinutes : Int
@@ -513,6 +484,7 @@ type Msg
     | SetEndCityInput String
     | SelectTab Tab
     | SetMapFit String
+    | Print
 
 
 {-| (Re)starts the search from `initialTour`, snapshotting `activeStart` (see
@@ -525,6 +497,7 @@ startSearch model =
     let
         activeStart =
             { weekday = mondayIndexedWeekday model.startDate
+            , date = Calendar.parseDate model.startDate
             , minutes = parseStartMinutes model.startTimeOfDay
             , metersPerMinute = metersPerMinuteFromPace (parseMinutesPerMile model.speedInput)
             , stopMinutes = parseStopMinutes model.stopInput
@@ -569,6 +542,7 @@ init defaultStartDate =
 
         activeStart =
             { weekday = mondayIndexedWeekday startDate
+            , date = Calendar.parseDate startDate
             , minutes = parseStartMinutes startTimeOfDay
             , metersPerMinute = metersPerMinuteFromPace (parseMinutesPerMile speedInput)
             , stopMinutes = parseStopMinutes stopInput
@@ -595,6 +569,12 @@ init defaultStartDate =
 
 
 -- UPDATE
+
+
+{-| Opens the browser's print dialog (see simulator.html), which prints
+`viewPrintSheet` instead of the page.
+-}
+port print : () -> Cmd msg
 
 
 searching : Model -> Bool
@@ -665,6 +645,9 @@ update msg model =
             , Cmd.none
             )
 
+        Print ->
+            ( model, print () )
+
 
 
 -- SUBSCRIPTIONS
@@ -710,7 +693,15 @@ view model =
         viewMax =
             max 600 (((totalMinutes model.activeStart tour // 60) + 1) * 60)
     in
-    Html.div [ Attr.style "font-family" "sans-serif", Attr.style "max-width" "1100px" ]
+    Html.div []
+        [ viewScreen model tour visits viewMax
+        , Html.Lazy.lazy3 viewPrintSheet model.mapFit model.activeStart (SimulatedAnnealing.best model.saState)
+        ]
+
+
+viewScreen : Model -> Tour -> List Visit -> Int -> Html Msg
+viewScreen model tour visits viewMax =
+    Html.div [ Attr.class "simulator-screen", Attr.style "font-family" "sans-serif", Attr.style "max-width" "1100px" ]
         [ viewRunSettings model
         , box "Search"
             [ Html.button [ Events.onClick Start ] [ Html.text "Start" ]
@@ -736,8 +727,8 @@ view model =
             , readout "Best distance" (formatMiles (totalDistanceMeters model.activeStart (SimulatedAnnealing.best model.saState)))
             ]
         , box "Output"
-            -- Disabled until there's a computed route to act on.
-            [ Html.button [ Attr.disabled True ] [ Html.text "Print" ]
+            -- Disabled until a search has produced a route to act on.
+            [ Html.button [ Attr.disabled (not model.running), Events.onClick Print ] [ Html.text "Print" ]
             , Html.button [ Attr.disabled True ] [ Html.text "Download GPX" ]
             , Html.details [ Attr.class "distance-matrix", Attr.style "flex-basis" "100%" ]
                 [ Html.summary [ Attr.style "cursor" "pointer", Attr.style "color" "#666" ]
@@ -931,12 +922,12 @@ mapLayer fit =
         ]
 
 
-{-| The box the layers stack in: `mapDisplayWidth` wide and centered for
-`Normal`, the full width otherwise (less `superstretchPadding` on each side
-for `Superstretch`).
+{-| The box the layers stack in, `height` tall: `mapDisplayWidth` wide and
+centered for `Normal`, the full width otherwise (less `superstretchPadding`
+on each side for `Superstretch`).
 -}
-viewMapFrame : MapFit -> List (Html msg) -> Html msg
-viewMapFrame fit layers =
+viewMapFrame : MapFit -> String -> List (Html msg) -> Html msg
+viewMapFrame fit height layers =
     Html.div
         [ Attr.style "padding"
             (if fit == Superstretch then
@@ -949,7 +940,7 @@ viewMapFrame fit layers =
         ]
         [ Html.div
             [ Attr.style "position" "relative"
-            , Attr.style "height" (String.fromFloat mapDisplayHeight ++ "px")
+            , Attr.style "height" height
             , Attr.style "width"
                 (if fit == Normal then
                     String.fromFloat mapDisplayWidth ++ "px"
@@ -983,34 +974,51 @@ viewRouteLayer fit =
         )
 
 
-{-| Every location dot — built once per `MapFit`, on top of everything else.
+{-| What a location's marker shows: where the route starts, where it
+finishes, or an ordinary stop.
 -}
-viewLocationLayer : MapFit -> Html msg
-viewLocationLayer fit =
-    mapLayer fit
-        [ Svg.g []
-            (MctrotMapData.locationCoords
-                |> Array.toList
-                |> List.map
-                    (\( x, y ) ->
-                        Svg.path
-                            [ SvgAttr.class "location"
-                            , SvgAttr.d ("M" ++ String.fromFloat x ++ " " ++ String.fromFloat y ++ "h0")
-                            ]
-                            []
-                    )
-            )
-        ]
+type LocationKind
+    = StartLocation
+    | FinishLocation
+    | StopLocation
 
 
-{-| Diamonds over the route but under the location dots, at the first and
-last of `route` (see `stops`): green for the start, a 2x2 checkered flag for
-the finish. They're HTML, positioned by
-percentage within the map frame, so they keep their shape however the map
-is stretched. For a round trip the flag covers the start.
+{-| For a round trip the finish covers the start.
 -}
-viewEndpoints : MapFit -> List Int -> Html msg
-viewEndpoints fit route =
+locationKind : Maybe Int -> Maybe Int -> Int -> LocationKind
+locationKind start finish cityIndex =
+    if Just cityIndex == finish then
+        FinishLocation
+
+    else if Just cityIndex == start then
+        StartLocation
+
+    else
+        StopLocation
+
+
+locationKindClass : LocationKind -> String
+locationKindClass kind =
+    case kind of
+        StartLocation ->
+            "location location-start"
+
+        FinishLocation ->
+            "location location-finish"
+
+        StopLocation ->
+            "location location-stop"
+
+
+{-| A marker at every location, on top of everything else: a green diamond
+where the route starts at `start`, a checkered one where it finishes at
+`finish`, and a dot everywhere else (styled in css/mctrot-map.css). They're
+HTML, positioned by percentage within the map frame, so they keep their
+shape however the map is stretched. Lazy in `viewMapLayers`, so it only
+rebuilds when the fit or the route's ends change.
+-}
+viewLocationLayer : MapFit -> Maybe Int -> Maybe Int -> Html msg
+viewLocationLayer fit start finish =
     let
         viewBox =
             case String.split " " (mapViewBoxFor fit) |> List.filterMap String.toFloat of
@@ -1020,32 +1028,145 @@ viewEndpoints fit route =
                 _ ->
                     Nothing
 
-        diamond background cityIndex =
-            case ( viewBox, Array.get cityIndex MctrotMapData.locationCoords ) of
-                ( Just vb, Just ( x, y ) ) ->
-                    [ Html.div
-                        [ Attr.style "position" "absolute"
-                        , Attr.style "left" (String.fromFloat ((x - vb.x) / vb.w * 100) ++ "%")
-                        , Attr.style "top" (String.fromFloat ((y - vb.y) / vb.h * 100) ++ "%")
-                        , Attr.style "width" "14px"
-                        , Attr.style "height" "14px"
-                        , Attr.style "transform" "translate(-50%, -50%) rotate(45deg)"
-                        , Attr.style "background" background
-                        , Attr.style "border" "1px solid #fff"
-                        ]
-                        []
-                    ]
-
-                _ ->
-                    []
-
-        at background cityIndex =
-            Maybe.map (diamond background) cityIndex |> Maybe.withDefault []
+        marker vb ( cityIndex, ( x, y ) ) =
+            Html.div
+                [ Attr.class (locationKindClass (locationKind start finish cityIndex))
+                , Attr.style "left" (String.fromFloat ((x - vb.x) / vb.w * 100) ++ "%")
+                , Attr.style "top" (String.fromFloat ((y - vb.y) / vb.h * 100) ++ "%")
+                ]
+                []
     in
     Html.div [ Attr.style "position" "absolute", Attr.style "inset" "0", Attr.style "pointer-events" "none" ]
-        (at "#1a9e3a" (List.head route)
-            ++ at "conic-gradient(#000 0 25%, #fff 0 50%, #000 0 75%, #fff 0)" (List.Extra.last route)
+        (case viewBox of
+            Just vb ->
+                MctrotMapData.locationCoords
+                    |> Array.toIndexedList
+                    |> List.map (marker vb)
+
+            Nothing ->
+                []
         )
+
+
+{-| The map's stacked layers, `height` tall (any CSS length), with `route`'s
+streets highlighted and its ends marked.
+-}
+viewMapLayers : MapFit -> String -> List Int -> Html msg
+viewMapLayers fit height route =
+    Html.div [ Attr.attribute "data-active" (tourEdgeTokens route) ]
+        [ viewMapFrame fit
+            height
+            [ Html.Lazy.lazy viewBoroughLayer fit
+            , Html.Lazy.lazy viewRouteLayer fit
+            , Html.Lazy.lazy3 viewLocationLayer fit (List.head route) (List.Extra.last route)
+            ]
+        ]
+
+
+{-| What prints instead of the page (see css/style.css): a US letter sheet
+with the best route's map stretched by `fit` over all of page one, in front of
+the header, and its schedule on page two. Each page is headed with the start
+date. Lazy in `view`, so it
+only rebuilds when the best route or run settings change.
+-}
+viewPrintSheet : MapFit -> StartTime -> Tour -> Html msg
+viewPrintSheet fit startTime best =
+    let
+        printHead =
+            Html.div [ Attr.class "print-head" ]
+                [ Html.span [ Attr.class "print-wordmark" ] [ Html.text "McTrot" ]
+                , Html.span [] [ Html.text (Maybe.map Calendar.formatLong startTime.date |> Maybe.withDefault "") ]
+                ]
+    in
+    Html.div [ Attr.class "print-sheet" ]
+        [ Html.div [ Attr.class "print-page" ]
+            [ printHead
+            , Html.div [ Attr.class "print-map" ] [ viewMapLayers fit "9in" (stops startTime best) ]
+            ]
+        , Html.div [ Attr.class "print-page" ]
+            [ printHead
+            , viewPrintSchedule startTime (simulate startTime best)
+            ]
+        ]
+
+
+{-| One row per visit. Arrival times are on a 12-hour clock; the first
+arrival on each later calendar day also gets that day's date, since the page
+header only names the start date.
+-}
+viewPrintSchedule : StartTime -> List Visit -> Html msg
+viewPrintSchedule startTime visits =
+    let
+        dayOf visit =
+            visit.arrival // dayLength
+
+        arrivalText previousDay visit =
+            let
+                dateText =
+                    case ( startTime.date, dayOf visit /= previousDay ) of
+                        ( Just date, True ) ->
+                            Calendar.formatShort (Calendar.addDays (dayOf visit) date) ++ ", "
+
+                        _ ->
+                            ""
+
+                waitText =
+                    if visit.wait > 0 then
+                        " (opens " ++ formatClock (visit.arrival + visit.wait) ++ ")"
+
+                    else
+                        ""
+            in
+            dateText ++ formatClock visit.arrival ++ waitText
+
+        row i previousDay visit =
+            let
+                city =
+                    Array.get visit.cityIndex cities
+            in
+            Html.tr []
+                [ Html.td [ Attr.class "print-num" ] [ Html.text (String.fromInt (i + 1)) ]
+                , Html.td [] [ Html.text (Maybe.map .name city |> Maybe.withDefault "") ]
+                , Html.td [] [ Html.text (Maybe.map .address city |> Maybe.withDefault "") ]
+                , Html.td [] [ Html.text (arrivalText previousDay visit) ]
+                ]
+
+        previousDays =
+            0 :: List.map dayOf visits
+    in
+    Html.table [ Attr.class "print-schedule" ]
+        [ Html.thead []
+            [ Html.tr []
+                [ Html.th [ Attr.class "print-num" ] [ Html.text "#" ]
+                , Html.th [] [ Html.text "Code name" ]
+                , Html.th [] [ Html.text "Address" ]
+                , Html.th [] [ Html.text "Expected arrival" ]
+                ]
+            ]
+        , Html.tbody [] (List.map3 row (List.range 0 (List.length visits - 1)) previousDays visits)
+        ]
+
+
+{-| Minutes since some midnight as a 12-hour time of day: "2:05 AM".
+-}
+formatClock : Int -> String
+formatClock minutes =
+    let
+        minuteOfDay =
+            modBy dayLength minutes
+
+        hour =
+            minuteOfDay // 60
+    in
+    String.fromInt (modBy 12 (hour + 11) + 1)
+        ++ ":"
+        ++ String.padLeft 2 '0' (String.fromInt (modBy 60 minuteOfDay))
+        ++ (if hour < 12 then
+                " AM"
+
+            else
+                " PM"
+           )
 
 
 {-| The map with a `MapFit` dropdown pinned to its top right corner.
@@ -1053,14 +1174,7 @@ viewEndpoints fit route =
 viewMap : MapFit -> List Int -> Html Msg
 viewMap fit route =
     Html.div [ Attr.style "position" "relative" ]
-        [ Html.div [ Attr.attribute "data-active" (tourEdgeTokens route) ]
-            [ viewMapFrame fit
-                [ Html.Lazy.lazy viewBoroughLayer fit
-                , Html.Lazy.lazy viewRouteLayer fit
-                , viewEndpoints fit route
-                , Html.Lazy.lazy viewLocationLayer fit
-                ]
-            ]
+        [ viewMapLayers fit (String.fromFloat mapDisplayHeight ++ "px") route
         , Html.select
             [ Attr.style "position" "absolute"
             , Attr.style "top" "0"

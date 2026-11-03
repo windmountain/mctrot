@@ -106,8 +106,12 @@
     };
   };
 
+  # The venv (.devenv/state/venv) is activated in the shell, so plain
+  # `python3 scripts/...` gets pyproject.toml's dependencies (psycopg etc.)
+  # just like `uv run` does.
   languages.python = {
     enable = true;
+    venv.enable = true;
     uv = {
       enable = true;
       sync.enable = true;

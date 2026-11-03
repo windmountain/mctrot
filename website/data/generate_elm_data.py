@@ -329,9 +329,16 @@ def write_css(mcd_ids):
         # The map is stretched non-uniformly to fill its box, so every stroke
         # is non-scaling and sized in screen pixels. Locations are zero-length
         # round-capped paths, which stay circular under the stretch.
+        # --route-active recolors the highlighted route. Location markers are
+        # HTML over the map (see viewLocationLayer in src/Simulator.elm), so
+        # they keep their shape too.
         ".borough { fill: #000; stroke: #999; stroke-width: 0.5px; vector-effect: non-scaling-stroke; }",
         ".route-edge { fill: none; stroke: #ccc; stroke-width: 1px; vector-effect: non-scaling-stroke; transition: stroke 150ms ease, stroke-width 150ms ease; }",
-        ".location { fill: none; stroke: #FF0000; stroke-width: 5px; stroke-linecap: round; vector-effect: non-scaling-stroke; }",
+        ".location { position: absolute; transform: translate(-50%, -50%); }",
+        ".location-stop { width: 5px; height: 5px; border-radius: 50%; background: #FF0000; }",
+        ".location-start, .location-finish { width: 14px; height: 14px; border: 1px solid #fff; transform: translate(-50%, -50%) rotate(45deg); }",
+        ".location-start { background: #1a9e3a; }",
+        ".location-finish { background: conic-gradient(#000 0 25%, #fff 0 50%, #000 0 75%, #fff 0); }",
         "",
     ]
     n = len(mcd_ids)
@@ -339,7 +346,7 @@ def write_css(mcd_ids):
         for j in range(i + 1, n):
             token = f"l{mcd_ids[i]}-l{mcd_ids[j]}"
             lines.append(
-                f'[data-active~="{token}"] .{token} {{ stroke: #FFD100; stroke-width: 8px; }}'
+                f'[data-active~="{token}"] .{token} {{ stroke: var(--route-active, #FFD100); stroke-width: 8px; }}'
             )
     CSS_OUT.write_text("\n".join(lines) + "\n")
 

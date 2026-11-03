@@ -90,9 +90,12 @@
     if (now.getMonth() > 10 || (now.getMonth() === 10 && now.getDate() > 21)) {
       year += 1;
     }
-    Elm.Simulator.init({
+    var app = Elm.Simulator.init({
       node: document.getElementById("simulator"),
       flags: year + "-11-21"
+    });
+    app.ports.print.subscribe(function () {
+      window.print();
     });
   </script>
 </body>

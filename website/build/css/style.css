@@ -366,6 +366,12 @@ table.records td {
   }
 }
 
+/* simulator printout (see viewPrintSheet in website/src/Simulator.elm) */
+
+.print-sheet {
+  display: none;
+}
+
 @media print {
   header nav,
   .skip-link,
@@ -376,5 +382,104 @@ table.records td {
   body {
     background: #fff;
     color: #000;
+  }
+
+  /* On the simulator, print only the two-page sheet. */
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  body:has(.print-sheet) > header,
+  body:has(.print-sheet) .page-head,
+  .simulator-screen {
+    display: none;
+  }
+
+  html:has(.print-sheet) {
+    background: #fff;
+  }
+
+  body:has(.print-sheet) main {
+    padding: 0;
+  }
+
+  body:has(.print-sheet) .wrap {
+    max-width: none;
+    padding: 0;
+  }
+
+  .print-sheet {
+    display: block;
+    font-family: var(--font);
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-page {
+    position: relative;
+    height: 10in;
+    overflow: hidden;
+    break-after: page;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+  }
+
+  .print-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    height: 0.4in;
+    margin-bottom: 0.2in;
+    border-bottom: 1px solid #000;
+    font-size: 11pt;
+  }
+
+  /* The map sits in front of the first page's header, a little short of
+     the page's full height so it never spills onto another page. */
+  .print-map {
+    position: absolute;
+    inset: 0;
+    --route-active: #fff;
+  }
+
+  /* Stop dots at 3x their on-screen size, white with a black border. */
+  .print-map .location-stop {
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border: 1.5px solid #000;
+  }
+
+  .print-wordmark {
+    font-weight: 700;
+  }
+
+  .print-schedule {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    line-height: 1.2;
+  }
+
+  .print-schedule th {
+    text-align: left;
+    border-bottom: 1px solid #000;
+  }
+
+  .print-schedule th,
+  .print-schedule td {
+    padding: 0.02in 0.08in 0.02in 0;
+  }
+
+  .print-schedule tbody tr:nth-child(even) {
+    background: #eee;
+  }
+
+  .print-num {
+    text-align: right;
+    width: 2em;
   }
 }
