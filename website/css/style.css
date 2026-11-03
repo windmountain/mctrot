@@ -753,6 +753,21 @@ body.sim-page {
   color-scheme: dark;
 }
 
+/* Native date/time inputs (notably iOS Safari) have an intrinsic minimum
+   width that ignores width/min-width, so they overflow their grid cell and
+   swallow the column gap. Dropping the native appearance lets them shrink. */
+.field input[type="date"],
+.field input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-height: calc(1.5em + 0.9rem + 4px); /* match the other fields' height when empty */
+}
+
+.field input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .field input:focus-visible,
 .field select:focus-visible {
   outline: 2px solid var(--cast);
