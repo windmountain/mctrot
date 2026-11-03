@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Assembles the deployable site in build/: copies the public pages and
 # assets (including geo/route-legs.json, which the simulator fetches for its
-# GPX export, and sim/, the simulator's own icons and share image), and
+# GPX export, and sim/, the simulator's own share image and manifest), and
 # compiles the Elm simulator to build/js/simulator.js.
 # Run inside `devenv shell` (for elm and terser). Does not regenerate map
 # data; run scripts/export_simulator_data.py for that (see README).

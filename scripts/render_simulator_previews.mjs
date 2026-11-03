@@ -1,9 +1,9 @@
-// Renders the simulator's share image and icons in website/sim/ from their
-// hand-editable SVG sources, with headless Chrome:
+// Renders the simulator's share image in website/sim/ from its
+// hand-editable SVG source, with headless Chrome:
 //
 //   og.svg       -> og.png (1200x630, the og:image; social sites need a PNG)
-//   icon.svg     -> icon-512.png, icon-192.png, apple-touch-icon.png
-//   favicon.svg  -> favicon-32.png
+//
+// (The simulator uses the site's own icons.)
 //
 // Usage: node scripts/render_simulator_previews.mjs, then website/build.sh.
 // Set CHROME to the browser binary if it isn't at the macOS default.
@@ -19,10 +19,6 @@ const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/M
 
 const renders = [
   ["og.svg", 1200, 630, "og.png"],
-  ["icon.svg", 512, 512, "icon-512.png"],
-  ["icon.svg", 192, 192, "icon-192.png"],
-  ["icon.svg", 180, 180, "apple-touch-icon.png"],
-  ["favicon.svg", 32, 32, "favicon-32.png"],
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

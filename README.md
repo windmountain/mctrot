@@ -126,7 +126,7 @@ devenv shell -- website/build.sh   # copies public pages/assets, compiles Elm to
 
 Elm tests: `cd website && elm-test`.
 
-The simulator has its own share image and icons in `website/sim/`. Their sources are hand-editable SVGs (`og.svg`, with each element grouped by name, plus `icon.svg` and `favicon.svg`); render the PNGs from them with headless Chrome:
+The simulator uses the site's icons but has its own share image and web app manifest in `website/sim/`. The share image's source is a hand-editable SVG (`og.svg`, with each element grouped by name); render the PNG from it with headless Chrome:
 
 ```
 node scripts/render_simulator_previews.mjs   # then website/build.sh to copy them into build/
