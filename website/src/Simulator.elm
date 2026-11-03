@@ -615,9 +615,7 @@ init defaultStartDate =
 port print : () -> Cmd msg
 
 
-{-| Hands a GPX file to simulator.html, which opens the share sheet on
-touch devices that can share files (so the visitor can send it straight to
-a map app) and downloads it everywhere else.
+{-| Hands a GPX file to simulator.html, which downloads it.
 -}
 port saveGpx : { filename : String, gpx : String } -> Cmd msg
 
@@ -783,9 +781,9 @@ fetchLegs =
         }
 
 
-{-| Shares or saves the best route as `mctrot-YYYY-MM-DD.gpx` (see
-`Gpx.build`, `saveGpx`). Safari only shares in direct response to a tap,
-which is why the legs are fetched ahead of time, when the search starts.
+{-| Downloads the best route as `mctrot-YYYY-MM-DD.gpx` (see `Gpx.build`,
+`saveGpx`). The legs are fetched ahead of time, when the search starts, so
+the download usually follows the tap directly.
 -}
 downloadGpx : Model -> Dict String String -> Cmd msg
 downloadGpx model legs =
@@ -1132,16 +1130,16 @@ viewExport done legs =
                 (case legs of
                     Loading { thenDownload } ->
                         if thenDownload then
-                            "GPX…"
+                            "Export GPX…"
 
                         else
-                            "GPX"
+                            "Export GPX"
 
                     Failed ->
-                        "Retry GPX"
+                        "Retry export"
 
                     _ ->
-                        "GPX"
+                        "Export GPX"
                 )
             ]
         , Html.details [ Attr.class "distance-matrix" ]

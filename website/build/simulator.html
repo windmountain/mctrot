@@ -55,35 +55,17 @@
       window.print();
     });
 
-    // GPX export: on a touch device that can share files (iOS Safari, for
-    // one), open the share sheet, which lists the installed apps that take
-    // GPX (Gaia GPS, OsmAnd, Komoot, ...) along with Files and AirDrop.
-    // Anywhere else, or if sharing fails, download the file instead.
-    // Cancelling the share sheet does nothing.
+    // GPX export: a plain download, on every device.
     app.ports.saveGpx.subscribe(function (out) {
       var file = new File([out.gpx], out.filename, { type: "application/gpx+xml" });
-
-      function download() {
-        var url = URL.createObjectURL(file);
-        var a = document.createElement("a");
-        a.href = url;
-        a.download = out.filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
-      }
-
-      var touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-      if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file] }).catch(function (err) {
-          if (err.name !== "AbortError") {
-            download();
-          }
-        });
-      } else {
-        download();
-      }
+      var url = URL.createObjectURL(file);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = out.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
     });
   </script>
 </body>
