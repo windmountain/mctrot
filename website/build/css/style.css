@@ -947,3 +947,286 @@ body.sim-page {
     width: 2em;
   }
 }
+
+/* mega search: the simulator's shell and screen, widened for the
+   landscape chart, which scrolls sideways inside the screen. */
+
+.sim.mega {
+  height: auto;
+  min-height: 100dvh;
+  max-width: 72rem;
+  --label-width: 9.5rem;
+}
+
+.mega-title {
+  margin: 0.25rem 0 0.25rem;
+  font-size: 1.75rem;
+  line-height: 1.1;
+  letter-spacing: var(--kern-fix);
+}
+
+.mega-intro {
+  margin: 0 0 1rem;
+  max-width: 39rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.mega-intro a {
+  color: inherit;
+}
+
+.mega-settings .settings {
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+}
+
+.mega-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.mega-summary {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mega-run .start-sheet {
+  margin: 0;
+}
+
+.mega-run .start-sheet .start-button {
+  width: 9rem;
+  height: 3.25rem;
+  font-size: 1rem;
+}
+
+.mega-run .start-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* START OVER: the same button in the keys' gray. */
+.mega-secondary {
+  --start: var(--key);
+  --start-hi: var(--key-hi);
+  --start-lo: var(--key-lo);
+}
+
+.mega-screen {
+  flex: none;
+  padding-bottom: 1rem;
+}
+
+.mega-empty {
+  margin: 0;
+  padding: 2rem 0.25rem;
+  color: var(--screen-dim);
+}
+
+.mega-readout {
+  min-height: 4.75rem;
+  padding: 0.75rem 0.15rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.mega-readout p {
+  margin: 0;
+}
+
+.mega-readout-when {
+  color: var(--screen-dim);
+}
+
+.mega-readout strong {
+  color: var(--screen-ink);
+}
+
+.mega-link,
+.mega-table a {
+  color: var(--screen-ink);
+}
+
+.mega-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin: 0 -0.15rem;
+  padding-bottom: 0.5rem;
+}
+
+.mega-grid {
+  display: grid;
+  width: max-content;
+}
+
+.mega-corner,
+.mega-labels {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--screen);
+  box-shadow: 4px 0 0 var(--screen);
+}
+
+.mega-strip-label {
+  align-self: end;
+  padding: 0 0.75rem 0.5rem 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--screen-dim);
+}
+
+.mega-label {
+  overflow: hidden;
+  padding-right: 0.5rem;
+  font-size: 11px;
+  line-height: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mega-strip {
+  position: relative;
+}
+
+.mega-strip svg,
+.mega-axis,
+.mega-heat {
+  display: block;
+}
+
+.mega-strip-line {
+  fill: none;
+  stroke: var(--screen-ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.mega-strip-dot {
+  fill: var(--screen-ink);
+}
+
+.mega-strip-best {
+  fill: var(--screen-ink);
+  stroke: var(--screen);
+  stroke-width: 2;
+}
+
+.mega-grid-line {
+  stroke: var(--screen-edge);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+/* The scale's two values ride the left edge of the scrolled strip. */
+.mega-strip-scale span {
+  position: absolute;
+  left: 0.25rem;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--screen-dim);
+  pointer-events: none;
+}
+
+.mega-strip-scale .mega-scale-hi {
+  transform: translateY(3px);
+}
+
+.mega-strip-scale .mega-scale-lo {
+  transform: translateY(calc(-100% - 3px));
+}
+
+.mega-tick {
+  stroke: #6E6A55;
+}
+
+.mega-tick-day {
+  stroke: var(--screen-text);
+}
+
+.mega-tick-label {
+  fill: var(--screen-dim);
+  font-size: 10px;
+}
+
+.mega-tick-label-day {
+  fill: var(--screen-text);
+  font-weight: 700;
+}
+
+.mega-heat-bg {
+  fill: #23221A;
+}
+
+.mega-heat rect:not(.mega-heat-bg) {
+  cursor: pointer;
+}
+
+.mega-heat rect:not(.mega-heat-bg):hover {
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.mega-key {
+  margin: 0.75rem 0 0;
+  color: var(--screen-text);
+}
+
+.mega-table {
+  width: 100%;
+  margin-top: 1.25rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mega-table caption {
+  margin-bottom: 0.5rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--screen-dim);
+}
+
+.mega-table th {
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--screen-dim);
+  border-bottom: 2px solid var(--screen-edge);
+}
+
+.mega-table th,
+.mega-table td {
+  padding: 0.35rem 0.75rem 0.35rem 0;
+}
+
+.mega-table td {
+  border-bottom: 1px solid var(--screen-edge);
+}
+
+.mega-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .sim.mega {
+    --label-width: 6.5rem;
+  }
+
+  .mega-table th:nth-child(5),
+  .mega-table td:nth-child(5) {
+    display: none;
+  }
+}

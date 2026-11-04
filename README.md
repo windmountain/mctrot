@@ -118,10 +118,10 @@ The export reprojects everything to EPSG:2263 (NAD83 / New York Long Island Stat
 
 # Website
 
-`website/` holds the hand-written pages of mctrot.nyc plus the Elm source (`website/src/`) for `simulator.html`. The deployable site is `website/build/`, which is committed. Rebuild it after changing any page, CSS, or Elm:
+`website/` holds the hand-written pages of mctrot.nyc plus the Elm source (`website/src/`) for `simulator.html` and `mega-search.html` (the simulator's search run across every start location and many start times; the search itself is `Search.elm`, shared by both). The deployable site is `website/build/`, which is committed. Rebuild it after changing any page, CSS, or Elm:
 
 ```
-devenv shell -- website/build.sh   # copies public pages/assets, compiles Elm to build/js/simulator.js
+devenv shell -- website/build.sh   # copies public pages/assets, compiles the Elm programs into build/js/
 ```
 
 Elm tests: `cd website && elm-test`.

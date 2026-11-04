@@ -9,9 +9,11 @@ sensible non-JS alternative — and even then, the site must keep working with
 JS disabled. Don't reach for a script to solve something CSS or plain HTML
 can do.
 
-The one exception is `simulator.html`, an interactive Elm demo that
-requires JS (it shows a `<noscript>` note without it). It's unlinked for
-now (a soft secret), and every other page must keep working with JS
+The exceptions are `simulator.html`, an interactive Elm demo, and
+`mega-search.html`, which runs the simulator's search across many start
+times and locations in Web Workers. Both require JS (each shows a
+`<noscript>` note without it). Both are unlinked from the site's navigation
+for now (soft secrets), and every other page must keep working with JS
 disabled.
 
 ## Browsers

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>McTrot Mega Search</title>
+  <meta name="description" content="Runs the McTrot simulator&rsquo;s route search from every McDonald&rsquo;s in Manhattan at every start time across a window, and maps how long each route takes.">
+  <link rel="canonical" href="https://mctrot.nyc/mega-search.html">
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#FFD100">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="sim-page">
+  <main id="main">
+    <div id="mega-search">
+      <noscript>
+        <p><a href="/">McTrot</a></p>
+        <h1>McTrot Mega Search</h1>
+        <p>The mega search runs the simulator&rsquo;s route search from every McDonald&rsquo;s in Manhattan, at every start time across a window, and maps how long each route takes.</p>
+        <p>The mega search requires JavaScript.</p>
+      </noscript>
+    </div>
+  </main>
+
+  <script src="js/mega-search.js"></script>
+  <script>
+    // Saved under one key: the settings and every result so far (see
+    // MegaSearch.elm's encodeSaved).
+    var STORAGE_KEY = "mctrot-mega-search";
+
+    // Default date: the next Nov 21, today or later, by the visitor's local
+    // date (as on simulator.html).
+    var now = new Date();
+    var year = now.getFullYear();
+    if (now.getMonth() > 10 || (now.getMonth() === 10 && now.getDate() > 21)) {
+      year += 1;
+    }
+
+    var saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    } catch (e) {}
+
+    // One worker per core, leaving one for the page.
+    var workerCount = Math.max(1, Math.min(16, (navigator.hardwareConcurrency || 4) - 1));
+
+    var app = Elm.MegaSearch.init({
+      node: document.getElementById("mega-search"),
+      flags: { defaultDate: year + "-11-21", workers: workerCount, saved: saved }
+    });
+    document.addEventListener("touchstart", function () {}, { passive: true });
+
+    // The pool: each worker runs one search at a time (see
+    // js/mega-search-worker.js) and takes the next queued job when it
+    // reports back.
+    var queue = [];
+    var pool = [];
+    for (var i = 0; i < workerCount; i++) {
+      var worker = new Worker("js/mega-search-worker.js");
+      worker.busy = false;
+      worker.onmessage = function (e) {
+        app.ports.jobDone.send(e.data);
+        this.busy = false;
+        feed(this);
+      };
+      pool.push(worker);
+    }
+
+    function feed(worker) {
+      if (!worker.busy && queue.length) {
+        worker.busy = true;
+        worker.postMessage(queue.shift());
+      }
+      if (!queue.length && pool.every(function (w) { return !w.busy; })) {
+        releaseWakeLock();
+      }
+    }
+
+    app.ports.runJobs.subscribe(function (jobs) {
+      queue = jobs.slice();
+      requestWakeLock();
+      pool.forEach(feed);
+    });
+
+    app.ports.stopJobs.subscribe(function () {
+      queue = [];
+      releaseWakeLock();
+    });
+
+    // Saving: at most every two seconds, and once more when the page goes
+    // away.
+    var pendingSave;
+    var saveTimer = null;
+
+    function flushSave() {
+      saveTimer = null;
+      if (pendingSave === undefined) return;
+      try {
+        if (pendingSave === null) {
+          localStorage.removeItem(STORAGE_KEY);
+        } else {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingSave));
+        }
+      } catch (e) {}
+      pendingSave = undefined;
+    }
+
+    app.ports.save.subscribe(function (value) {
+      pendingSave = value;
+      if (value === null) {
+        clearTimeout(saveTimer);
+        flushSave();
+      } else if (saveTimer === null) {
+        saveTimer = setTimeout(flushSave, 2000);
+      }
+    });
+
+    window.addEventListener("pagehide", flushSave);
+
+    // Keep the screen on while searching, where the browser allows it; a
+    // sleeping phone suspends the workers.
+    var wakeLock = null;
+
+    function requestWakeLock() {
+      if (wakeLock || !navigator.wakeLock) return;
+      navigator.wakeLock.request("screen").then(
+        function (lock) {
+          wakeLock = lock;
+          lock.addEventListener("release", function () { wakeLock = null; });
+        },
+        function () {}
+      );
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) wakeLock.release();
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && queue.length) requestWakeLock();
+    });
+  </script>
+</body>
+</html>
