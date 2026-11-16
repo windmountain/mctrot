@@ -18,6 +18,8 @@
       # takes the bare IP instead, since DNS may not have propagated.
       host = "root@recorder.mctrot.nyc";
 
+      # NB: `${./.}`, not `${self}`: when the flake is read from git,
+      # self points at the repo root, which has no flake.nix.
       # Laptop-side tools, runnable from macOS or Linux. Both build on the
       # Droplet itself, so a Mac needs no Linux builder.
       forLaptops = f: nixpkgs.lib.genAttrs
@@ -33,7 +35,7 @@
             set -eu
             ip="''${1:?usage: nix run .#install -- <droplet-ip>}"
             exec ${lpkgs.nixos-anywhere}/bin/nixos-anywhere \
-              --flake ${self}#recorder \
+              --flake "path:${./.}#recorder" \
               --build-on remote \
               --target-host "root@$ip"
           '');
@@ -46,7 +48,7 @@
             set -eu
             target="''${1:-${host}}"
             exec ${lpkgs.nixos-rebuild-ng}/bin/nixos-rebuild switch \
-              --flake ${self}#recorder \
+              --flake "path:${./.}#recorder" \
               --target-host "$target" \
               --build-host "$target"
           '');
