@@ -26,7 +26,7 @@ buildNpmPackage {
   nodejs = nodejs_26;
   # Update after changing package-lock.json:
   #   nix run nixpkgs#prefetch-npm-deps -- package-lock.json
-  npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  npmDepsHash = "sha256-WIrUQyBpqnwJTRZvKRPce0qNhtIHfxRtvhnDX2BFDDk=";
 
   nativeBuildInputs = [ node-gyp python3 makeWrapper ]
     ++ lib.optional stdenv.hostPlatform.isDarwin cctools;
