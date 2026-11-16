@@ -150,23 +150,14 @@ export const LiveResponse = z
         }),
         squares: z.array(
           z.object({
-            label: z.string().describe('Where to look: "Low in the SW, toward the sun"'),
+            label: z.string().describe('Where to look: "Overhead", or a compass point 10° above the horizon: "NE", "NW", "SE", "SW"'),
             elevation: z.number(),
             azimuth: z.number(),
             color: z.string().describe("CSS hex colour"),
           }),
         ),
-        dome: z
-          .object({
-            overhead: z.string().describe("CSS hex colour"),
-            north: z.string().describe("CSS hex colour"),
-            east: z.string().describe("CSS hex colour"),
-            south: z.string().describe("CSS hex colour"),
-            west: z.string().describe("CSS hex colour"),
-          })
-          .describe("Overhead, and each compass point 10° above the horizon: the whole sky for a gradient"),
       })
-      .describe("The sky's colour in a few directions, simulated from the sun and the latest weather (src/sky.ts)"),
+      .describe("The sky's colour overhead and low in four directions, simulated from the sun and the latest weather (src/sky.ts)"),
   })
   .meta({ title: "McTrot /live response" });
 

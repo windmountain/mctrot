@@ -54,24 +54,12 @@ type alias LiveResponse =
     , weather : Maybe Weather
     , sun : Sun
     , sky : List SkySquare
-    , dome : Dome
     }
 
 
-{-| The whole sky in five colours: overhead, and each compass point low
-in the sky. Drawn as a diamond gradient, north at the top.
--}
-type alias Dome =
-    { overhead : String
-    , north : String
-    , east : String
-    , south : String
-    , west : String
-    }
-
-
-{-| The sky's colour in one direction, simulated by the recorder from the
-sun's position and the latest weather (recorder/api/src/sky.ts).
+{-| The sky's colour overhead or low in one direction ("NE"), simulated by
+the recorder from the sun's position and the latest weather
+(recorder/api/src/sky.ts).
 -}
 type alias SkySquare =
     { label : String
@@ -198,16 +186,7 @@ liveDecoder =
                     )
                 )
             )
-        |> andMap
-            (Decode.at [ "sky", "dome" ]
-                (Decode.map5 Dome
-                    (Decode.field "overhead" Decode.string)
-                    (Decode.field "north" Decode.string)
-                    (Decode.field "east" Decode.string)
-                    (Decode.field "south" Decode.string)
-                    (Decode.field "west" Decode.string)
-                )
-            )
+
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -499,15 +478,19 @@ viewWeather model =
             Html.text ""
 
 
-{-| The sky now, as coloured squares, each labelled with where to look.
+{-| The sky now, as coloured tiles labelled with where to look: a row on a
+phone, a column pinned to the bottom-left corner on a wide screen
+(live.html).
 -}
 viewSky : Maybe LiveResponse -> Html Msg
 viewSky response =
-    case Maybe.map (\r -> ( r.sky, r.dome )) response of
-        Just ( (_ :: _) as squares, dome ) ->
-            Html.figure [ Attr.class "live-sky" ]
-                [ viewDome dome
-                , Html.ul []
+    case Maybe.map .sky response of
+        Just ((_ :: _) as squares) ->
+            Html.figure
+                [ Attr.class "live-sky"
+                , Attr.title "The sky now, simulated from the sun and the weather"
+                ]
+                [ Html.ul []
                     (List.map
                         (\square ->
                             Html.li []
@@ -523,54 +506,10 @@ viewSky response =
                         )
                         squares
                     )
-                , Html.figcaption [] [ Html.text "The sky now, simulated from the sun and the weather." ]
                 ]
 
         _ ->
             Html.text ""
-
-
-{-| The sky as a diamond, north at the top corner, east right, south
-bottom, west left, and overhead in the middle: each compass colour sweeps
-around the edge (a conic gradient), and the overhead colour fades out
-from the centre over it (a radial one).
--}
-viewDome : Dome -> Html Msg
-viewDome dome =
-    let
-        corner class label =
-            Html.span [ Attr.class ("live-dome-label " ++ class), Attr.attribute "aria-hidden" "true" ] [ Html.text label ]
-    in
-    Html.div [ Attr.class "live-dome" ]
-        [ Html.div
-            [ Attr.class "live-dome-sky"
-            , Attr.attribute "role" "img"
-            , Attr.attribute "aria-label"
-                ("The sky as a gradient: overhead "
-                    ++ dome.overhead
-                    ++ ", north "
-                    ++ dome.north
-                    ++ ", east "
-                    ++ dome.east
-                    ++ ", south "
-                    ++ dome.south
-                    ++ ", west "
-                    ++ dome.west
-                )
-            , Attr.style "background"
-                ("radial-gradient(circle closest-side, "
-                    ++ dome.overhead
-                    ++ ", transparent), conic-gradient("
-                    ++ String.join ", " [ dome.north, dome.east, dome.south, dome.west, dome.north ]
-                    ++ ")"
-                )
-            ]
-            []
-        , corner "live-dome-n" "N"
-        , corner "live-dome-e" "E"
-        , corner "live-dome-s" "S"
-        , corner "live-dome-w" "W"
-        ]
 
 
 capitalize : String -> String

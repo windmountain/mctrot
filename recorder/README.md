@@ -363,8 +363,9 @@ curl -s https://api.mctrot.nyc/live | jq '.weather, .sun'
 
 ### The sky's colour
 
-`/live` shows the sky's colour in five directions (overhead, and high and
-low toward and away from the sun), simulated by `api/src/sky.ts` from the
+`/live` shows the sky's colour overhead and low (10° up) to the NE, NW, SE
+and SW, as tiles (a column pinned bottom-left on wide screens), simulated
+by `api/src/sky.ts` from the
 sun's position and the latest weather: sunlight scattered once through
 the air (Rayleigh for blue, Mie for haze from the reported visibility,
 ozone for twilight's blue), blended toward a grey or sunset-lit cloud deck

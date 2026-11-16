@@ -1,5 +1,5 @@
-// The colour of the sky over central Manhattan, simulated: a few
-// directions, each a CSS colour, for /live's squares.
+// The colour of the sky over central Manhattan, simulated: overhead and
+// four compass points low in the sky, each a CSS colour, for /live's tiles.
 //
 // Clear sky: sunlight scattered once on its way through the air (as in
 // Nishita et al. 1993 and Bruneton & Neyret 2008), at three wavelengths
@@ -197,26 +197,21 @@ function hex(light: RGB, adaptation: number): string {
 }
 
 export type SkySquare = {
-  label: string;
+  label: string; // "Overhead", "NE", …
   elevation: number; // degrees above the horizon
   azimuth: number; // compass bearing
   color: string; // "#5b8bd0"
 };
 
-// The whole dome in five colours, for a gradient: overhead, and each
-// compass point low in the sky (DOME_EDGE degrees up).
-export type Dome = { overhead: string; north: string; east: string; south: string; west: string };
-export const DOME_EDGE = 10;
-
 export type Sky = {
   at: number;
   sun: { elevation: number; azimuth: number };
   squares: SkySquare[];
-  dome: Dome;
 };
 
-const POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-const point = (azimuth: number) => POINTS[Math.round((((azimuth % 360) + 360) % 360) / 45) % 8]!;
+// How high the compass tiles look, in degrees: low in the sky, where its
+// colour changes most with the sun.
+export const TILE_ELEVATION = 10;
 
 export function sky(ms: number, lat: number, lon: number, weather: SkyInputs | null): Sky {
   const sunPos = sunPosition(ms, lat, lon);
@@ -247,31 +242,21 @@ export function sky(ms: number, lat: number, lon: number, weather: SkyInputs | n
     Math.max(1, Math.sqrt(NOON_LUMINANCE / Math.max(1e-9, luminance(looking([0, 1, 0]))))),
   );
 
-  const opposite = (sunPos.azimuth + 180) % 360;
   const views: [string, number, number][] = [
-    ["Overhead", 90, sunPos.azimuth],
-    [`High in the ${point(sunPos.azimuth)}, toward the sun`, 45, sunPos.azimuth],
-    [`Low in the ${point(sunPos.azimuth)}, toward the sun`, 4, sunPos.azimuth],
-    [`Low in the ${point(opposite)}, away from the sun`, 4, opposite],
-    [`High in the ${point(opposite)}, away from the sun`, 45, opposite],
+    ["Overhead", 90, 0],
+    ["NE", TILE_ELEVATION, 45],
+    ["NW", TILE_ELEVATION, 315],
+    ["SE", TILE_ELEVATION, 135],
+    ["SW", TILE_ELEVATION, 225],
   ];
   const squares = views.map(([label, elevation, azimuth]) => {
     const color = hex(looking(direction(elevation, azimuth)), adaptation);
     return { label, elevation, azimuth: Math.round(azimuth), color };
   });
-  const toward = (azimuth: number) => hex(looking(direction(DOME_EDGE, azimuth)), adaptation);
-  const dome: Dome = {
-    overhead: hex(looking([0, 1, 0]), adaptation),
-    north: toward(0),
-    east: toward(90),
-    south: toward(180),
-    west: toward(270),
-  };
   return {
     at: ms,
     sun: { elevation: Math.round(sunPos.elevation * 10) / 10, azimuth: Math.round(sunPos.azimuth) },
     squares,
-    dome,
   };
 }
 

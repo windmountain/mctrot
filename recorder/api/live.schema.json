@@ -727,7 +727,7 @@
             "properties": {
               "label": {
                 "type": "string",
-                "description": "Where to look: \"Low in the SW, toward the sun\""
+                "description": "Where to look: \"Overhead\", or a compass point 10° above the horizon: \"NE\", \"NW\", \"SE\", \"SW\""
               },
               "elevation": {
                 "type": "number"
@@ -748,50 +748,15 @@
             ],
             "additionalProperties": false
           }
-        },
-        "dome": {
-          "type": "object",
-          "properties": {
-            "overhead": {
-              "type": "string",
-              "description": "CSS hex colour"
-            },
-            "north": {
-              "type": "string",
-              "description": "CSS hex colour"
-            },
-            "east": {
-              "type": "string",
-              "description": "CSS hex colour"
-            },
-            "south": {
-              "type": "string",
-              "description": "CSS hex colour"
-            },
-            "west": {
-              "type": "string",
-              "description": "CSS hex colour"
-            }
-          },
-          "required": [
-            "overhead",
-            "north",
-            "east",
-            "south",
-            "west"
-          ],
-          "additionalProperties": false,
-          "description": "Overhead, and each compass point 10° above the horizon: the whole sky for a gradient"
         }
       },
       "required": [
         "at",
         "sun",
-        "squares",
-        "dome"
+        "squares"
       ],
       "additionalProperties": false,
-      "description": "The sky's colour in a few directions, simulated from the sun and the latest weather (src/sky.ts)"
+      "description": "The sky's colour overhead and low in four directions, simulated from the sun and the latest weather (src/sky.ts)"
     }
   },
   "required": [

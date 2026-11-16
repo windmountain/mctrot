@@ -22,19 +22,16 @@
     .live-visits { margin: 0 0 1rem; min-height: 1.6em; }
     .live-weather { margin: 0 0 1rem; }
     .live-weather-when { opacity: 0.7; }
+    /* The sky tiles (src/Live.elm, viewSky): a row of five on a phone; on
+       a wide screen, a column pinned to the bottom-left corner. */
     .live-sky { margin: 0 0 1rem; }
-    /* The sky dome: a diamond, north at the top corner (src/Live.elm, viewDome). */
-    .live-dome { position: relative; width: min(13rem, 65vw); aspect-ratio: 1; margin: 0.5rem auto 1.25rem; }
-    .live-dome-sky { position: absolute; inset: 1.1rem; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-    .live-dome-label { position: absolute; font-size: 0.75em; font-weight: bold; opacity: 0.7; line-height: 1; }
-    .live-dome-n { top: 0; left: 50%; transform: translateX(-50%); }
-    .live-dome-s { bottom: 0; left: 50%; transform: translateX(-50%); }
-    .live-dome-e { right: 0; top: 50%; transform: translateY(-50%); }
-    .live-dome-w { left: 0; top: 50%; transform: translateY(-50%); }
-    .live-sky ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(4rem, 1fr)); gap: 0.75rem 0.5rem; }
-    .live-sky li { font-size: 0.75em; line-height: 1.25; overflow-wrap: anywhere; }
-    .live-sky-swatch { display: block; aspect-ratio: 1; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); margin-bottom: 0.3rem; }
-    .live-sky figcaption { font-size: 0.8em; opacity: 0.7; margin-top: 0.5rem; }
+    .live-sky ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
+    .live-sky li { font-size: 0.75em; line-height: 1.25; text-align: center; }
+    .live-sky-swatch { display: block; aspect-ratio: 1; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); margin-bottom: 0.25rem; }
+    @media (min-width: 64rem) {
+      .live-sky { position: fixed; left: 16px; bottom: 16px; width: 3.5rem; margin: 0; z-index: 1; }
+      .live-sky ul { grid-template-columns: 1fr; }
+    }
     .live-sun { margin: 1rem auto 0; border-collapse: collapse; font-size: 0.9em; }
     .live-sun caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
     .live-sun th, .live-sun td { text-align: left; padding: 0.15rem 0.75rem 0.15rem 0; font-variant-numeric: tabular-nums; }
