@@ -13,8 +13,10 @@
   };
 
   # DigitalOcean hands out public addresses through cloud-init's config
-  # drive, not DHCP. cloud-init only configures the network here; SSH keys
-  # come from configuration.nix.
+  # drive, not DHCP. cloud-init configures the network (which it does
+  # outside the module lists below) and grows the root disk, nothing else:
+  # the hostname, users and SSH keys come from this flake, and
+  # DigitalOcean's vendor scripts assume Ubuntu and fail on NixOS.
   networking.useDHCP = lib.mkForce false;
   services.cloud-init = {
     enable = true;
@@ -22,6 +24,10 @@
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
+      preserve_hostname = true;
+      cloud_init_modules = [ "growpart" "resizefs" ];
+      cloud_config_modules = [ ];
+      cloud_final_modules = [ ];
     };
   };
 
