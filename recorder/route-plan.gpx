@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="McTrot Simulator" xmlns="http://www.topografix.com/GPX/1/1" xmlns:mctrot="https://mctrot.nyc/gpx/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+<metadata>
+<name>McTrot route, Saturday, November 21, 2026</name>
+<link href="https://mctrot.nyc/simulator.html"><text>McTrot Simulator</text></link>
+<time>2026-11-21T10:05:00Z</time>
+</metadata>
+<wpt lat="40.867396" lon="-73.921301"><time>2026-11-21T10:05:00Z</time><name>SLOPER</name><desc>608 West 207th Street · arrive Sat Nov 21, 5:05 AM</desc><extensions><mctrot:stop><mctrot:mcdId>40</mctrot:mcdId><mctrot:address>608 West 207th Street</mctrot:address><mctrot:arrive>2026-11-21T10:05:00Z</mctrot:arrive><mctrot:depart>2026-11-21T10:09:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.865080" lon="-73.927202"><time>2026-11-21T10:14:00Z</time><name>STRADDLER</name><desc>208 Dyckman St · arrive Sat Nov 21, 5:14 AM</desc><extensions><mctrot:stop><mctrot:mcdId>36</mctrot:mcdId><mctrot:address>208 Dyckman St</mctrot:address><mctrot:arrive>2026-11-21T10:14:00Z</mctrot:arrive><mctrot:depart>2026-11-21T10:18:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.850094" lon="-73.936035"><time>2026-11-21T10:36:00Z</time><name>CHAMFER</name><desc>4259 Broadway · arrive Sat Nov 21, 5:36 AM</desc><extensions><mctrot:stop><mctrot:mcdId>20</mctrot:mcdId><mctrot:address>4259 Broadway</mctrot:address><mctrot:arrive>2026-11-21T10:36:00Z</mctrot:arrive><mctrot:depart>2026-11-21T10:40:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.842594" lon="-73.938972"><time>2026-11-21T10:49:00Z</time><name>SHIP</name><desc>4040 Broadway · arrive Sat Nov 21, 5:49 AM</desc><extensions><mctrot:stop><mctrot:mcdId>14</mctrot:mcdId><mctrot:address>4040 Broadway</mctrot:address><mctrot:arrive>2026-11-21T10:49:00Z</mctrot:arrive><mctrot:depart>2026-11-21T10:53:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.835319" lon="-73.944335"><time>2026-11-21T11:01:00Z</time><name>RAMP</name><desc>3809 Broadway · arrive Sat Nov 21, 6:01 AM</desc><extensions><mctrot:stop><mctrot:mcdId>10</mctrot:mcdId><mctrot:address>3809 Broadway</mctrot:address><mctrot:arrive>2026-11-21T11:01:00Z</mctrot:arrive><mctrot:depart>2026-11-21T11:05:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.826694" lon="-73.950630"><time>2026-11-21T11:16:00Z</time><name>RIVERVIEW</name><desc>3543-49 Broadway · arrive Sat Nov 21, 6:16 AM</desc><extensions><mctrot:stop><mctrot:mcdId>4</mctrot:mcdId><mctrot:address>3543-49 Broadway</mctrot:address><mctrot:arrive>2026-11-21T11:16:00Z</mctrot:arrive><mctrot:depart>2026-11-21T11:20:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.817932" lon="-73.941360"><time>2026-11-21T11:34:00Z</time><name>DRIVETHRU</name><desc>2379 Adam Clayton Powell Jr Blvd · arrive Sat Nov 21, 6:34 AM</desc><extensions><mctrot:stop><mctrot:mcdId>1</mctrot:mcdId><mctrot:address>2379 Adam Clayton Powell Jr Blvd</mctrot:address><mctrot:arrive>2026-11-21T11:34:00Z</mctrot:arrive><mctrot:depart>2026-11-21T11:38:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.808569" lon="-73.947756"><time>2026-11-21T11:49:00Z</time><name>ACP</name><desc>148 W 125th Street · arrive Sat Nov 21, 6:49 AM</desc><extensions><mctrot:stop><mctrot:mcdId>2</mctrot:mcdId><mctrot:address>148 W 125th Street</mctrot:address><mctrot:arrive>2026-11-21T11:49:00Z</mctrot:arrive><mctrot:depart>2026-11-21T11:53:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.810780" lon="-73.953039"><time>2026-11-21T11:57:00Z</time><name>BRACES</name><desc>354 W 125th St · arrive Sat Nov 21, 6:57 AM</desc><extensions><mctrot:stop><mctrot:mcdId>5</mctrot:mcdId><mctrot:address>354 W 125th St</mctrot:address><mctrot:arrive>2026-11-21T11:57:00Z</mctrot:arrive><mctrot:depart>2026-11-21T12:01:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.815821" lon="-73.958570"><time>2026-11-21T12:08:00Z</time><name>COLUMBIA</name><desc>600a W. 125 Street Broadway · arrive Sat Nov 21, 7:08 AM</desc><extensions><mctrot:stop><mctrot:mcdId>6</mctrot:mcdId><mctrot:address>600a W. 125 Street Broadway</mctrot:address><mctrot:arrive>2026-11-21T12:08:00Z</mctrot:arrive><mctrot:depart>2026-11-21T12:12:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.800014" lon="-73.967846"><time>2026-11-21T12:31:00Z</time><name>TITANIC</name><desc>2726 Broadway · arrive Sat Nov 21, 7:31 AM</desc><extensions><mctrot:stop><mctrot:mcdId>16</mctrot:mcdId><mctrot:address>2726 Broadway</mctrot:address><mctrot:arrive>2026-11-21T12:31:00Z</mctrot:arrive><mctrot:depart>2026-11-21T12:35:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.794389" lon="-73.972343"><time>2026-11-21T12:42:00Z</time><name>OG</name><desc>2549 Broadway · arrive Sat Nov 21, 7:42 AM</desc><extensions><mctrot:stop><mctrot:mcdId>22</mctrot:mcdId><mctrot:address>2549 Broadway</mctrot:address><mctrot:arrive>2026-11-21T12:42:00Z</mctrot:arrive><mctrot:depart>2026-11-21T12:46:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.777901" lon="-73.982472"><time>2026-11-21T13:05:00Z</time><name>72ND</name><desc>2049 Broadway · arrive Sat Nov 21, 8:05 AM</desc><extensions><mctrot:stop><mctrot:mcdId>38</mctrot:mcdId><mctrot:address>2049 Broadway</mctrot:address><mctrot:arrive>2026-11-21T13:05:00Z</mctrot:arrive><mctrot:depart>2026-11-21T13:09:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.765877" lon="-73.983273"><time>2026-11-21T13:22:00Z</time><name>PUNCH</name><desc>946 8th Ave · arrive Sat Nov 21, 8:22 AM</desc><extensions><mctrot:stop><mctrot:mcdId>51</mctrot:mcdId><mctrot:address>946 8th Ave</mctrot:address><mctrot:arrive>2026-11-21T13:22:00Z</mctrot:arrive><mctrot:depart>2026-11-21T13:26:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.762244" lon="-73.983757"><time>2026-11-21T13:31:00Z</time><name>CHURCH</name><desc>1651 Broadway (51st &amp; Broadway) · arrive Sat Nov 21, 8:31 AM</desc><extensions><mctrot:stop><mctrot:mcdId>53</mctrot:mcdId><mctrot:address>1651 Broadway (51st &amp; Broadway)</mctrot:address><mctrot:arrive>2026-11-21T13:31:00Z</mctrot:arrive><mctrot:depart>2026-11-21T13:35:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.757629" lon="-73.981850"><time>2026-11-21T13:41:00Z</time><name>WHORL</name><desc>1188 6th Ave · arrive Sat Nov 21, 8:41 AM</desc><extensions><mctrot:stop><mctrot:mcdId>59</mctrot:mcdId><mctrot:address>1188 6th Ave</mctrot:address><mctrot:arrive>2026-11-21T13:41:00Z</mctrot:arrive><mctrot:depart>2026-11-21T13:45:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.757385" lon="-73.985452"><time>2026-11-21T13:50:00Z</time><name>SHOWCASE</name><desc>1528 Broadway · arrive Sat Nov 21, 8:50 AM</desc><extensions><mctrot:stop><mctrot:mcdId>61</mctrot:mcdId><mctrot:address>1528 Broadway</mctrot:address><mctrot:arrive>2026-11-21T13:50:00Z</mctrot:arrive><mctrot:depart>2026-11-21T13:54:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.754673" lon="-73.988188"><time>2026-11-21T13:57:00Z</time><name>7TH</name><desc>556 Fashion Ave · arrive Sat Nov 21, 8:57 AM</desc><extensions><mctrot:stop><mctrot:mcdId>65</mctrot:mcdId><mctrot:address>556 Fashion Ave</mctrot:address><mctrot:arrive>2026-11-21T13:57:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:01:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.757477" lon="-73.989891"><time>2026-11-21T14:05:00Z</time><name>GIRAFFE</name><desc>661 8th Ave · arrive Sat Nov 21, 9:05 AM</desc><extensions><mctrot:stop><mctrot:mcdId>63</mctrot:mcdId><mctrot:address>661 8th Ave</mctrot:address><mctrot:arrive>2026-11-21T14:05:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:09:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.752510" lon="-73.993004"><time>2026-11-21T14:14:00Z</time><name>B&amp;H</name><desc>490 8th Ave · arrive Sat Nov 21, 9:14 AM</desc><extensions><mctrot:stop><mctrot:mcdId>70</mctrot:mcdId><mctrot:address>490 8th Ave</mctrot:address><mctrot:arrive>2026-11-21T14:14:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:18:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.750779" lon="-73.989538"><time>2026-11-21T14:21:00Z</time><name>MACYS</name><desc>151 W 34th St · arrive Sat Nov 21, 9:21 AM</desc><extensions><mctrot:stop><mctrot:mcdId>71</mctrot:mcdId><mctrot:address>151 W 34th St</mctrot:address><mctrot:arrive>2026-11-21T14:21:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:25:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.745995" lon="-73.990845"><time>2026-11-21T14:32:00Z</time><name>MCCAFE PUNK</name><desc>809 Ave Of The Americas · arrive Sat Nov 21, 9:32 AM</desc><extensions><mctrot:stop><mctrot:mcdId>79</mctrot:mcdId><mctrot:address>809 Ave Of The Americas</mctrot:address><mctrot:arrive>2026-11-21T14:32:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:36:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.743156" lon="-73.983930"><time>2026-11-21T14:42:00Z</time><name>PARK</name><desc>401 Park Ave S · arrive Sat Nov 21, 9:42 AM</desc><extensions><mctrot:stop><mctrot:mcdId>80</mctrot:mcdId><mctrot:address>401 Park Ave S</mctrot:address><mctrot:arrive>2026-11-21T14:42:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:46:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.740654" lon="-73.987856"><time>2026-11-21T14:51:00Z</time><name>SHORTY III</name><desc>26 E 23rd St · arrive Sat Nov 21, 9:51 AM</desc><extensions><mctrot:stop><mctrot:mcdId>83</mctrot:mcdId><mctrot:address>26 E 23rd St</mctrot:address><mctrot:arrive>2026-11-21T14:51:00Z</mctrot:arrive><mctrot:depart>2026-11-21T14:55:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.741928" lon="-73.993286"><time>2026-11-21T15:00:00Z</time><name>MICHAELS</name><desc>686 Avenue Of The Americas · arrive Sat Nov 21, 10:00 AM</desc><extensions><mctrot:stop><mctrot:mcdId>84</mctrot:mcdId><mctrot:address>686 Avenue Of The Americas</mctrot:address><mctrot:arrive>2026-11-21T15:00:00Z</mctrot:arrive><mctrot:depart>2026-11-21T15:04:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.737864" lon="-73.996726"><time>2026-11-21T15:09:00Z</time><name>OVERLAND</name><desc>541 6th Ave · arrive Sat Nov 21, 10:09 AM</desc><extensions><mctrot:stop><mctrot:mcdId>92</mctrot:mcdId><mctrot:address>541 6th Ave</mctrot:address><mctrot:arrive>2026-11-21T15:09:00Z</mctrot:arrive><mctrot:depart>2026-11-21T15:13:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.736977" lon="-73.990517"><time>2026-11-21T15:19:00Z</time><name>UNION</name><desc>39 Union Sq W · arrive Sat Nov 21, 10:19 AM</desc><extensions><mctrot:stop><mctrot:mcdId>90</mctrot:mcdId><mctrot:address>39 Union Sq W</mctrot:address><mctrot:arrive>2026-11-21T15:19:00Z</mctrot:arrive><mctrot:depart>2026-11-21T15:23:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.729197" lon="-73.993408"><time>2026-11-21T15:33:00Z</time><name>NYU</name><desc>724 Broadway · arrive Sat Nov 21, 10:33 AM</desc><extensions><mctrot:stop><mctrot:mcdId>100</mctrot:mcdId><mctrot:address>724 Broadway</mctrot:address><mctrot:arrive>2026-11-21T15:33:00Z</mctrot:arrive><mctrot:depart>2026-11-21T15:37:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.728794" lon="-74.005090"><time>2026-11-21T15:48:00Z</time><name>VARICK</name><desc>208 Varick St · arrive Sat Nov 21, 10:48 AM</desc><extensions><mctrot:stop><mctrot:mcdId>101</mctrot:mcdId><mctrot:address>208 Varick St</mctrot:address><mctrot:arrive>2026-11-21T15:48:00Z</mctrot:arrive><mctrot:depart>2026-11-21T15:52:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.716366" lon="-74.010736"><time>2026-11-21T16:08:00Z</time><name>GREENWICH</name><desc>167 Chambers St (Chambers &amp; Greenwich) · arrive Sat Nov 21, 11:08 AM</desc><extensions><mctrot:stop><mctrot:mcdId>105</mctrot:mcdId><mctrot:address>167 Chambers St (Chambers &amp; Greenwich)</mctrot:address><mctrot:arrive>2026-11-21T16:08:00Z</mctrot:arrive><mctrot:depart>2026-11-21T16:12:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.709438" lon="-74.010086"><time>2026-11-21T16:20:00Z</time><name>OCCUPY</name><desc>160 Broadway · arrive Sat Nov 21, 11:20 AM</desc><extensions><mctrot:stop><mctrot:mcdId>106</mctrot:mcdId><mctrot:address>160 Broadway</mctrot:address><mctrot:arrive>2026-11-21T16:20:00Z</mctrot:arrive><mctrot:depart>2026-11-21T16:24:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.718587" lon="-74.001052"><time>2026-11-21T16:36:00Z</time><name>麦当劳</name><desc>262 Canal St · arrive Sat Nov 21, 11:36 AM</desc><extensions><mctrot:stop><mctrot:mcdId>102</mctrot:mcdId><mctrot:address>262 Canal St</mctrot:address><mctrot:arrive>2026-11-21T16:36:00Z</mctrot:arrive><mctrot:depart>2026-11-21T16:40:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.718830" lon="-73.988281"><time>2026-11-21T16:53:00Z</time><name>DELANCEY</name><desc>114 Delancey St · arrive Sat Nov 21, 11:53 AM</desc><extensions><mctrot:stop><mctrot:mcdId>104</mctrot:mcdId><mctrot:address>114 Delancey St</mctrot:address><mctrot:arrive>2026-11-21T16:53:00Z</mctrot:arrive><mctrot:depart>2026-11-21T16:57:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.726555" lon="-73.985855"><time>2026-11-21T17:07:00Z</time><name>GREENHOUSE</name><desc>102 1st Ave · arrive Sat Nov 21, 12:07 PM</desc><extensions><mctrot:stop><mctrot:mcdId>103</mctrot:mcdId><mctrot:address>102 1st Ave</mctrot:address><mctrot:arrive>2026-11-21T17:07:00Z</mctrot:arrive><mctrot:depart>2026-11-21T17:11:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.731014" lon="-73.982277"><time>2026-11-21T17:19:00Z</time><name>IMMACULATE</name><desc>404 E 14th St · arrive Sat Nov 21, 12:19 PM</desc><extensions><mctrot:stop><mctrot:mcdId>96</mctrot:mcdId><mctrot:address>404 E 14th St</mctrot:address><mctrot:arrive>2026-11-21T17:19:00Z</mctrot:arrive><mctrot:depart>2026-11-21T17:23:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.736945" lon="-73.979165"><time>2026-11-21T17:29:00Z</time><name>TALLBOY</name><desc>336 E 23rd St · arrive Sat Nov 21, 12:29 PM</desc><extensions><mctrot:stop><mctrot:mcdId>86</mctrot:mcdId><mctrot:address>336 E 23rd St</mctrot:address><mctrot:arrive>2026-11-21T17:29:00Z</mctrot:arrive><mctrot:depart>2026-11-21T17:33:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.744904" lon="-73.978949"><time>2026-11-21T17:44:00Z</time><name>SHORTY II</name><desc>480 3rd Ave · arrive Sat Nov 21, 12:44 PM</desc><extensions><mctrot:stop><mctrot:mcdId>74</mctrot:mcdId><mctrot:address>480 3rd Ave</mctrot:address><mctrot:arrive>2026-11-21T17:44:00Z</mctrot:arrive><mctrot:depart>2026-11-21T17:48:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.753042" lon="-73.980280"><time>2026-11-21T18:00:00Z</time><name>PIANO FACTORY</name><desc>18 E 42nd St · arrive Sat Nov 21, 1:00 PM</desc><extensions><mctrot:stop><mctrot:mcdId>64</mctrot:mcdId><mctrot:address>18 E 42nd St</mctrot:address><mctrot:arrive>2026-11-21T18:00:00Z</mctrot:arrive><mctrot:depart>2026-11-21T18:04:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.756223" lon="-73.977799"><time>2026-11-21T18:09:00Z</time><name>CONNOLY&apos;S</name><desc>14 E 47th St · arrive Sat Nov 21, 1:09 PM</desc><extensions><mctrot:stop><mctrot:mcdId>58</mctrot:mcdId><mctrot:address>14 E 47th St</mctrot:address><mctrot:arrive>2026-11-21T18:09:00Z</mctrot:arrive><mctrot:depart>2026-11-21T18:13:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.756163" lon="-73.970751"><time>2026-11-21T18:20:00Z</time><name>SHORTY</name><desc>824 3rd Avenue 50th St · arrive Sat Nov 21, 1:20 PM</desc><extensions><mctrot:stop><mctrot:mcdId>55</mctrot:mcdId><mctrot:address>824 3rd Avenue 50th St</mctrot:address><mctrot:arrive>2026-11-21T18:20:00Z</mctrot:arrive><mctrot:depart>2026-11-21T18:24:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.760838" lon="-73.967323"><time>2026-11-21T18:30:00Z</time><name>STIJL</name><desc>966 3rd Ave · arrive Sat Nov 21, 1:30 PM</desc><extensions><mctrot:stop><mctrot:mcdId>49</mctrot:mcdId><mctrot:address>966 3rd Ave</mctrot:address><mctrot:arrive>2026-11-21T18:30:00Z</mctrot:arrive><mctrot:depart>2026-11-21T18:34:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.765888" lon="-73.957161"><time>2026-11-21T18:46:00Z</time><name>CORNELL</name><desc>1286 1st Ave · arrive Sat Nov 21, 1:46 PM</desc><extensions><mctrot:stop><mctrot:mcdId>43</mctrot:mcdId><mctrot:address>1286 1st Ave</mctrot:address><mctrot:arrive>2026-11-21T18:46:00Z</mctrot:arrive><mctrot:depart>2026-11-21T18:50:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.777789" lon="-73.954515"><time>2026-11-21T19:06:00Z</time><name>CLOCK</name><desc>1499 3rd Ave · arrive Sat Nov 21, 2:06 PM</desc><extensions><mctrot:stop><mctrot:mcdId>29</mctrot:mcdId><mctrot:address>1499 3rd Ave</mctrot:address><mctrot:arrive>2026-11-21T19:06:00Z</mctrot:arrive><mctrot:depart>2026-11-21T19:10:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.784657" lon="-73.947028"><time>2026-11-21T19:20:00Z</time><name>METROPOLITAN</name><desc>1871 2nd Ave · arrive Sat Nov 21, 2:20 PM</desc><extensions><mctrot:stop><mctrot:mcdId>24</mctrot:mcdId><mctrot:address>1871 2nd Ave</mctrot:address><mctrot:arrive>2026-11-21T19:20:00Z</mctrot:arrive><mctrot:depart>2026-11-21T19:24:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.789984" lon="-73.946077"><time>2026-11-21T19:30:00Z</time><name>103</name><desc>1872 3rd Ave · arrive Sat Nov 21, 2:30 PM</desc><extensions><mctrot:stop><mctrot:mcdId>17</mctrot:mcdId><mctrot:address>1872 3rd Ave</mctrot:address><mctrot:arrive>2026-11-21T19:30:00Z</mctrot:arrive><mctrot:depart>2026-11-21T19:34:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<wpt lat="40.798618" lon="-73.939789"><time>2026-11-21T19:45:00Z</time><name>BIGMAC</name><desc>2142 3rd Ave · arrive Sat Nov 21, 2:45 PM</desc><extensions><mctrot:stop><mctrot:mcdId>12</mctrot:mcdId><mctrot:address>2142 3rd Ave</mctrot:address><mctrot:arrive>2026-11-21T19:45:00Z</mctrot:arrive><mctrot:depart>2026-11-21T19:49:00Z</mctrot:depart></mctrot:stop></extensions></wpt>
+<trk>
+<name>McTrot route, Saturday, November 21, 2026</name>
+<trkseg>
+<trkpt lat="40.86769" lon="-73.92121"/>
+<trkpt lat="40.86553" lon="-73.92727"/>
+<trkpt lat="40.86466" lon="-73.92889"/>
+<trkpt lat="40.86426" lon="-73.92941"/>
+<trkpt lat="40.86378" lon="-73.92983"/>
+<trkpt lat="40.86334" lon="-73.93005"/>
+<trkpt lat="40.86255" lon="-73.92995"/>
+<trkpt lat="40.86210" lon="-73.93000"/>
+<trkpt lat="40.86175" lon="-73.93011"/>
+<trkpt lat="40.86064" lon="-73.93077"/>
+<trkpt lat="40.85966" lon="-73.93122"/>
+<trkpt lat="40.85933" lon="-73.93131"/>
+<trkpt lat="40.85897" lon="-73.93146"/>
+<trkpt lat="40.85650" lon="-73.93276"/>
+<trkpt lat="40.85533" lon="-73.93331"/>
+<trkpt lat="40.85417" lon="-73.93370"/>
+<trkpt lat="40.85017" lon="-73.93575"/>
+<trkpt lat="40.84954" lon="-73.93640"/>
+<trkpt lat="40.84839" lon="-73.93767"/>
+<trkpt lat="40.84771" lon="-73.93798"/>
+<trkpt lat="40.84544" lon="-73.93868"/>
+<trkpt lat="40.84322" lon="-73.93918"/>
+<trkpt lat="40.84244" lon="-73.93925"/>
+<trkpt lat="40.84233" lon="-73.93903"/>
+<trkpt lat="40.84224" lon="-73.93882"/>
+<trkpt lat="40.84171" lon="-73.93923"/>
+<trkpt lat="40.84166" lon="-73.93946"/>
+<trkpt lat="40.83534" lon="-73.94407"/>
+<trkpt lat="40.82647" lon="-73.95055"/>
+<trkpt lat="40.82403" lon="-73.94476"/>
+<trkpt lat="40.81989" lon="-73.94672"/>
+<trkpt lat="40.81781" lon="-73.94174"/>
+<trkpt lat="40.81527" lon="-73.94362"/>
+<trkpt lat="40.81210" lon="-73.94591"/>
+<trkpt lat="40.81086" lon="-73.94685"/>
+<trkpt lat="40.80893" lon="-73.94823"/>
+<trkpt lat="40.81077" lon="-73.95259"/>
+<trkpt lat="40.81173" lon="-73.95483"/>
+<trkpt lat="40.81339" lon="-73.95626"/>
+<trkpt lat="40.81580" lon="-73.95839"/>
+<trkpt lat="40.81576" lon="-73.95836"/>
+<trkpt lat="40.81507" lon="-73.95858"/>
+<trkpt lat="40.80990" lon="-73.96240"/>
+<trkpt lat="40.80289" lon="-73.96750"/>
+<trkpt lat="40.80264" lon="-73.96759"/>
+<trkpt lat="40.80216" lon="-73.96769"/>
+<trkpt lat="40.80046" lon="-73.96786"/>
+<trkpt lat="40.79974" lon="-73.96811"/>
+<trkpt lat="40.79982" lon="-73.96830"/>
+<trkpt lat="40.79915" lon="-73.96864"/>
+<trkpt lat="40.79402" lon="-73.97238"/>
+<trkpt lat="40.78900" lon="-73.97604"/>
+<trkpt lat="40.78709" lon="-73.97769"/>
+<trkpt lat="40.78321" lon="-73.98058"/>
+<trkpt lat="40.78252" lon="-73.98091"/>
+<trkpt lat="40.78107" lon="-73.98142"/>
+<trkpt lat="40.77879" lon="-73.98206"/>
+<trkpt lat="40.77781" lon="-73.98219"/>
+<trkpt lat="40.77392" lon="-73.98234"/>
+<trkpt lat="40.76896" lon="-73.98222"/>
+<trkpt lat="40.76852" lon="-73.98218"/>
+<trkpt lat="40.76809" lon="-73.98239"/>
+<trkpt lat="40.76799" lon="-73.98238"/>
+<trkpt lat="40.76786" lon="-73.98230"/>
+<trkpt lat="40.76774" lon="-73.98211"/>
+<trkpt lat="40.76605" lon="-73.98337"/>
+<trkpt lat="40.76546" lon="-73.98199"/>
+<trkpt lat="40.76403" lon="-73.98247"/>
+<trkpt lat="40.76336" lon="-73.98282"/>
+<trkpt lat="40.76206" lon="-73.98363"/>
+<trkpt lat="40.76079" lon="-73.98451"/>
+<trkpt lat="40.76012" lon="-73.98484"/>
+<trkpt lat="40.75940" lon="-73.98510"/>
+<trkpt lat="40.75802" lon="-73.98179"/>
+<trkpt lat="40.75614" lon="-73.98317"/>
+<trkpt lat="40.75726" lon="-73.98582"/>
+<trkpt lat="40.75734" lon="-73.98601"/>
+<trkpt lat="40.75475" lon="-73.98789"/>
+<trkpt lat="40.75537" lon="-73.98745"/>
+<trkpt lat="40.75657" lon="-73.99028"/>
+<trkpt lat="40.75723" lon="-73.98979"/>
+<trkpt lat="40.75285" lon="-73.99298"/>
+<trkpt lat="40.75166" lon="-73.99013"/>
+<trkpt lat="40.75066" lon="-73.98778"/>
+<trkpt lat="40.74985" lon="-73.98794"/>
+<trkpt lat="40.74949" lon="-73.98797"/>
+<trkpt lat="40.74604" lon="-73.99052"/>
+<trkpt lat="40.74330" lon="-73.98401"/>
+<trkpt lat="40.74144" lon="-73.98536"/>
+<trkpt lat="40.74214" lon="-73.98706"/>
+<trkpt lat="40.74153" lon="-73.98753"/>
+<trkpt lat="40.74087" lon="-73.98798"/>
+<trkpt lat="40.74155" lon="-73.98958"/>
+<trkpt lat="40.74088" lon="-73.99007"/>
+<trkpt lat="40.74223" lon="-73.99329"/>
+<trkpt lat="40.73805" lon="-73.99634"/>
+<trkpt lat="40.73927" lon="-73.99545"/>
+<trkpt lat="40.73713" lon="-73.99033"/>
+<trkpt lat="40.73522" lon="-73.99171"/>
+<trkpt lat="40.73484" lon="-73.99075"/>
+<trkpt lat="40.73174" lon="-73.99146"/>
+<trkpt lat="40.72901" lon="-73.99375"/>
+<trkpt lat="40.72782" lon="-73.99475"/>
+<trkpt lat="40.72893" lon="-73.99712"/>
+<trkpt lat="40.73043" lon="-74.00012"/>
+<trkpt lat="40.72999" lon="-74.00050"/>
+<trkpt lat="40.73025" lon="-74.00102"/>
+<trkpt lat="40.72989" lon="-74.00135"/>
+<trkpt lat="40.72965" lon="-74.00220"/>
+<trkpt lat="40.72974" lon="-74.00241"/>
+<trkpt lat="40.72882" lon="-74.00529"/>
+<trkpt lat="40.72567" lon="-74.00578"/>
+<trkpt lat="40.72440" lon="-74.00604"/>
+<trkpt lat="40.72450" lon="-74.00703"/>
+<trkpt lat="40.72430" lon="-74.00717"/>
+<trkpt lat="40.72388" lon="-74.00773"/>
+<trkpt lat="40.72370" lon="-74.00791"/>
+<trkpt lat="40.72197" lon="-74.00823"/>
+<trkpt lat="40.72212" lon="-74.00977"/>
+<trkpt lat="40.72076" lon="-74.01007"/>
+<trkpt lat="40.71811" lon="-74.01053"/>
+<trkpt lat="40.71630" lon="-74.01097"/>
+<trkpt lat="40.71559" lon="-74.01112"/>
+<trkpt lat="40.71492" lon="-74.01136"/>
+<trkpt lat="40.71366" lon="-74.01172"/>
+<trkpt lat="40.71361" lon="-74.01161"/>
+<trkpt lat="40.71283" lon="-74.01179"/>
+<trkpt lat="40.71278" lon="-74.01168"/>
+<trkpt lat="40.71237" lon="-74.01191"/>
+<trkpt lat="40.71203" lon="-74.01200"/>
+<trkpt lat="40.71088" lon="-74.01240"/>
+<trkpt lat="40.70981" lon="-74.00999"/>
+<trkpt lat="40.71166" lon="-74.00838"/>
+<trkpt lat="40.71468" lon="-74.00589"/>
+<trkpt lat="40.71745" lon="-74.00353"/>
+<trkpt lat="40.71716" lon="-74.00293"/>
+<trkpt lat="40.71772" lon="-74.00242"/>
+<trkpt lat="40.71769" lon="-74.00236"/>
+<trkpt lat="40.71896" lon="-74.00127"/>
+<trkpt lat="40.71843" lon="-74.00053"/>
+<trkpt lat="40.72004" lon="-73.99906"/>
+<trkpt lat="40.72158" lon="-73.99776"/>
+<trkpt lat="40.72032" lon="-73.99404"/>
+<trkpt lat="40.72036" lon="-73.99394"/>
+<trkpt lat="40.71983" lon="-73.99212"/>
+<trkpt lat="40.71861" lon="-73.98817"/>
+<trkpt lat="40.72232" lon="-73.98625"/>
+<trkpt lat="40.72425" lon="-73.98484"/>
+<trkpt lat="40.72519" lon="-73.98704"/>
+<trkpt lat="40.72640" lon="-73.98616"/>
+<trkpt lat="40.73135" lon="-73.98256"/>
+<trkpt lat="40.73127" lon="-73.98249"/>
+<trkpt lat="40.73097" lon="-73.98176"/>
+<trkpt lat="40.73106" lon="-73.98150"/>
+<trkpt lat="40.73136" lon="-73.98222"/>
+<trkpt lat="40.73140" lon="-73.98227"/>
+<trkpt lat="40.73148" lon="-73.98225"/>
+<trkpt lat="40.73334" lon="-73.98088"/>
+<trkpt lat="40.73364" lon="-73.98090"/>
+<trkpt lat="40.73499" lon="-73.97988"/>
+<trkpt lat="40.73689" lon="-73.97854"/>
+<trkpt lat="40.73941" lon="-73.97670"/>
+<trkpt lat="40.73986" lon="-73.97774"/>
+<trkpt lat="40.74045" lon="-73.97731"/>
+<trkpt lat="40.74102" lon="-73.97862"/>
+<trkpt lat="40.74164" lon="-73.97817"/>
+<trkpt lat="40.74285" lon="-73.97721"/>
+<trkpt lat="40.74347" lon="-73.97676"/>
+<trkpt lat="40.74410" lon="-73.97636"/>
+<trkpt lat="40.74506" lon="-73.97861"/>
+<trkpt lat="40.74573" lon="-73.97812"/>
+<trkpt lat="40.74640" lon="-73.97972"/>
+<trkpt lat="40.75016" lon="-73.97699"/>
+<trkpt lat="40.75079" lon="-73.97849"/>
+<trkpt lat="40.75091" lon="-73.97856"/>
+<trkpt lat="40.75212" lon="-73.97768"/>
+<trkpt lat="40.75348" lon="-73.98089"/>
+<trkpt lat="40.75665" lon="-73.97857"/>
+<trkpt lat="40.75598" lon="-73.97696"/>
+<trkpt lat="40.75723" lon="-73.97605"/>
+<trkpt lat="40.75660" lon="-73.97454"/>
+<trkpt lat="40.75722" lon="-73.97408"/>
+<trkpt lat="40.75582" lon="-73.97076"/>
+<trkpt lat="40.75895" lon="-73.96848"/>
+<trkpt lat="40.75964" lon="-73.96803"/>
+<trkpt lat="40.76077" lon="-73.96722"/>
+<trkpt lat="40.76091" lon="-73.96711"/>
+<trkpt lat="40.76092" lon="-73.96704"/>
+<trkpt lat="40.76094" lon="-73.96708"/>
+<trkpt lat="40.75998" lon="-73.96480"/>
+<trkpt lat="40.76060" lon="-73.96431"/>
+<trkpt lat="40.76066" lon="-73.96409"/>
+<trkpt lat="40.76067" lon="-73.96379"/>
+<trkpt lat="40.76060" lon="-73.96329"/>
+<trkpt lat="40.75995" lon="-73.96173"/>
+<trkpt lat="40.76587" lon="-73.95741"/>
+<trkpt lat="40.76649" lon="-73.95696"/>
+<trkpt lat="40.76843" lon="-73.96155"/>
+<trkpt lat="40.77814" lon="-73.95448"/>
+<trkpt lat="40.78326" lon="-73.95074"/>
+<trkpt lat="40.78232" lon="-73.94851"/>
+<trkpt lat="40.78424" lon="-73.94709"/>
+<trkpt lat="40.78617" lon="-73.94570"/>
+<trkpt lat="40.78645" lon="-73.94634"/>
+<trkpt lat="40.78932" lon="-73.94564"/>
+<trkpt lat="40.78946" lon="-73.94568"/>
+<trkpt lat="40.78955" lon="-73.94577"/>
+<trkpt lat="40.78968" lon="-73.94600"/>
+<trkpt lat="40.78965" lon="-73.94608"/>
+<trkpt lat="40.79863" lon="-73.93952"/>
+</trkseg>
+</trk>
+</gpx>
