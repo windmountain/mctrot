@@ -63,20 +63,36 @@ One SQLite file. Points are keyed by timestamp, so out-of-order and repeated bat
 
 ```
 attempts(id, started_at, ended_at)
-points(attempt_id, ts, lat, lon, accuracy, speed, battery)
-visits(attempt_id, store_id, arrived_at, left_at)
+points(ts, lat, lon, accuracy, speed, battery, received_at)
+visit_taps(id, ts, received_at)
 posts(id, attempt_id, ts, type, text, media_path, poster_path, lat, lon, hidden)
 jobs(id, post_id, kind, status, error)
 weather(fetched_at, forecast_json)
 ```
 
-**Visit detection**
+Points and visit taps belong to an attempt by time: whatever falls between its start and stop.
 
-Store locations come from the route plan below. A visit counts when I stay within about 40 m of a store for about 3 minutes. Both thresholds are guesses to tune on a test walk.
+**Visits**
+
+A visit counts only when I say so: I tap **Visit** on the upload page at each McDonald's. The tap is just a timestamp, with no location and no store to pick. The server works out which store it was from my GPS track and the store list in the route plan:
+
+1. **Where I was:** my position at the tap's time, interpolated between the GPS points just before and after it.
+2. **Which store:** the nearest store within about 150 m of that spot that no earlier tap has claimed. Taps are matched in time order.
+
+Nothing about the match is stored; it's worked out from taps, points and stores each time `/live` is asked. GPS is weakest exactly when I tap (indoors), and Overland may deliver the points around a tap minutes later, so a tap made in a dead zone resolves once those points arrive.
+
+| Case | Result |
+| --- | --- |
+| No GPS after the tap yet | "Checking in…" until points arrive |
+| Two stores close together | The nearest unclaimed store wins, so the next tap goes to its neighbour |
+| No store within 150 m | "Unmatched", never forced onto a wrong store |
+| Two taps within 2 minutes | One visit |
+
+The 150 m radius and 2-minute window are guesses to tune on a test walk. There's deliberately no manual override.
 
 **Route plan**
 
-The API loads my route plan at startup: stores in visiting order, coordinates, miles between stops, and expected arrival and departure times. Visits are matched against it, and `/live` derives live stats from it (miles done and left, ahead or behind schedule, projected finish) plus the series for the mileage burndown chart.
+The route plan is the simulator's GPX download (/simulator): a waypoint per McDonald's in visiting order, each with a `<mctrot:stop>` extension (mcd_id, address, planned arrival and departure), and a track along the walk. Saved as `recorder/route-plan.gpx`, it's converted to JSON when the system is built (`tools/route_plan.py`), so the API never parses XML; `nix run .#route-plan -- file.gpx` checks one first. Visits are matched against it, and `/live` derives live stats from it (miles done and left, ahead or behind schedule, projected finish) plus the series for the mileage burndown chart.
 
 ## Radio
 
@@ -203,12 +219,13 @@ mctrot/
     post/                the upload page, served by the API
     station/             Liquidsoap script and cue-sheet format
     secrets/             sops-encrypted
-    route-plan.json      exported from the route pipeline
+    route-plan.gpx       the simulator's GPX download
+    tools/route_plan.py  turns it into the API's JSON at build time
 ```
 
 - `recorder/` has its own flake rather than using devenv, so the server deploys without the GIS tooling.
 - The radio folder is `station/` because the repo's `.gitignore` ignores `*radio`. The 12-hour audio file stays out of git either way.
-- `route-plan.json` comes from a new `scripts/export_route_plan.py`, built on the existing `route_summary.csv` and `mcd_locations.csv`.
+- `route-plan.gpx` comes from the simulator's GPX download, which carries every field the recorder needs (see "Route plan").
 
 **Services on the box (all systemd, all from the flake)**
 
@@ -281,7 +298,7 @@ One command — `nix run .#archive -- --attempt 2026-12-05` — turns an attempt
 2. Writes a bundle in a fixed format:
    - `manifest.json` — schema version, start, end, totals.
    - `track.geojson` — thinned to about one point per 10 s; `track-full.geojson.gz` keeps every point.
-   - `visits.json` — each store with arrival time and time spent.
+   - `visits.json` — each visit tap with its time and the store it matched.
    - `posts.json` — every post with time, place, text and media paths.
    - `radio.json` — what actually aired, as offsets from the start.
 3. Cuts the broadcast recording into HLS segments (10-second chunks plus a playlist), so jumping to hour 9 is instant.
@@ -314,7 +331,8 @@ The biggest risk is the single server going down mid-run; location and posts sur
 | Video processing starves the radio | Stream stutters | Worker at `Nice=19`, `CPUQuota=50%` |
 | Phone battery dies | Everything stops | Battery pack; Overland battery field shown on a private status view |
 | Page closed with uploads pending | Posts arrive late | Pending badge; resume on reopen |
-| Visit thresholds wrong | Missed or false visits | Tune on a test walk; manual override endpoint |
+| Visit tap matched wrongly | Wrong or unmatched store | Tune the radius on a test walk; taps carry their time, so late GPS fixes it |
+| Forgetting to tap Visit | A store doesn't count (a later tap matches where I am then) | The upload page shows the visit count; tap before leaving |
 | A post goes viral | VM bandwidth spike | Cache headers now; CDN in front of `media.` if needed |
 
 **Open questions**
@@ -331,10 +349,10 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 - [x] **3. API skeleton.** Node 26 package, systemd unit, SQLite on the Volume, sops-nix secrets. Demo: `GET /health` shows version, database and uptime; a deploy changes the version.
 - [x] **4. Location ingest.** `POST /ingest` with token. Demo: Overland on a walk around the block; `GET /debug/points?last=10`.
 - [ ] **5. First `/live`.** Last position in JSON; bare Netlify page with a dot on a map. Demo: refresh during a walk.
-- [ ] **6. Attempts, route plan, visits.** Demo: a fake three-stop route of nearby coffee shops; the visit count goes up.
+- [ ] **6. Attempts, route plan, visits.** Attempts start/stop, the route plan's store list, `POST /visits` taps (by curl until step 9) matched to stores by GPS. Demo: a fake three-stop route of nearby coffee shops; a tap at each, and the visit count goes up.
 - [ ] **7. Radio, part 1.** Icecast + Liquidsoap on a test loop with a fixed title. Demo: VLC plays `radio.mctrot.nyc/live.mp3`.
 - [ ] **8. Radio, part 2.** Scheduled start, cue sheet, on-air log, now-playing in `/live`. Demo: 10-minute file with four cues starting in five minutes; titles change on time; a restart resumes at the right spot.
-- [ ] **9. Posting, part 1.** Passkey sign-in and text-only posts. Demo: "hello" from the phone shows in `/live`.
+- [ ] **9. Posting, part 1.** Passkey sign-in, text-only posts, and the **Visit** button. Demo: "hello" from the phone shows in `/live`.
 - [ ] **10. Posting, part 2.** tus uploads and photo processing, then video and voice. Demo: a photo appears with its thumbnail.
 - [ ] **11. Outbox and progress.** Demo: three posts in airplane mode land after reconnecting.
 - [ ] **12. Weather, stats, burndown data.** Demo: `/live` shows the forecast and miles walked on the test route.
@@ -346,7 +364,7 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 
 - [ ] Record the 10–12 hour radio file
 - [ ] Prepare the cue sheet (timestamp → artist, title) for the radio file
-- [ ] Prepare the route plan (base exported by scripts/export\_route\_plan.py): McDonald's in visiting order, with coordinates, miles to the next stop, and expected arrival and departure times
+- [ ] Prepare the route plan: set the start time, pace and stop length in /simulator, download its GPX as `recorder/route-plan.gpx`, and set `recorder.routePlan` in `host/configuration.nix`
 - [ ] Pick the event date and the radio start time
 - [ ] Configure start time (`radio.startAt` in the flake)
 - [ ] Before going live, set `recorder.live = true` in `recorder/host/configuration.nix` and deploy: it blocks `nix run .#wipe` and `nix run .#dislocate` and stops a schema change from setting event data aside

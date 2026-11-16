@@ -20,9 +20,9 @@ route =
             , ( "2-3", "o{csF~q`bMfE?" ) -- (40.002, -73.9) → (40.001, -73.9)
             ]
     , stops =
-        [ { mcdId = 1, name = "A", desc = "1 Main St", lat = 40.0, lon = -73.9, arrival = 120 }
-        , { mcdId = 3, name = "B&H", desc = "2 Main St · arrive <late>", lat = 40.001, lon = -73.9, arrival = 130 }
-        , { mcdId = 2, name = "C", desc = "3 Main St", lat = 40.002, lon = -73.9, arrival = 22 * 60 + 30 }
+        [ { mcdId = 1, name = "A", address = "1 Main St", desc = "1 Main St", lat = 40.0, lon = -73.9, arrival = 120, departure = 128 }
+        , { mcdId = 3, name = "B&H", address = "2 Main St", desc = "2 Main St · arrive <late>", lat = 40.001, lon = -73.9, arrival = 130, departure = 140 }
+        , { mcdId = 2, name = "C", address = "3 Main St", desc = "3 Main St", lat = 40.002, lon = -73.9, arrival = 22 * 60 + 30, departure = 24 * 60 + 5 }
         ]
     }
 
@@ -69,6 +69,20 @@ suite =
                 Gpx.build { route | date = Nothing }
                     |> String.contains "<time>"
                     |> Expect.equal False
+        , test "each waypoint carries its mctrot:stop extension" <|
+            \_ ->
+                String.contains
+                    "<extensions><mctrot:stop><mctrot:mcdId>3</mctrot:mcdId><mctrot:address>2 Main St</mctrot:address><mctrot:arrive>2026-11-21T07:10:00Z</mctrot:arrive><mctrot:depart>2026-11-21T07:20:00Z</mctrot:depart></mctrot:stop></extensions>"
+                    gpx
+                    |> Expect.equal True
+        , test "the mctrot namespace is declared" <|
+            \_ ->
+                String.contains ("xmlns:mctrot=\"" ++ Gpx.mctrotNamespace ++ "\"") gpx
+                    |> Expect.equal True
+        , test "departure across midnight" <|
+            \_ ->
+                String.contains "<mctrot:depart>2026-11-22T05:05:00Z</mctrot:depart>" gpx
+                    |> Expect.equal True
         , test "legKey puts the lower id first" <|
             \_ -> Gpx.legKey 17 3 |> Expect.equal "3-17"
         ]

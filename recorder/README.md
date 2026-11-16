@@ -225,3 +225,47 @@ cd recorder/api && nix develop .. -c npm run dev     # API on :3000
 open "website/build/live.html"                        # or any static server, then:
 # http://localhost:<port>/live.html?api=http://localhost:3000
 ```
+
+## Attempts and visits (step 6)
+
+An attempt is a start and a stop time; `/live` shows the running attempt
+(or the last one), and only Visit taps inside it count. A **Visit tap** is
+only a time: the API matches it to the nearest unclaimed store within
+150 m of where my GPS says I was (DESIGN.md, "Visits"). Until the upload
+page's Visit button (step 9), use curl, with the ingest token:
+
+```
+TOKEN=$(sops decrypt --extract '["ingest-token"]' secrets/recorder.yaml)
+api() { curl -s -X POST "https://api.mctrot.nyc$1" -H "Authorization: Bearer $TOKEN"; echo; }
+api /attempts/start
+api /visits              # "I'm here", now
+api /attempts/stop
+curl -s https://api.mctrot.nyc/live    # attempt, stores, visits
+```
+
+**The route plan** is a GPX: the simulator's GPX download, saved as
+`route-plan.gpx` here. Each waypoint carries a `<mctrot:stop>` extension
+(mcd_id, address, planned arrive/depart) that other GPX apps ignore.
+Point `recorder.routePlan` at it in `host/configuration.nix` and deploy;
+the build converts it to the JSON the API reads (`tools/route_plan.py`).
+Without a route plan, the API has no stores and no tap can match.
+
+```
+nix run .#route-plan -- route-plan.gpx   # check it first: the JSON the API would get
+```
+
+**A test walk with your own stores:** hand-write a GPX with a waypoint
+per store and point `recorder.routePlan` at it:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="by hand" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="40.7362" lon="-73.9903"><name>Coffee 1</name><desc>10 Union Sq E</desc></wpt>
+  <wpt lat="40.7381" lon="-73.9881"><name>Coffee 2</name></wpt>
+</gpx>
+```
+
+Without `<mctrot:stop>`, a waypoint's id is its position in the file and
+its address is its `<desc>` (the converter warns). The `/live` page draws
+whatever stores the plan has; ones outside Manhattan are off its map,
+but the visit count still works.

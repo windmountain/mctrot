@@ -42,3 +42,19 @@ test("live.schema.json is up to date (npm run schema)", () => {
   const onDisk = JSON.parse(readFileSync(new URL("../live.schema.json", import.meta.url), "utf8"));
   assert.deepEqual(onDisk, liveJsonSchema());
 });
+
+test("GET /live without a route plan: no stores", async () => {
+  const { buildApp } = await import("../src/app.ts");
+  const { openDb } = await import("../src/db.ts");
+  const { NO_PLAN } = await import("../src/plan.ts");
+  const app = buildApp({ db: openDb(":memory:").db, plan: NO_PLAN, version: "x", startedAt: new Date(), ingestToken: "t" });
+  const body = (await app.inject({ url: "/live" })).json();
+  assert.deepEqual(body.stores, []);
+  assert.ok(LiveResponse.safeParse(body).success);
+});
+
+test("GET /live lists stores with only the contract's fields", async () => {
+  const { app } = setup();
+  const body = (await app.inject({ url: "/live" })).json();
+  assert.deepEqual(Object.keys(body.stores[0]).sort(), ["address", "id", "lat", "lon", "name"]);
+});

@@ -46,11 +46,169 @@
         }
       ],
       "description": "The latest recorded point; null before any"
+    },
+    "attempt": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "startedAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Started, ms since epoch"
+            },
+            "endedAt": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Stopped, ms since epoch"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null while the attempt is running"
+            }
+          },
+          "required": [
+            "id",
+            "startedAt",
+            "endedAt"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The running attempt, or else the most recent; null before any"
+    },
+    "stores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "lat",
+          "lon"
+        ],
+        "additionalProperties": false
+      },
+      "description": "The route plan's stores"
+    },
+    "visits": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "tapTs": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "When I tapped Visit, ms since epoch"
+              },
+              "status": {
+                "type": "string",
+                "const": "matched"
+              },
+              "storeId": {
+                "type": "string"
+              },
+              "distanceM": {
+                "type": "number",
+                "description": "From my position at the tap to the store"
+              }
+            },
+            "required": [
+              "tapTs",
+              "status",
+              "storeId",
+              "distanceM"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "tapTs": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "When I tapped Visit, ms since epoch"
+              },
+              "status": {
+                "type": "string",
+                "const": "pending",
+                "description": "Waiting for GPS from after the tap"
+              }
+            },
+            "required": [
+              "tapTs",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "tapTs": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "When I tapped Visit, ms since epoch"
+              },
+              "status": {
+                "type": "string",
+                "const": "unmatched",
+                "description": "No store near, or no GPS near the tap"
+              }
+            },
+            "required": [
+              "tapTs",
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "description": "This attempt's Visit taps in time order, each matched to a store by GPS"
     }
   },
   "required": [
     "serverTs",
-    "position"
+    "position",
+    "attempt",
+    "stores",
+    "visits"
   ],
   "additionalProperties": false,
   "title": "McTrot /live response"

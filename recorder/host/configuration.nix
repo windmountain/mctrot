@@ -36,5 +36,10 @@
   # change). See host/recorder.nix.
   recorder.live = false;
 
+  # The route plan: the simulator's GPX download, saved next to this
+  # folder's flake.nix (or a hand-written GPX for a test walk). See
+  # host/recorder.nix. Without it, Visit taps have no stores to match.
+  # recorder.routePlan = ../route-plan.gpx;
+
   system.stateVersion = "26.05";
 }

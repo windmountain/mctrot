@@ -384,6 +384,7 @@ port share : String -> Cmd msg
 port linkCopied : (() -> msg) -> Sub msg
 
 
+
 searching : Model -> Bool
 searching model =
     model.running && not (SimulatedAnnealing.isDone (config model.activeStart) model.saState)
@@ -553,19 +554,6 @@ downloadGpx model legs =
 
         dateText =
             Maybe.map Calendar.formatIso startTime.date |> Maybe.withDefault "route"
-
-        toStop visit =
-            Array.get visit.cityIndex cities
-                |> Maybe.map
-                    (\city ->
-                        { mcdId = Array.get visit.cityIndex MctrotMapData.mcdIds |> Maybe.withDefault 0
-                        , name = city.name
-                        , desc = city.address ++ " · arrive " ++ arrivalText startTime visit
-                        , lat = city.lat
-                        , lon = city.lon
-                        , arrival = visit.arrival
-                        }
-                    )
     in
     saveGpx
         { filename = "mctrot-" ++ dateText ++ ".gpx"
@@ -574,9 +562,36 @@ downloadGpx model legs =
                 { name = "McTrot route" ++ (Maybe.map (\d -> ", " ++ Calendar.formatLong d) startTime.date |> Maybe.withDefault "")
                 , date = startTime.date
                 , legs = legs
-                , stops = List.filterMap toStop (simulate startTime (SimulatedAnnealing.best model.saState))
+                , stops = currentStops model
                 }
         }
+
+
+{-| The best route so far, stop by stop, with its planned times, for the
+GPX download.
+-}
+currentStops : Model -> List Gpx.Stop
+currentStops model =
+    let
+        startTime =
+            model.activeStart
+
+        toStop visit =
+            Array.get visit.cityIndex cities
+                |> Maybe.map
+                    (\city ->
+                        { mcdId = Array.get visit.cityIndex MctrotMapData.mcdIds |> Maybe.withDefault 0
+                        , name = city.name
+                        , address = city.address
+                        , desc = city.address ++ " · arrive " ++ arrivalText startTime visit
+                        , lat = city.lat
+                        , lon = city.lon
+                        , arrival = visit.arrival
+                        , departure = visit.departure
+                        }
+                    )
+    in
+    List.filterMap toStop (simulate startTime (SimulatedAnnealing.best model.saState))
 
 
 {-| How many steps the cooling schedule takes to reach

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildApp } from "./app.ts";
 import { openDb } from "./db.ts";
+import { loadPlan } from "./plan.ts";
 
 // Configuration comes from the environment, set by the systemd unit in
 // host/api.nix. The defaults are for running on a laptop.
@@ -10,6 +11,8 @@ const port = Number(env.PORT ?? 3000);
 const host = env.HOST ?? "127.0.0.1";
 const dbPath = env.MCTROT_DB ?? "dev.sqlite";
 const version = env.MCTROT_VERSION ?? "dev";
+// JSON made from the route GPX (tools/route_plan.py); unset means no stores.
+const planPath = env.MCTROT_ROUTE_PLAN || undefined;
 const resetPolicy = env.MCTROT_DB_RESET === "never" ? "never" : "reset";
 
 // Secrets arrive as files via systemd's LoadCredential, so they never sit
@@ -26,9 +29,11 @@ function readSecret(name: string): string | undefined {
 
 const ingestToken = readSecret("ingest-token") ?? (env.MCTROT_INGEST_TOKEN || undefined);
 
+const plan = loadPlan(planPath);
 const { db, archived } = openDb(dbPath, resetPolicy);
 const app = buildApp({
   db,
+  plan,
   version,
   startedAt: new Date(),
   ingestToken,

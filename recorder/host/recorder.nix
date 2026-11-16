@@ -66,6 +66,18 @@ in
         module adds itself here.
       '';
     };
+    routePlan = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      example = lib.literalExpression "../route-plan.gpx";
+      description = ''
+        The route plan: a GPX from the simulator's GPX download, whose
+        waypoints are the stores Visit taps are matched against (see
+        DESIGN.md, "Visits"). A hand-written GPX works for a test walk.
+        Converted to JSON when the system is built (tools/route_plan.py).
+        Null: no stores, so no tap can match.
+      '';
+    };
   };
 
   config.environment.systemPackages = [ wipe ];

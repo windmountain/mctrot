@@ -1,8 +1,13 @@
-module Gpx exposing (Route, Stop, build, legKey)
+module Gpx exposing (Route, Stop, build, legKey, mctrotNamespace)
 
 {-| The simulator's route as a GPX 1.1 file: a waypoint at every stop, in
 visiting order, and one track along the walking legs between them (from
 geo/route-legs.json; see `legKey`).
+
+Each waypoint also carries a `<mctrot:stop>` extension (see
+`mctrotNamespace`): the McDonald's id, its street address, and the planned
+arrival and departure. Other GPX apps ignore it; the recorder reads this
+file as its route plan (recorder/tools/route_plan.py).
 -}
 
 import Calendar
@@ -10,18 +15,28 @@ import Dict exposing (Dict)
 import Polyline
 
 
-{-| `arrival` is minutes after midnight beginning the route's start date (so
-past 1440 on later days), the same clock as `Simulator.Visit`. `desc` is
-free text for the waypoint.
+{-| `arrival` and `departure` are minutes after midnight beginning the
+route's start date (so past 1440 on later days), the same clock as
+`Simulator.Visit`. `name` is the nickname, `address` the street line, and
+`desc` free text for the waypoint.
 -}
 type alias Stop =
     { mcdId : Int
     , name : String
+    , address : String
     , desc : String
     , lat : Float
     , lon : Float
     , arrival : Int
+    , departure : Int
     }
+
+
+{-| The XML namespace of the `<mctrot:stop>` waypoint extension.
+-}
+mctrotNamespace : String
+mctrotNamespace =
+    "https://mctrot.nyc/gpx/1"
 
 
 {-| `date` is `Nothing` if the start date is invalid, which leaves out every
@@ -48,7 +63,7 @@ build route =
     String.join "\n"
         (List.concat
             [ [ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-              , "<gpx version=\"1.1\" creator=\"McTrot Simulator\" xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\">"
+              , "<gpx version=\"1.1\" creator=\"McTrot Simulator\" xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:mctrot=\"" ++ mctrotNamespace ++ "\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\">"
               , "<metadata>"
               , element "name" route.name
               , "<link href=\"https://mctrot.nyc/simulator.html\">" ++ element "text" "McTrot Simulator" ++ "</link>"
@@ -71,7 +86,22 @@ waypoint date stop =
     String.concat
         (("<wpt lat=\"" ++ fixed 6 stop.lat ++ "\" lon=\"" ++ fixed 6 stop.lon ++ "\">")
             :: timeElement date stop
-            ++ [ element "name" stop.name, element "desc" stop.desc, "</wpt>" ]
+            ++ [ element "name" stop.name
+               , element "desc" stop.desc
+               , "<extensions><mctrot:stop>"
+               , element "mctrot:mcdId" (String.fromInt stop.mcdId)
+               , element "mctrot:address" stop.address
+               ]
+            ++ (case date of
+                    Just d ->
+                        [ element "mctrot:arrive" (Calendar.isoUtcFromNewYork d stop.arrival)
+                        , element "mctrot:depart" (Calendar.isoUtcFromNewYork d stop.departure)
+                        ]
+
+                    Nothing ->
+                        []
+               )
+            ++ [ "</mctrot:stop></extensions>", "</wpt>" ]
         )
 
 

@@ -8,7 +8,6 @@ position on the site's Manhattan map.
 
 -}
 
-import Array
 import Browser
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -45,6 +44,9 @@ type alias Flags =
 type alias LiveResponse =
     { serverTs : Int
     , position : Maybe Position
+    , attempt : Maybe Attempt
+    , stores : List Store
+    , visits : List Visit
     }
 
 
@@ -56,11 +58,72 @@ type alias Position =
     }
 
 
+type alias Attempt =
+    { startedAt : Int
+    , endedAt : Maybe Int
+    }
+
+
+type alias Store =
+    { id : String
+    , name : String
+    , lat : Float
+    , lon : Float
+    }
+
+
+{-| A Visit tap, matched to a store by GPS on the server.
+-}
+type Visit
+    = Matched String
+    | Pending
+    | Unmatched
+
+
 liveDecoder : Decoder LiveResponse
 liveDecoder =
-    Decode.map2 LiveResponse
+    Decode.map5 LiveResponse
         (Decode.field "serverTs" Decode.int)
         (Decode.field "position" (Decode.nullable positionDecoder))
+        (Decode.field "attempt" (Decode.nullable attemptDecoder))
+        (Decode.field "stores" (Decode.list storeDecoder))
+        (Decode.field "visits" (Decode.list visitDecoder))
+
+
+attemptDecoder : Decoder Attempt
+attemptDecoder =
+    Decode.map2 Attempt
+        (Decode.field "startedAt" Decode.int)
+        (Decode.field "endedAt" (Decode.nullable Decode.int))
+
+
+storeDecoder : Decoder Store
+storeDecoder =
+    Decode.map4 Store
+        (Decode.field "id" Decode.string)
+        (Decode.field "name" Decode.string)
+        (Decode.field "lat" Decode.float)
+        (Decode.field "lon" Decode.float)
+
+
+visitDecoder : Decoder Visit
+visitDecoder =
+    Decode.field "status" Decode.string
+        |> Decode.andThen
+            (\statusName ->
+                case statusName of
+                    "matched" ->
+                        Decode.map Matched (Decode.field "storeId" Decode.string)
+
+                    "pending" ->
+                        Decode.succeed Pending
+
+                    "unmatched" ->
+                        Decode.succeed Unmatched
+
+                    other ->
+                        Decode.fail ("unknown visit status " ++ other)
+            )
 
 
 positionDecoder : Decoder Position
@@ -154,13 +217,40 @@ subscriptions _ =
 
 view : Model -> Html Msg
 view model =
+    let
+        response =
+            Maybe.map .response model.latest
+    in
     Html.div [ Attr.class "live" ]
         [ Html.p [ Attr.class "live-home" ] [ Html.a [ Attr.href "/" ] [ Html.text "McTrot" ] ]
         , Html.h1 [] [ Html.text "Live" ]
         , Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ]
             [ Html.text (status model) ]
-        , viewMap (Maybe.andThen (.response >> .position) model.latest)
+        , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
+        , viewMap response
         ]
+
+
+{-| The server's clock now: its time at the last response, plus however
+long ago this browser received it. Ages and durations count from this, so
+a viewer's wrong clock doesn't matter.
+-}
+serverNow : Model -> Maybe Int
+serverNow model =
+    model.latest
+        |> Maybe.map
+            (\{ response, receivedAt } ->
+                let
+                    sinceReceived =
+                        case model.now of
+                            Just now ->
+                                max 0 (Time.posixToMillis now - Time.posixToMillis receivedAt)
+
+                            Nothing ->
+                                0
+                in
+                response.serverTs + sinceReceived
+            )
 
 
 status : Model -> String
@@ -173,69 +263,132 @@ status model =
             else
                 ""
     in
-    case model.latest of
-        Nothing ->
+    case ( model.latest, serverNow model ) of
+        ( Just { response }, Just now ) ->
+            case response.position of
+                Nothing ->
+                    "No position yet." ++ problem
+
+                Just position ->
+                    "Last position " ++ duration (now - position.ts) ++ " ago." ++ problem
+
+        _ ->
             if model.failing then
                 "Can’t reach the recorder; retrying."
 
             else
                 "Connecting…"
 
-        Just { response, receivedAt } ->
-            case response.position of
+
+visitsLine : Model -> String
+visitsLine model =
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            case response.attempt of
                 Nothing ->
-                    "No position yet." ++ problem
+                    "No attempt yet."
 
-                Just position ->
+                Just attempt ->
                     let
-                        sinceReceived =
-                            case model.now of
-                                Just now ->
-                                    Time.posixToMillis now - Time.posixToMillis receivedAt
+                        count status_ =
+                            List.length (List.filter status_ response.visits)
 
-                                Nothing ->
-                                    0
+                        matched =
+                            count isMatched
 
-                        ageMs =
-                            response.serverTs - position.ts + max 0 sinceReceived
+                        extra label n =
+                            if n > 0 then
+                                " · " ++ String.fromInt n ++ " " ++ label
+
+                            else
+                                ""
+
+                        visits =
+                            "Visits "
+                                ++ String.fromInt matched
+                                ++ " / "
+                                ++ String.fromInt (List.length response.stores)
+                                ++ extra "checking in" (count ((==) Pending))
+                                ++ extra "unmatched" (count ((==) Unmatched))
                     in
-                    "Last position " ++ ago ageMs ++ "." ++ problem
+                    case attempt.endedAt of
+                        Nothing ->
+                            "On the road for " ++ duration (now - attempt.startedAt) ++ ". " ++ visits ++ "."
+
+                        Just endedAt ->
+                            "Last attempt took " ++ duration (endedAt - attempt.startedAt) ++ ". " ++ visits ++ "."
+
+        _ ->
+            ""
 
 
-ago : Int -> String
-ago ms =
+isMatched : Visit -> Bool
+isMatched visit =
+    case visit of
+        Matched _ ->
+            True
+
+        _ ->
+            False
+
+
+duration : Int -> String
+duration ms =
     let
         seconds =
             max 0 ms // 1000
     in
     if seconds < 60 then
-        String.fromInt seconds ++ " s ago"
+        String.fromInt seconds ++ " s"
 
     else if seconds < 3600 then
-        String.fromInt (seconds // 60) ++ " min ago"
+        String.fromInt (seconds // 60) ++ " min"
 
     else if seconds < 2 * 86400 then
-        String.fromInt (seconds // 3600) ++ " h ago"
+        String.fromInt (seconds // 3600) ++ " h " ++ String.fromInt (modBy 60 (seconds // 60)) ++ " min"
 
     else
-        String.fromInt (seconds // 86400) ++ " days ago"
+        String.fromInt (seconds // 86400) ++ " days"
 
 
-viewMap : Maybe Position -> Html Msg
-viewMap position =
+viewMap : Maybe LiveResponse -> Html Msg
+viewMap response =
     let
+        position =
+            Maybe.andThen .position response
+
         placed =
             Maybe.map (\p -> Projection.toMap { lat = p.lat, lon = p.lon }) position
+
+        stores =
+            Maybe.map .stores response |> Maybe.withDefault []
+
+        visited =
+            Maybe.map .visits response
+                |> Maybe.withDefault []
+                |> List.filterMap
+                    (\v ->
+                        case v of
+                            Matched id ->
+                                Just id
+
+                            _ ->
+                                Nothing
+                    )
+
+        ( done, todo ) =
+            List.partition (\s -> List.member s.id visited) stores
     in
     Html.div [ Attr.class "live-map" ]
         [ Svg.svg
             [ SvgAttr.viewBox MctrotMapData.mapViewBox
             , SvgAttr.class "live-map-svg"
             , Attr.attribute "role" "img"
-            , Attr.attribute "aria-label" "Map of Manhattan with every McDonald’s and my last position"
+            , Attr.attribute "aria-label" "Map of Manhattan with every store, the ones visited, and my last position"
             ]
             (Svg.path [ SvgAttr.class "borough", SvgAttr.d MctrotMapData.boroughPath ] []
-                :: List.map viewStore (Array.toList MctrotMapData.locationCoords)
+                :: List.map (viewStore "live-store" "120") todo
+                ++ List.map (viewStore "live-store live-store-visited" "200") done
                 ++ (placed |> Maybe.map (\xy -> [ viewMe xy ]) |> Maybe.withDefault [])
             )
         , if placed /= Nothing && not (onMap placed) then
@@ -246,15 +399,19 @@ viewMap position =
         ]
 
 
-viewStore : ( Float, Float ) -> Svg Msg
-viewStore ( x, y ) =
+viewStore : String -> String -> Store -> Svg Msg
+viewStore class radius store =
+    let
+        ( x, y ) =
+            Projection.toMap { lat = store.lat, lon = store.lon }
+    in
     Svg.circle
-        [ SvgAttr.class "live-store"
+        [ SvgAttr.class class
         , SvgAttr.cx (String.fromFloat x)
         , SvgAttr.cy (String.fromFloat y)
-        , SvgAttr.r "120"
+        , SvgAttr.r radius
         ]
-        []
+        [ Svg.title [] [ Svg.text store.name ] ]
 
 
 viewMe : ( Float, Float ) -> Svg Msg
@@ -281,4 +438,3 @@ onMap placed =
 viewBoxNumbers : List Float
 viewBoxNumbers =
     MctrotMapData.mapViewBox |> String.words |> List.filterMap String.toFloat
-

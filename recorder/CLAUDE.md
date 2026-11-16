@@ -35,8 +35,8 @@ Design doc: recorder/DESIGN.md
   `recorder/NN-short-name`. Each step adds one layer and ends with a small
   demo; write the demo in the PR description and run it before merging.
 - Stay inside `recorder/` unless the step says otherwise (the `/live` page
-  and replay bundles live in `website/`, the route-plan export in
-  `scripts/`).
+  and replay bundles live in `website/`, and the route plan comes from
+  the simulator's GPX download, `website/src/Gpx.elm`).
 - Keep the machine reproducible: no manual changes on the box that aren't
   in the flake.
 

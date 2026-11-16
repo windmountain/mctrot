@@ -99,6 +99,16 @@
             exec ssh -t "''${1:-${host}}" mctrot-dislocate
           '');
         };
+
+        # Check a route GPX before deploying it: prints the route plan the
+        # API would get, or why the GPX won't do.
+        # Usage: nix run .#route-plan -- route.gpx
+        route-plan = {
+          type = "app";
+          program = toString (lpkgs.writeShellScript "recorder-route-plan" ''
+            exec ${lpkgs.python3}/bin/python3 ${./tools/route_plan.py} "$@"
+          '');
+        };
       };
     in
     {
