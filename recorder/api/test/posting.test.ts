@@ -128,6 +128,11 @@ test("the upload page and its scripts are served, locked down", async () => {
     ["/post/app.js", "text/javascript"],
     ["/post/webauthn.js", "text/javascript"],
     ["/post/manifest.webmanifest", "application/manifest+json"],
+    ["/post/icons/favicon.svg", "image/svg+xml"],
+    ["/post/icons/favicon.ico", "image/x-icon"],
+    ["/post/icons/apple-touch-icon.png", "image/png"],
+    ["/post/icons/icon-192.png", "image/png"],
+    ["/post/icons/icon-512.png", "image/png"],
   ] as const) {
     const res = await app.inject({ url });
     assert.equal(res.statusCode, 200, url);

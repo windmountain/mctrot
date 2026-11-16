@@ -64,6 +64,12 @@ const POST_FILES: Record<string, { file: string | URL; type: string }> = {
   "/post/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
   "/post/manifest.webmanifest": { file: "manifest.webmanifest", type: "application/manifest+json" },
   "/post/webauthn.js": { file: webauthnBrowser, type: "text/javascript; charset=utf-8" },
+  // Its icons, "McTrot / CTRL" (scripts/render_studio_icons.mjs).
+  "/post/icons/favicon.svg": { file: "icons/favicon.svg", type: "image/svg+xml" },
+  "/post/icons/favicon.ico": { file: "icons/favicon.ico", type: "image/x-icon" },
+  "/post/icons/apple-touch-icon.png": { file: "icons/apple-touch-icon.png", type: "image/png" },
+  "/post/icons/icon-192.png": { file: "icons/icon-192.png", type: "image/png" },
+  "/post/icons/icon-512.png": { file: "icons/icon-512.png", type: "image/png" },
 };
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -210,7 +216,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       // Only this origin's own scripts and requests; no third parties.
       reply.header(
         "content-security-policy",
-        "default-src 'self'; img-src 'self' https://mctrot.nyc data:; style-src 'self' 'unsafe-inline'",
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'",
       );
       return body;
     });

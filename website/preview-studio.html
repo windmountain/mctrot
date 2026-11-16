@@ -229,7 +229,8 @@
     <p class="sub">Favicon &amp; social preview studio</p>
 
     <label for="text">Text</label>
-    <input id="text" type="text" value="McTrot" maxlength="24">
+    <textarea id="text" rows="2" maxlength="40">McTrot</textarea>
+    <p class="sub">One or two lines; each is centered, and the block is fitted to the padding. (The upload page's icons are "McTrot", new line, "CTRL".)</p>
 
     <fieldset>
       <legend>Theme</legend>
@@ -281,6 +282,8 @@
       <legend>Small sizes</legend>
       <label><input id="maskableSafe" type="checkbox" checked> Extra safe-zone padding for maskable Android icons (192 / 512)</label>
       <label><input id="smallLetterMode" type="checkbox" checked> Use first letter only at or below <input id="smallThreshold" type="number" value="48" min="8" max="128" style="width:3.5em;display:inline-block;margin-left:.3em"> px</label>
+      <label for="smallText">Small-size text (blank: the first letter)</label>
+      <input id="smallText" type="text" maxlength="3" placeholder="first letter">
     </fieldset>
     <p class="sub" style="margin-top:.4rem">48px and below render as "M" — the full wordmark reads better from 180px up. Toggle off to compare.</p>
 
@@ -330,7 +333,27 @@
     maskableSafe: true,
     smallLetterMode: true,
     smallThreshold: 48,
+    smallText: '',
   };
+
+  // Lines of a multi-line wordmark ("McTrot\nCTRL"), each centered, with
+  // baselines LINE_HEIGHT ems apart.
+  const LINE_HEIGHT = 1.0;
+
+  function linesOf(text){
+    const lines = (text || 'McTrot').split('\n').map(l => l.trim()).filter(Boolean);
+    return lines.length ? lines : ['McTrot'];
+  }
+
+  // Where line i's middle sits, relative to the block's middle.
+  function lineOffset(i, n, size){
+    return (i - (n - 1) / 2) * LINE_HEIGHT * size;
+  }
+
+  // One line for names and titles: "McTrot CTRL".
+  function oneLine(text){
+    return linesOf(text).join(' ');
+  }
 
   function getColors(){
     if (state.theme === 'light') return LIGHT;
@@ -390,14 +413,24 @@
     return measureTracked(ctx, prefix, size, trackingFrac) + kernFrac * size + measureTracked(ctx, suffix, size, trackingFrac);
   }
 
+  // The largest size at which every line fits maxW and the block fits maxH.
+  // With one line, the height test is the original single-word one.
   function fitFontSize(ctx, text, maxW, maxH, trackingFrac, kernFrac){
+    const lines = linesOf(text);
+    const blockEms = 1 + (lines.length - 1) * LINE_HEIGHT;
     let lo = 1, hi = Math.max(2, maxH * 1.4);
     for (let i = 0; i < 22; i++){
       const mid = (lo + hi) / 2;
-      const w = measureWord(ctx, text, mid, trackingFrac, kernFrac);
-      if (w > maxW || mid > maxH * 1.15) hi = mid; else lo = mid;
+      const w = Math.max(...lines.map(l => measureWord(ctx, l, mid, trackingFrac, kernFrac)));
+      if (w > maxW || mid * blockEms > maxH * 1.15) hi = mid; else lo = mid;
     }
     return lo;
+  }
+
+  function drawLines(ctx, text, cx, cy, size, trackingFrac, kernFrac){
+    const lines = linesOf(text);
+    lines.forEach((line, i) =>
+      drawWord(ctx, line, cx, cy + lineOffset(i, lines.length, size), size, trackingFrac, kernFrac));
   }
 
   function drawTrackedFrom(ctx, text, x, y, size, trackingFrac){
@@ -450,7 +483,7 @@
 
     let text = (state.text || 'McTrot');
     if (state.smallLetterMode && Math.min(w,h) <= state.smallThreshold){
-      text = text.charAt(0);
+      text = state.smallText.trim() || linesOf(text)[0].charAt(0);
     }
     if (!text) return;
 
@@ -470,7 +503,7 @@
     const cx = w/2;
     const cy = h/2 + (state.nudge/100) * h;
 
-    drawWord(ctx, text, cx, cy, size, trackingFrac, kernFrac);
+    drawLines(ctx, text, cx, cy, size, trackingFrac, kernFrac);
   }
 
   // ---------- SVG ----------
@@ -498,32 +531,32 @@
     const letterSpacingAttr = Math.abs(trackingFrac) > 0.0001
       ? ` letter-spacing="${(trackingFrac*size).toFixed(2)}"` : '';
 
-    const splitAt = findKernSplit(text);
-    let prefix = '', suffix = '', x0 = w/2, prefixW = 0, gap = 0;
-    if (splitAt !== -1){
-      const measureCanvas = document.createElement('canvas');
-      const mctx = measureCanvas.getContext('2d');
-      mctx.font = `${state.weight} ${size}px ${FONT_STACK}`;
-      prefix = text.slice(0, splitAt);
-      suffix = text.slice(splitAt);
-      prefixW = measureTracked(mctx, prefix, size, trackingFrac);
+    const measureCanvas = document.createElement('canvas');
+    const mctx = measureCanvas.getContext('2d');
+    mctx.font = `${state.weight} ${size}px ${FONT_STACK}`;
+    const lines = linesOf(text);
+
+    // One line's <text> elements at height y: a single centered one, or
+    // "Mc" and "Trot" placed apart by the kern nudge.
+    function lineMarkup(line, y, ink){
+      const attrs = `font-family='${FONT_STACK}' font-weight="${state.weight}" `
+        + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}"`;
+      const splitAt = findKernSplit(line);
+      if (splitAt === -1){
+        return `<text x="${w/2}" y="${y.toFixed(2)}" text-anchor="middle" dominant-baseline="central" ${attrs}>${escapeXml(line)}</text>`;
+      }
+      const prefix = line.slice(0, splitAt);
+      const suffix = line.slice(splitAt);
+      const prefixW = measureTracked(mctx, prefix, size, trackingFrac);
       const suffixW = measureTracked(mctx, suffix, size, trackingFrac);
-      gap = kernFrac * size;
-      x0 = w/2 - (prefixW + gap + suffixW) / 2;
+      const gap = kernFrac * size;
+      const x0 = w/2 - (prefixW + gap + suffixW) / 2;
+      return `<text x="${x0.toFixed(2)}" y="${y.toFixed(2)}" text-anchor="start" dominant-baseline="central" ${attrs}>${escapeXml(prefix)}</text>`
+        + `<text x="${(x0 + prefixW + gap).toFixed(2)}" y="${y.toFixed(2)}" text-anchor="start" dominant-baseline="central" ${attrs}>${escapeXml(suffix)}</text>`;
     }
 
     function textMarkup(ink){
-      if (splitAt === -1){
-        return `<text x="${w/2}" y="${cy.toFixed(2)}" text-anchor="middle" dominant-baseline="central" `
-          + `font-family='${FONT_STACK}' font-weight="${state.weight}" `
-          + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(text)}</text>`;
-      }
-      return `<text x="${x0.toFixed(2)}" y="${cy.toFixed(2)}" text-anchor="start" dominant-baseline="central" `
-          + `font-family='${FONT_STACK}' font-weight="${state.weight}" `
-          + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(prefix)}</text>`
-        + `<text x="${(x0 + prefixW + gap).toFixed(2)}" y="${cy.toFixed(2)}" text-anchor="start" dominant-baseline="central" `
-          + `font-family='${FONT_STACK}' font-weight="${state.weight}" `
-          + `font-size="${size.toFixed(2)}"${letterSpacingAttr} fill="${ink}">${escapeXml(suffix)}</text>`;
+      return lines.map((line, i) => lineMarkup(line, cy + lineOffset(i, lines.length, size), ink)).join('');
     }
 
     function group(cls, bg, ink){
@@ -605,7 +638,7 @@ ${group('dark', DARK.bg, DARK.ink)}
 
   function buildManifest(){
     const { bg } = getColors();
-    const text = state.text || 'McTrot';
+    const text = oneLine(state.text);
     return JSON.stringify({
       name: text,
       short_name: text,
@@ -620,7 +653,7 @@ ${group('dark', DARK.bg, DARK.ink)}
   }
 
   function buildOgTags(){
-    const text = state.text || 'McTrot';
+    const text = oneLine(state.text);
     return `<meta property="og:type" content="website">
 <meta property="og:title" content="${text}">
 <meta property="og:description" content="McTrot is a challenge to eat at every McDonald&#8217;s in Manhattan, on foot, in one go.">
@@ -810,13 +843,15 @@ ${group('dark', DARK.bg, DARK.ink)}
   el('maskableSafe').addEventListener('change', e => { state.maskableSafe = e.target.checked; renderAll(); });
   el('smallLetterMode').addEventListener('change', e => { state.smallLetterMode = e.target.checked; renderAll(); });
   el('smallThreshold').addEventListener('input', e => { state.smallThreshold = Number(e.target.value) || 32; renderAll(); });
+  el('smallText').addEventListener('input', e => { state.smallText = e.target.value; renderAll(); });
 
   el('resetBtn').addEventListener('click', () => {
     Object.assign(state, {
       text: 'McTrot', theme: 'light', bgCustom: '#FFD100', inkCustom: '#0D0D08',
       weight: 700, padding: 12, tracking: 0, nudge: 0, radius: 0,
-      maskableSafe: true, smallLetterMode: true, smallThreshold: 48,
+      maskableSafe: true, smallLetterMode: true, smallThreshold: 48, smallText: '',
     });
+    el('smallText').value = '';
     el('text').value = state.text;
     document.querySelector('input[name="theme"][value="light"]').checked = true;
     el('customColors').hidden = true;
