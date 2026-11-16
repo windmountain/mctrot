@@ -328,7 +328,7 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 
 - [ ] **1. Flake skeleton, local only.** Repo, flake, NixOS config with Caddy in a local VM (`nixos-rebuild build-vm`). Demo: `curl localhost` says hello.
 - [x] **2. The real server.** Droplet + Volume, nixos-anywhere, Namecheap DNS, Caddy certificate. Demo: `https://api.mctrot.nyc` says hello.
-- [ ] **3. API skeleton.** Node 26 package, systemd unit, SQLite on the Volume, sops-nix secrets. Demo: `GET /health` shows version, database and uptime; a deploy changes the version.
+- [x] **3. API skeleton.** Node 26 package, systemd unit, SQLite on the Volume, sops-nix secrets. Demo: `GET /health` shows version, database and uptime; a deploy changes the version.
 - [ ] **4. Location ingest.** `POST /ingest` with token. Demo: Overland on a walk around the block; `GET /debug/points?last=10`.
 - [ ] **5. First `/live`.** Last position in JSON; bare Netlify page with a dot on a map. Demo: refresh during a walk.
 - [ ] **6. Attempts, route plan, visits.** Demo: a fake three-stop route of nearby coffee shops; the visit count goes up.

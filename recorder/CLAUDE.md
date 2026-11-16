@@ -50,5 +50,9 @@ Design doc: recorder/DESIGN.md
   (nixos-anywhere; wipes its disk, not the Volume).
 - `nix run .#deploy`: push changes to `root@recorder.mctrot.nyc`.
   Both build on the Droplet, so no Linux builder is needed for them.
+  Run them from inside the repo: they read the flake from git, and the
+  commit becomes the version in `GET /health`.
+- `nix develop` (from `recorder/`): Node 26, sops and ssh-to-age.
+- `nix build .#api`: build and test the API package locally.
 - `nix flake check`: evaluate the configuration.
 - `nix fmt`: format Nix files.

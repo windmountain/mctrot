@@ -74,3 +74,67 @@ ssh root@recorder.mctrot.nyc df -h /var/lib/mctrot   # the Volume
 `root@recorder.mctrot.nyc`; pass another `user@host` to override). A bad
 deploy rolls back with `nixos-rebuild switch --rollback` on the box, or by
 picking the previous generation in the GRUB menu from the Droplet console.
+
+## The API (step 3)
+
+`api/` is a Node 26 TypeScript service (Fastify, better-sqlite3). Node runs
+the `.ts` files directly; `tsc` only type-checks. On the box it runs as
+`mctrot-api.service` (user `mctrot`) behind Caddy at `api.mctrot.nyc`, with
+its database at `/var/lib/mctrot/db/recorder.sqlite` on the Volume.
+
+```
+curl https://api.mctrot.nyc/health   # version = git commit, database, secrets
+```
+
+**Working on it locally**
+
+```
+cd recorder/api
+nix develop ..          # Node 26, sops, ssh-to-age
+npm install
+npm test && npx tsc     # tests and type-check
+npm run dev             # http://localhost:3000/health
+```
+
+`nix build .#api` (from `recorder/`) builds the same package the server
+runs, tests included.
+
+**After changing dependencies** (`package-lock.json`), update
+`npmDepsHash` in `api/package.nix`:
+
+```
+nix run --inputs-from . nixpkgs-darwin#prefetch-npm-deps -- api/package-lock.json
+```
+
+(If you forget, the build fails with a hash mismatch showing the right
+value.) npm blocks dependency install scripts by default; native packages
+need `npm install-scripts approve <pkg>`, and their build in
+`package.nix`.
+
+**Logs:** `ssh root@recorder.mctrot.nyc journalctl -u mctrot-api -f`
+
+## Secrets
+
+Secrets live encrypted in `secrets/recorder.yaml`, readable by my SSH key
+(`~/.ssh/id_ed25519`) and the Droplet's SSH host key (see `.sops.yaml`).
+The box decrypts them at boot into `/run/secrets/`; services get them as
+systemd credentials.
+
+```
+cd recorder
+nix develop
+sops secrets/recorder.yaml                                   # edit
+sops decrypt --extract '["ingest-token"]' secrets/recorder.yaml   # read one
+```
+
+A new secret also needs an entry in `host/secrets.nix` and a
+`LoadCredential` line on the service that uses it.
+
+**After reinstalling the Droplet** its host key changes, so it can no
+longer decrypt. Get the new key and re-encrypt:
+
+```
+ssh-keyscan -t ed25519 recorder.mctrot.nyc | cut -d' ' -f2- | ssh-to-age
+# put the result in .sops.yaml as &recorder, then:
+sops updatekeys secrets/recorder.yaml
+```
