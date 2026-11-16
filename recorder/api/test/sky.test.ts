@@ -66,3 +66,11 @@ test("/live has the sky, labelled by where to look", async () => {
   assert.match(body.sky.squares[0].color, /^#[0-9a-f]{6}$/);
   assert.match(body.sky.squares[2].label, /^Low in the (N|NE|E|SE|S|SW|W|NW), toward the sun$/);
 });
+
+test("the dome: overhead and the four compass points; the sun's side is brighter", () => {
+  // Mid-morning on the walk: the sun is in the SE, low.
+  const { dome } = sky(at("2026-11-21T14:30:00Z"), LAT, LON, weather());
+  for (const c of Object.values(dome)) assert.match(c, /^#[0-9a-f]{6}$/);
+  assert.ok(bright(dome.south) > bright(dome.north), `south ${dome.south} brighter than north ${dome.north}`);
+  assert.ok(bright(dome.east) > bright(dome.west), `east ${dome.east} brighter than west ${dome.west}`);
+});

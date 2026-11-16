@@ -54,6 +54,19 @@ type alias LiveResponse =
     , weather : Maybe Weather
     , sun : Sun
     , sky : List SkySquare
+    , dome : Dome
+    }
+
+
+{-| The whole sky in five colours: overhead, and each compass point low
+in the sky. Drawn as a diamond gradient, north at the top.
+-}
+type alias Dome =
+    { overhead : String
+    , north : String
+    , east : String
+    , south : String
+    , west : String
     }
 
 
@@ -183,6 +196,16 @@ liveDecoder =
                         (Decode.field "label" Decode.string)
                         (Decode.field "color" Decode.string)
                     )
+                )
+            )
+        |> andMap
+            (Decode.at [ "sky", "dome" ]
+                (Decode.map5 Dome
+                    (Decode.field "overhead" Decode.string)
+                    (Decode.field "north" Decode.string)
+                    (Decode.field "east" Decode.string)
+                    (Decode.field "south" Decode.string)
+                    (Decode.field "west" Decode.string)
                 )
             )
 
@@ -480,10 +503,11 @@ viewWeather model =
 -}
 viewSky : Maybe LiveResponse -> Html Msg
 viewSky response =
-    case Maybe.map .sky response of
-        Just ((_ :: _) as squares) ->
+    case Maybe.map (\r -> ( r.sky, r.dome )) response of
+        Just ( (_ :: _) as squares, dome ) ->
             Html.figure [ Attr.class "live-sky" ]
-                [ Html.ul []
+                [ viewDome dome
+                , Html.ul []
                     (List.map
                         (\square ->
                             Html.li []
@@ -504,6 +528,49 @@ viewSky response =
 
         _ ->
             Html.text ""
+
+
+{-| The sky as a diamond, north at the top corner, east right, south
+bottom, west left, and overhead in the middle: each compass colour sweeps
+around the edge (a conic gradient), and the overhead colour fades out
+from the centre over it (a radial one).
+-}
+viewDome : Dome -> Html Msg
+viewDome dome =
+    let
+        corner class label =
+            Html.span [ Attr.class ("live-dome-label " ++ class), Attr.attribute "aria-hidden" "true" ] [ Html.text label ]
+    in
+    Html.div [ Attr.class "live-dome" ]
+        [ Html.div
+            [ Attr.class "live-dome-sky"
+            , Attr.attribute "role" "img"
+            , Attr.attribute "aria-label"
+                ("The sky as a gradient: overhead "
+                    ++ dome.overhead
+                    ++ ", north "
+                    ++ dome.north
+                    ++ ", east "
+                    ++ dome.east
+                    ++ ", south "
+                    ++ dome.south
+                    ++ ", west "
+                    ++ dome.west
+                )
+            , Attr.style "background"
+                ("radial-gradient(circle closest-side, "
+                    ++ dome.overhead
+                    ++ ", transparent), conic-gradient("
+                    ++ String.join ", " [ dome.north, dome.east, dome.south, dome.west, dome.north ]
+                    ++ ")"
+                )
+            ]
+            []
+        , corner "live-dome-n" "N"
+        , corner "live-dome-e" "E"
+        , corner "live-dome-s" "S"
+        , corner "live-dome-w" "W"
+        ]
 
 
 capitalize : String -> String

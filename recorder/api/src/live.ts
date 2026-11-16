@@ -156,6 +156,15 @@ export const LiveResponse = z
             color: z.string().describe("CSS hex colour"),
           }),
         ),
+        dome: z
+          .object({
+            overhead: z.string().describe("CSS hex colour"),
+            north: z.string().describe("CSS hex colour"),
+            east: z.string().describe("CSS hex colour"),
+            south: z.string().describe("CSS hex colour"),
+            west: z.string().describe("CSS hex colour"),
+          })
+          .describe("Overhead, and each compass point 10° above the horizon: the whole sky for a gradient"),
       })
       .describe("The sky's colour in a few directions, simulated from the sun and the latest weather (src/sky.ts)"),
   })

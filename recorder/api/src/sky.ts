@@ -203,10 +203,16 @@ export type SkySquare = {
   color: string; // "#5b8bd0"
 };
 
+// The whole dome in five colours, for a gradient: overhead, and each
+// compass point low in the sky (DOME_EDGE degrees up).
+export type Dome = { overhead: string; north: string; east: string; south: string; west: string };
+export const DOME_EDGE = 10;
+
 export type Sky = {
   at: number;
   sun: { elevation: number; azimuth: number };
   squares: SkySquare[];
+  dome: Dome;
 };
 
 const POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -253,10 +259,19 @@ export function sky(ms: number, lat: number, lon: number, weather: SkyInputs | n
     const color = hex(looking(direction(elevation, azimuth)), adaptation);
     return { label, elevation, azimuth: Math.round(azimuth), color };
   });
+  const toward = (azimuth: number) => hex(looking(direction(DOME_EDGE, azimuth)), adaptation);
+  const dome: Dome = {
+    overhead: hex(looking([0, 1, 0]), adaptation),
+    north: toward(0),
+    east: toward(90),
+    south: toward(180),
+    west: toward(270),
+  };
   return {
     at: ms,
     sun: { elevation: Math.round(sunPos.elevation * 10) / 10, azimuth: Math.round(sunPos.azimuth) },
     squares,
+    dome,
   };
 }
 

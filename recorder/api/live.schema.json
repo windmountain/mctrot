@@ -748,12 +748,47 @@
             ],
             "additionalProperties": false
           }
+        },
+        "dome": {
+          "type": "object",
+          "properties": {
+            "overhead": {
+              "type": "string",
+              "description": "CSS hex colour"
+            },
+            "north": {
+              "type": "string",
+              "description": "CSS hex colour"
+            },
+            "east": {
+              "type": "string",
+              "description": "CSS hex colour"
+            },
+            "south": {
+              "type": "string",
+              "description": "CSS hex colour"
+            },
+            "west": {
+              "type": "string",
+              "description": "CSS hex colour"
+            }
+          },
+          "required": [
+            "overhead",
+            "north",
+            "east",
+            "south",
+            "west"
+          ],
+          "additionalProperties": false,
+          "description": "Overhead, and each compass point 10° above the horizon: the whole sky for a gradient"
         }
       },
       "required": [
         "at",
         "sun",
-        "squares"
+        "squares",
+        "dome"
       ],
       "additionalProperties": false,
       "description": "The sky's colour in a few directions, simulated from the sun and the latest weather (src/sky.ts)"
