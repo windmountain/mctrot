@@ -23,6 +23,11 @@ in
       PORT = toString port;
       MCTROT_DB = "/var/lib/mctrot/db/recorder.sqlite";
       MCTROT_VERSION = version;
+      # When the schema changes (SCHEMA_VERSION in api/src/schema.ts), the
+      # API moves the old database aside as a .bak and starts empty.
+      # BEFORE GOING LIVE: set to "never", so a schema change refuses to
+      # start instead of setting event data aside.
+      MCTROT_DB_RESET = "allow";
       NODE_ENV = "production";
     };
 

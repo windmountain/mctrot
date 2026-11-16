@@ -349,6 +349,7 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 - [ ] Prepare the route plan (base exported by scripts/export\_route\_plan.py): McDonald's in visiting order, with coordinates, miles to the next stop, and expected arrival and departure times
 - [ ] Pick the event date and the radio start time
 - [ ] Configure start time (`radio.startAt` in the flake)
+- [ ] Before going live, set `MCTROT_DB_RESET = "never"` in `recorder/host/api.nix` and deploy, so a schema change can't set event data aside
 - [ ] Check music licensing for the radio file
 - [x] Create the DigitalOcean Droplet and Volume
 - [x] Add the DNS records at Namecheap
