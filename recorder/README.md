@@ -138,3 +138,52 @@ ssh-keyscan -t ed25519 recorder.mctrot.nyc | cut -d' ' -f2- | ssh-to-age
 # put the result in .sops.yaml as &recorder, then:
 sops updatekeys secrets/recorder.yaml
 ```
+
+## Location (step 4)
+
+My phone runs [Overland](https://github.com/aaronpk/overland-ios), which
+posts batches of GPS points to `POST /ingest`. Points are keyed by the
+phone's timestamp, so retried and late batches never store anything twice.
+
+**Overland settings**
+
+| Setting | Value |
+| --- | --- |
+| Receiver endpoint | `https://api.mctrot.nyc/ingest` |
+| Access token | `sops decrypt --extract '["ingest-token"]' secrets/recorder.yaml` |
+| Points per batch | 10 |
+| Send interval | 30 s |
+
+Overland never shows an error for a wrong token or a down server: it
+keeps the batch and retries. **If its queue count keeps growing, check the
+token and `/health`.** Nothing is lost; the queue uploads once fixed.
+
+**Checking what arrived** (the token guards it: it's my location)
+
+```
+TOKEN=$(sops decrypt --extract '["ingest-token"]' secrets/recorder.yaml)
+curl -s "https://api.mctrot.nyc/debug/points?last=10" -H "Authorization: Bearer $TOKEN"
+ssh root@recorder.mctrot.nyc journalctl -u mctrot-api -f | grep ingest   # stored/duplicates/skipped per batch
+```
+
+## Data: schema changes, wiping, going live
+
+Everything the recorder records lives on the Volume under
+`/var/lib/mctrot`. There are no migrations: the schema is
+`api/src/schema.ts`, and when `SCHEMA_VERSION` changes the API moves the
+old database aside as a dated `.bak` and starts empty.
+
+**Back to fresh out of the box:**
+
+```
+nix run .#wipe
+```
+
+Lists what's on the Volume, asks you to type `wipe`, stops the services
+that use it, empties it, and starts them again. Config, secrets, SSH keys
+and HTTPS certificates are untouched. Overland's queue on the phone isn't:
+anything still waiting there uploads after the wipe.
+
+**Before the event:** set `recorder.live = true` in
+`host/configuration.nix` and deploy. Then `wipe` refuses, and a schema
+change stops the API instead of setting the database aside.
