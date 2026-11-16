@@ -3,7 +3,9 @@ import { latestAttempt } from "./attempts.ts";
 import type { Db } from "./db.ts";
 import type { RoutePlan } from "./plan.ts";
 import { recentPosts } from "./posts.ts";
+import { newYorkDate, sunTimes } from "./sun.ts";
 import { NO_ATTEMPT_WINDOW_MS, track } from "./track.ts";
+import { latestWeather, WEATHER_POINT } from "./weather.ts";
 import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 
 // The /live response: everything the public page needs, in one call. This
@@ -11,6 +13,8 @@ import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 // (`npm run schema`; a test fails when it's stale), and website/src/Live.elm's
 // decoder follows it.
 const clip = z.object({ url: z.string().describe("The clip's .mp4"), posterUrl: z.string().nullable() });
+const msOrNull = (what: string) =>
+  z.number().int().nullable().describe(`${what}, ms since epoch; null if it doesn't happen that day`);
 const ms = (what: string) => z.number().int().describe(`${what}, ms since epoch`);
 
 export const LiveResponse = z
@@ -103,6 +107,40 @@ export const LiveResponse = z
       )
       .describe("The newest posts first; photos, video, voice and DoubleTake pairs once processed"),
   })
+  .extend({
+    weather: z
+      .object({
+        place: z.object({ name: z.string(), lat: z.number(), lon: z.number() }).describe("Where all weather and sun times are for"),
+        observedAt: ms("The reading's own time (Open-Meteo updates every 15 minutes)"),
+        fetchedAt: ms("When the recorder fetched it"),
+        temperatureF: z.number().nullable(),
+        feelsLikeF: z.number().nullable(),
+        humidityPct: z.number().nullable(),
+        precipitationIn: z.number().nullable().describe("In the reading's 15 minutes"),
+        summary: z.string().nullable().describe('From the WMO weather code: "Light rain"'),
+        cloudCoverPct: z.number().nullable(),
+        windMph: z.number().nullable(),
+        gustMph: z.number().nullable(),
+        windFrom: z.string().nullable().describe('Compass point the wind blows from: "NW"'),
+        isDay: z.boolean().nullable(),
+      })
+      .nullable()
+      .describe("The latest weather reading in central Manhattan; null before the first"),
+    sun: z
+      .object({
+        date: z.string().describe("Today in New York, YYYY-MM-DD"),
+        astronomicalDawn: msOrNull("Sun 18° below the horizon, rising"),
+        nauticalDawn: msOrNull("12° below, rising"),
+        civilDawn: msOrNull("6° below, rising"),
+        sunrise: msOrNull("Sunrise"),
+        solarNoon: ms("The sun at its highest"),
+        sunset: msOrNull("Sunset"),
+        civilDusk: msOrNull("6° below, setting"),
+        nauticalDusk: msOrNull("12° below, setting"),
+        astronomicalDusk: msOrNull("18° below, setting"),
+      })
+      .describe("Sun times for today in New York, at the weather's place"),
+  })
   .meta({ title: "McTrot /live response" });
 
 export type Live = z.infer<typeof LiveResponse>;
@@ -131,6 +169,11 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
     track: path,
     visits,
     posts: recentPosts(db, mediaUrl, 50, now),
+    weather: (() => {
+      const w = latestWeather(db);
+      return w ? { place: WEATHER_POINT, ...w } : null;
+    })(),
+    sun: sunTimes(newYorkDate(now), WEATHER_POINT.lat, WEATHER_POINT.lon),
   };
 }
 

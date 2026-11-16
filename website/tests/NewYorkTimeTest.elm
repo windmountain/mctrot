@@ -62,6 +62,10 @@ suite =
             \_ ->
                 ( NewYorkTime.format (utc 2026 11 1 5 59), NewYorkTime.format (utc 2026 11 1 6 0) )
                     |> Expect.equal ( "November 1, 1:59 AM EDT", "November 1, 1:00 AM EST" )
+        , test "clock: just the time, no date or zone" <|
+            \_ ->
+                ( NewYorkTime.clock (utc 2026 11 21 11 50), NewYorkTime.clock (utc 2026 11 21 17 0) )
+                    |> Expect.equal ( "6:50 AM", "12:00 PM" )
         , test "2027: March 14 and November 7" <|
             \_ ->
                 ( NewYorkTime.isDaylight (utc 2027 3 14 7 0), NewYorkTime.isDaylight (utc 2027 11 7 6 0) )

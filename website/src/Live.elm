@@ -51,6 +51,38 @@ type alias LiveResponse =
     , track : List (List ( Float, Float ))
     , visits : List Visit
     , posts : List Post
+    , weather : Maybe Weather
+    , sun : Sun
+    }
+
+
+{-| The latest reading in central Manhattan (Open-Meteo, every 15 minutes).
+-}
+type alias Weather =
+    { place : String
+    , observedAt : Int
+    , temperatureF : Maybe Float
+    , feelsLikeF : Maybe Float
+    , summary : Maybe String
+    , windMph : Maybe Float
+    , gustMph : Maybe Float
+    , windFrom : Maybe String
+    }
+
+
+{-| Today's sun times in New York, ms since epoch. A twilight that doesn't
+happen (never, at this latitude) is Nothing.
+-}
+type alias Sun =
+    { astronomicalDawn : Maybe Int
+    , nauticalDawn : Maybe Int
+    , civilDawn : Maybe Int
+    , sunrise : Maybe Int
+    , solarNoon : Int
+    , sunset : Maybe Int
+    , civilDusk : Maybe Int
+    , nauticalDusk : Maybe Int
+    , astronomicalDusk : Maybe Int
     }
 
 
@@ -124,14 +156,56 @@ type Visit
 
 liveDecoder : Decoder LiveResponse
 liveDecoder =
-    Decode.map7 LiveResponse
-        (Decode.field "serverTs" Decode.int)
-        (Decode.field "position" (Decode.nullable positionDecoder))
-        (Decode.field "attempt" (Decode.nullable attemptDecoder))
-        (Decode.field "stores" (Decode.list storeDecoder))
-        (Decode.field "track" (Decode.list (Decode.list latLonDecoder)))
-        (Decode.field "visits" (Decode.list visitDecoder))
-        (Decode.field "posts" (Decode.list postDecoder))
+    Decode.succeed LiveResponse
+        |> andMap (Decode.field "serverTs" Decode.int)
+        |> andMap (Decode.field "position" (Decode.nullable positionDecoder))
+        |> andMap (Decode.field "attempt" (Decode.nullable attemptDecoder))
+        |> andMap (Decode.field "stores" (Decode.list storeDecoder))
+        |> andMap (Decode.field "track" (Decode.list (Decode.list latLonDecoder)))
+        |> andMap (Decode.field "visits" (Decode.list visitDecoder))
+        |> andMap (Decode.field "posts" (Decode.list postDecoder))
+        |> andMap (Decode.field "weather" (Decode.nullable weatherDecoder))
+        |> andMap (Decode.field "sun" sunDecoder)
+
+
+andMap : Decoder a -> Decoder (a -> b) -> Decoder b
+andMap =
+    Decode.map2 (|>)
+
+
+weatherDecoder : Decoder Weather
+weatherDecoder =
+    let
+        maybe field decoder =
+            Decode.field field (Decode.nullable decoder)
+    in
+    Decode.succeed Weather
+        |> andMap (Decode.at [ "place", "name" ] Decode.string)
+        |> andMap (Decode.field "observedAt" Decode.int)
+        |> andMap (maybe "temperatureF" Decode.float)
+        |> andMap (maybe "feelsLikeF" Decode.float)
+        |> andMap (maybe "summary" Decode.string)
+        |> andMap (maybe "windMph" Decode.float)
+        |> andMap (maybe "gustMph" Decode.float)
+        |> andMap (maybe "windFrom" Decode.string)
+
+
+sunDecoder : Decoder Sun
+sunDecoder =
+    let
+        maybe field =
+            Decode.field field (Decode.nullable Decode.int)
+    in
+    Decode.succeed Sun
+        |> andMap (maybe "astronomicalDawn")
+        |> andMap (maybe "nauticalDawn")
+        |> andMap (maybe "civilDawn")
+        |> andMap (maybe "sunrise")
+        |> andMap (Decode.field "solarNoon" Decode.int)
+        |> andMap (maybe "sunset")
+        |> andMap (maybe "civilDusk")
+        |> andMap (maybe "nauticalDusk")
+        |> andMap (maybe "astronomicalDusk")
 
 
 {-| A point of the track: [lat, lon].
@@ -332,9 +406,97 @@ view model =
         , Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ]
             [ Html.text (status model) ]
         , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
+        , viewWeather model
         , viewMap response
+        , viewSun response
         , viewPosts model
         ]
+
+
+{-| "54°F, clear, feels like 47°F. Wind 9 mph from the NW, gusts 12 mph."
+-}
+viewWeather : Model -> Html Msg
+viewWeather model =
+    case ( Maybe.andThen (.response >> .weather) model.latest, serverNow model ) of
+        ( Just w, Just now ) ->
+            let
+                degrees f =
+                    String.fromInt (round f) ++ "°F"
+
+                mph f =
+                    String.fromInt (round f) ++ " mph"
+
+                first =
+                    [ Maybe.map degrees w.temperatureF
+                    , Maybe.map String.toLower w.summary
+                    , Maybe.map (\f -> "feels like " ++ degrees f) w.feelsLikeF
+                    ]
+                        |> List.filterMap identity
+                        |> String.join ", "
+
+                wind =
+                    case w.windMph of
+                        Just speed ->
+                            "Wind "
+                                ++ mph speed
+                                ++ (w.windFrom |> Maybe.map (\d -> " from the " ++ d) |> Maybe.withDefault "")
+                                ++ (w.gustMph |> Maybe.map (\g -> ", gusts " ++ mph g) |> Maybe.withDefault "")
+                                ++ "."
+
+                        Nothing ->
+                            ""
+            in
+            Html.p [ Attr.class "live-weather" ]
+                [ Html.text (capitalize first ++ ". " ++ wind)
+                , Html.span [ Attr.class "live-weather-when" ]
+                    [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
+                ]
+
+        _ ->
+            Html.text ""
+
+
+capitalize : String -> String
+capitalize text =
+    String.toUpper (String.left 1 text) ++ String.dropLeft 1 text
+
+
+{-| Today's sunrise, sunset and twilights, in New York time.
+-}
+viewSun : Maybe LiveResponse -> Html Msg
+viewSun response =
+    case response of
+        Just { sun } ->
+            let
+                time =
+                    Maybe.map NewYorkTime.clock >> Maybe.withDefault "—"
+
+                row label morning evening =
+                    Html.tr []
+                        [ Html.th [ Attr.scope "row" ] [ Html.text label ]
+                        , Html.td [] [ Html.text (time morning) ]
+                        , Html.td [] [ Html.text (time evening) ]
+                        ]
+            in
+            Html.table [ Attr.class "live-sun" ]
+                [ Html.caption [] [ Html.text ("Today’s sun · solar noon " ++ NewYorkTime.clock sun.solarNoon) ]
+                , Html.thead []
+                    [ Html.tr []
+                        [ Html.td [] []
+                        , Html.th [ Attr.scope "col" ] [ Html.text "Morning" ]
+                        , Html.th [ Attr.scope "col" ] [ Html.text "Evening" ]
+                        ]
+                    ]
+                , Html.tbody []
+                    [ row "Astronomical twilight" sun.astronomicalDawn sun.astronomicalDusk
+                    , row "Nautical twilight" sun.nauticalDawn sun.nauticalDusk
+                    , row "Civil twilight" sun.civilDawn sun.civilDusk
+                    , row "Sunrise, sunset" sun.sunrise sun.sunset
+                    ]
+                ]
+
+        Nothing ->
+            Html.text ""
 
 
 {-| The server's clock now: its time at the last response, plus however

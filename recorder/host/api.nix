@@ -59,7 +59,12 @@ in
   };
   users.groups.mctrot = { };
 
-  recorder.dataServices = [ "mctrot-api.service" "mctrot-worker.service" ];
+  recorder.dataServices = [
+    "mctrot-api.service"
+    "mctrot-worker.service"
+    "mctrot-weather.timer"
+    "mctrot-weather.service"
+  ];
 
   # Caddy serves the media folder (media.mctrot.nyc, below); the group
   # lets it read there while the Volume's folders stay closed to others.
@@ -167,6 +172,49 @@ in
       ProtectControlGroups = true;
       RestrictNamespaces = true;
       LockPersonality = true;
+    };
+  };
+
+  # The weather in central Manhattan, every 10 minutes, from Open-Meteo
+  # (api/src/weather.ts). One fetch per run; a failed one is logged and the
+  # next run tries again.
+  systemd.services.mctrot-weather = {
+    description = "McTrot weather fetch";
+    after = [ "mctrot-api.service" "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig.RequiresMountsFor = "/var/lib/mctrot";
+    environment = {
+      MCTROT_DB = dbPath;
+      NODE_ENV = "production";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${api}/bin/mctrot-weather";
+      User = "mctrot";
+      Group = "mctrot";
+      StateDirectory = stateDirs;
+      StateDirectoryMode = "0750";
+      TimeoutStartSec = 60;
+
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectControlGroups = true;
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+      RestrictNamespaces = true;
+      LockPersonality = true;
+    };
+  };
+
+  systemd.timers.mctrot-weather = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*:0/10"; # :00, :10, :20 …
+      Persistent = true; # catch up once after a reboot or deploy
     };
   };
 

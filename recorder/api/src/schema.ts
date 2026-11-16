@@ -75,6 +75,26 @@ export const SCHEMA = `
     received_at integer not null
   ) strict;
 
+  -- The weather in central Manhattan (src/weather.ts), fetched every 10
+  -- minutes by mctrot-weather. Imperial units, as /live shows them. Open-
+  -- Meteo's current conditions update every 15 minutes, so neighbouring
+  -- rows can repeat a reading (same observed_at).
+  create table weather (
+    fetched_at integer primary key, -- ms since epoch, server clock
+    observed_at integer not null,  -- ms since epoch: the reading's own time
+    temperature_f real,
+    feels_like_f real,
+    humidity_pct real,
+    precipitation_in real,         -- in the reading's 15 minutes
+    weather_code integer,          -- WMO code
+    cloud_cover_pct real,
+    wind_mph real,
+    gust_mph real,
+    wind_from_deg real,
+    is_day integer,
+    raw text not null              -- Open-Meteo's whole response, for later
+  ) strict;
+
   -- Media waiting to be processed: one per uploaded file.
   create table jobs (
     id integer primary key,

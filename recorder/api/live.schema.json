@@ -434,6 +434,264 @@
         "additionalProperties": false
       },
       "description": "The newest posts first; photos, video, voice and DoubleTake pairs once processed"
+    },
+    "weather": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": "number"
+                },
+                "lon": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "name",
+                "lat",
+                "lon"
+              ],
+              "additionalProperties": false,
+              "description": "Where all weather and sun times are for"
+            },
+            "observedAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The reading's own time (Open-Meteo updates every 15 minutes), ms since epoch"
+            },
+            "fetchedAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "When the recorder fetched it, ms since epoch"
+            },
+            "temperatureF": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "feelsLikeF": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "humidityPct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "precipitationIn": {
+              "description": "In the reading's 15 minutes",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "summary": {
+              "description": "From the WMO weather code: \"Light rain\"",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cloudCoverPct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "windMph": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "gustMph": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "windFrom": {
+              "description": "Compass point the wind blows from: \"NW\"",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "isDay": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "place",
+            "observedAt",
+            "fetchedAt",
+            "temperatureF",
+            "feelsLikeF",
+            "humidityPct",
+            "precipitationIn",
+            "summary",
+            "cloudCoverPct",
+            "windMph",
+            "gustMph",
+            "windFrom",
+            "isDay"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The latest weather reading in central Manhattan; null before the first"
+    },
+    "sun": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Today in New York, YYYY-MM-DD"
+        },
+        "astronomicalDawn": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sun 18° below the horizon, rising, ms since epoch; null if it doesn't happen that day"
+        },
+        "nauticalDawn": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "12° below, rising, ms since epoch; null if it doesn't happen that day"
+        },
+        "civilDawn": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "6° below, rising, ms since epoch; null if it doesn't happen that day"
+        },
+        "sunrise": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sunrise, ms since epoch; null if it doesn't happen that day"
+        },
+        "solarNoon": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "The sun at its highest, ms since epoch"
+        },
+        "sunset": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sunset, ms since epoch; null if it doesn't happen that day"
+        },
+        "civilDusk": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "6° below, setting, ms since epoch; null if it doesn't happen that day"
+        },
+        "nauticalDusk": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "12° below, setting, ms since epoch; null if it doesn't happen that day"
+        },
+        "astronomicalDusk": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "18° below, setting, ms since epoch; null if it doesn't happen that day"
+        }
+      },
+      "required": [
+        "date",
+        "astronomicalDawn",
+        "nauticalDawn",
+        "civilDawn",
+        "sunrise",
+        "solarNoon",
+        "sunset",
+        "civilDusk",
+        "nauticalDusk",
+        "astronomicalDusk"
+      ],
+      "additionalProperties": false,
+      "description": "Sun times for today in New York, at the weather's place"
     }
   },
   "required": [
@@ -443,7 +701,9 @@
     "stores",
     "track",
     "visits",
-    "posts"
+    "posts",
+    "weather",
+    "sun"
   ],
   "additionalProperties": false,
   "title": "McTrot /live response"

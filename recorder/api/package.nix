@@ -76,6 +76,9 @@ buildNpmPackage {
     # ffmpeg on PATH, which its unit provides.
     makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-worker \
       --add-flags $out/lib/api/src/worker.ts
+    # The weather fetch (mctrot-weather, run by a timer in host/api.nix).
+    makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-weather \
+      --add-flags $out/lib/api/src/weather.ts
     # The raw tool; on the box, use mctrot-dislocate (host/api.nix).
     makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-dislocate-db \
       --add-flags $out/lib/api/src/dislocate.ts

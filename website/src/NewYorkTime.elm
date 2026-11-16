@@ -1,4 +1,4 @@
-module NewYorkTime exposing (format, isDaylight)
+module NewYorkTime exposing (clock, format, isDaylight)
 
 {-| Times as New York tells them, for every visitor wherever they are:
 "November 21, 5:34 AM EST".
@@ -26,23 +26,19 @@ dayMs =
 format : Int -> String
 format ms =
     let
-        daylight =
-            isDaylight ms
-
-        local =
-            ms
-                - (if daylight then
-                    4 * hourMs
-
-                   else
-                    5 * hourMs
-                  )
-
         { month, day } =
-            civilFromDays (floorDiv local dayMs)
+            civilFromDays (floorDiv (local ms) dayMs)
+    in
+    monthName month ++ " " ++ String.fromInt day ++ ", " ++ clock ms ++ " " ++ zoneName ms
 
+
+{-| Just the time of day in New York: "5:34 AM".
+-}
+clock : Int -> String
+clock ms =
+    let
         minuteOfDay =
-            modBy dayMs local // 60000
+            modBy dayMs (local ms) // 60000
 
         hour24 =
             minuteOfDay // 60
@@ -53,29 +49,38 @@ format ms =
 
             else
                 modBy 12 hour24
-
-        minute =
-            modBy 60 minuteOfDay
     in
-    monthName month
-        ++ " "
-        ++ String.fromInt day
-        ++ ", "
-        ++ String.fromInt hour12
+    String.fromInt hour12
         ++ ":"
-        ++ String.padLeft 2 '0' (String.fromInt minute)
+        ++ String.padLeft 2 '0' (String.fromInt (modBy 60 minuteOfDay))
         ++ (if hour24 < 12 then
-                " AM "
+                " AM"
 
             else
-                " PM "
+                " PM"
            )
-        ++ (if daylight then
-                "EDT"
 
-            else
-                "EST"
-           )
+
+zoneName : Int -> String
+zoneName ms =
+    if isDaylight ms then
+        "EDT"
+
+    else
+        "EST"
+
+
+{-| New York's wall-clock time, as ms since a local "epoch".
+-}
+local : Int -> Int
+local ms =
+    ms
+        - (if isDaylight ms then
+            4 * hourMs
+
+           else
+            5 * hourMs
+          )
 
 
 {-| Whether New York is on daylight time at this moment.

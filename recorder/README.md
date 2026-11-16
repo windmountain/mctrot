@@ -330,3 +330,33 @@ I can upload. `api/test/fixtures/tiled.heic` (20 tiles) keeps it tested.
 **Secrets:** the session cookie is signed with `session-secret` in
 `secrets/recorder.yaml`; passkeys are stored in the database (so `wipe`
 removes them: set up Face ID again after a wipe).
+
+### DoubleTake pairs
+
+DoubleTake films the back camera (A) and front camera (B) at once and saves
+two videos, `…_A.MOV` and `…_B.MOV`. Upload both, in either order; the
+worker pairs any two videos with the same time and length (within 0.1 s)
+into one post (`api/src/pairs.ts`), keeping only the A/B letter from the
+filenames. It makes two cuts that switch cameras halfway, `ab.mp4` and
+`ba.mp4`. A pair starts as AB; switch it on the upload page. Phones see the
+cut; wide screens see both clips side by side in one player
+(`website/js/pair-player.js`). A DoubleTake clip waits up to 10 minutes for
+its partner before showing on its own.
+
+## Weather and sun (step 12)
+
+`mctrot-weather` fetches the current weather for central Manhattan
+(40.7831, −73.9712, Central Park near 81st St) from
+[Open-Meteo](https://open-meteo.com) every 10 minutes and saves each
+reading in the `weather` table (`api/src/weather.ts`). No account or key.
+`/live` shows the latest.
+
+Sunrise, sunset, solar noon and civil, nautical and astronomical twilight
+for today in New York are calculated from the date and that point
+(`api/src/sun.ts`, NOAA's formulas; within a minute of published tables).
+
+```sh
+ssh root@recorder.mctrot.nyc systemctl list-timers mctrot-weather   # next run
+ssh root@recorder.mctrot.nyc journalctl -u mctrot-weather -n 5      # last fetches
+curl -s https://api.mctrot.nyc/live | jq '.weather, .sun'
+```
