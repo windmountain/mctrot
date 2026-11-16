@@ -373,3 +373,28 @@ by cloud cover, plus Manhattan's glow at night, shown as an eye adapted to
 the light would see it. Worked out at most once a minute. A plausible sky,
 not a photograph: deep twilight comes out darker than it really is, and
 broken cloud is averaged.
+
+## Radio (step 7)
+
+`https://radio.mctrot.nyc/live.mp3` is a real internet radio station: open
+it in VLC, Apple Music ("Open Stream URL") or any radio app, or press play
+on `/live`. For now it plays a 30-second 440 Hz test tone on loop, titled
+"McTrot - Test tone" (`station/test-loop.liq`); step 8 replaces it with
+the scheduled show.
+
+- **Liquidsoap** (`mctrot-radio`) loops the tone, encodes 128 kbps stereo
+  MP3 and sends it to Icecast. It takes about 20 seconds to start (it
+  type-checks its whole library on one CPU), so the stream is down that
+  long after a deploy that restarts it.
+- **Icecast** (`icecast`) serves listeners, on 127.0.0.1 only. Caddy
+  passes on `/live.mp3` and nothing else, so Icecast's admin pages aren't
+  reachable from outside. Not listed in any public directory.
+- Its passwords (`icecast-source`, `icecast-admin`) are sops secrets,
+  filled into Icecast's config when the box starts (sops-nix templates),
+  never in the Nix store.
+
+```sh
+curl -sI https://radio.mctrot.nyc/live.mp3 | head -5     # 200, audio/mpeg
+ssh root@recorder.mctrot.nyc journalctl -u mctrot-radio -n 20 --no-pager
+ssh root@recorder.mctrot.nyc 'curl -s localhost:8000/status-json.xsl'   # listeners, title
+```

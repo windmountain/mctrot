@@ -1,0 +1,131 @@
+{ config, lib, pkgs, ... }:
+
+# The radio: Liquidsoap makes the stream and sends it to Icecast, which
+# serves it to listeners at https://radio.mctrot.nyc/live.mp3 (through
+# Caddy). Both listen only on 127.0.0.1; Caddy passes on the stream and
+# nothing else, so Icecast's admin pages aren't reachable from outside.
+#
+# Step 7: a 30-second test tone on loop (station/test-loop.liq).
+let
+  port = 8000;
+
+  # The tone, made at build time: 440 Hz at −18 dBFS (ffmpeg's default
+  # level, the usual broadcast alignment tone), faded in and out so each
+  # loop starts cleanly.
+  tone = pkgs.runCommand "mctrot-test-tone.wav" { nativeBuildInputs = [ pkgs.ffmpeg-headless ]; } ''
+    ffmpeg -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:sample_rate=44100:duration=30" \
+      -af "afade=t=in:d=0.5,afade=t=out:st=29.5:d=0.5" -ac 2 $out
+  '';
+
+  script = pkgs.replaceVars ../station/test-loop.liq {
+    inherit tone;
+    port = toString port;
+  };
+
+  # Icecast's settings, with the passwords filled in by sops-nix when the
+  # box starts (see sops.templates below), so they never sit in the store.
+  icecastXml = ''
+    <icecast>
+      <location>New York</location>
+      <admin>radio@mctrot.nyc</admin>
+      <hostname>radio.mctrot.nyc</hostname>
+      <limits>
+        <clients>500</clients>
+        <sources>2</sources>
+        <queue-size>524288</queue-size>
+        <burst-size>65536</burst-size>
+      </limits>
+      <authentication>
+        <source-password>${config.sops.placeholder.icecast-source}</source-password>
+        <admin-user>admin</admin-user>
+        <admin-password>${config.sops.placeholder.icecast-admin}</admin-password>
+      </authentication>
+      <listen-socket>
+        <port>${toString port}</port>
+        <bind-address>127.0.0.1</bind-address>
+      </listen-socket>
+      <mount type="normal">
+        <mount-name>/live.mp3</mount-name>
+        <public>0</public>
+      </mount>
+      <fileserve>1</fileserve>
+      <paths>
+        <logdir>/var/log/icecast</logdir>
+        <webroot>${pkgs.icecast}/share/icecast/web</webroot>
+        <adminroot>${pkgs.icecast}/share/icecast/admin</adminroot>
+      </paths>
+      <logging>
+        <accesslog>-</accesslog>
+        <errorlog>-</errorlog>
+        <loglevel>2</loglevel>
+      </logging>
+      <security>
+        <chroot>0</chroot>
+      </security>
+    </icecast>
+  '';
+
+  hardening = {
+    NoNewPrivileges = true;
+    ProtectSystem = "strict";
+    ProtectHome = true;
+    PrivateTmp = true;
+    PrivateDevices = true;
+    ProtectKernelTunables = true;
+    ProtectKernelModules = true;
+    ProtectControlGroups = true;
+    RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+    RestrictNamespaces = true;
+    LockPersonality = true;
+  };
+in
+{
+  sops.secrets.icecast-source = { };
+  sops.secrets.icecast-admin = { };
+  sops.templates."icecast.xml".content = icecastXml;
+
+  systemd.services.icecast = {
+    description = "Icecast: serves the McTrot radio stream";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    restartTriggers = [ config.sops.templates."icecast.xml".content ];
+    serviceConfig = hardening // {
+      DynamicUser = true;
+      LoadCredential = [ "icecast.xml:${config.sops.templates."icecast.xml".path}" ];
+      # %d: this unit's credentials directory.
+      ExecStart = "${pkgs.icecast}/bin/icecast -c %d/icecast.xml";
+      LogsDirectory = "icecast";
+      Restart = "always";
+      RestartSec = 2;
+    };
+  };
+
+  systemd.services.mctrot-radio = {
+    description = "McTrot radio: Liquidsoap, streaming to Icecast";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "icecast.service" ];
+    wants = [ "icecast.service" ];
+    serviceConfig = hardening // {
+      DynamicUser = true;
+      LoadCredential = [ "icecast-source:${config.sops.secrets.icecast-source.path}" ];
+      ExecStart = "${pkgs.liquidsoap}/bin/liquidsoap ${script}";
+      Restart = "always";
+      RestartSec = 2;
+      # Ahead of everything else for the CPU: the stream must never stutter.
+      Nice = -5;
+    };
+  };
+
+  # Only the stream; anything else gets a short note.
+  services.caddy.virtualHosts."radio.mctrot.nyc".extraConfig = ''
+    handle /live.mp3 {
+      reverse_proxy 127.0.0.1:${toString port} {
+        # Send audio on as it arrives, not in buffered chunks.
+        flush_interval -1
+      }
+    }
+    handle {
+      respond "McTrot radio: https://radio.mctrot.nyc/live.mp3" 404
+    }
+  '';
+}

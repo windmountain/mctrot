@@ -17,6 +17,7 @@ import Json.Decode as Decode exposing (Decoder)
 import MctrotMapData
 import NewYorkTime
 import Projection
+import Radio
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Task
@@ -36,7 +37,9 @@ main =
 {-| `api`: the recorder's base URL, e.g. "https://api.mctrot.nyc".
 -}
 type alias Flags =
-    { api : String }
+    { api : String
+    , radio : Radio.Flags
+    }
 
 
 
@@ -344,6 +347,7 @@ type alias Model =
     , latest : Maybe Fetched
     , failing : Bool
     , now : Maybe Time.Posix
+    , radio : Radio.Model
     }
 
 
@@ -359,7 +363,7 @@ type alias Fetched =
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { api = flags.api, latest = Nothing, failing = False, now = Nothing }
+    ( { api = flags.api, latest = Nothing, failing = False, now = Nothing, radio = Radio.init flags.radio }
     , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now ]
     )
 
@@ -373,11 +377,16 @@ type Msg
     | Got (Result Http.Error LiveResponse)
     | Received LiveResponse Time.Posix
     | Tick Time.Posix
+    | RadioMsg Radio.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        RadioMsg radioMsg ->
+            Radio.update radioMsg model.radio
+                |> Tuple.mapBoth (\radio -> { model | radio = radio }) (Cmd.map RadioMsg)
+
         Poll ->
             ( model, fetch model.api )
 
@@ -403,9 +412,10 @@ fetch api =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
+subscriptions model =
     Sub.batch
-        [ -- Overland sends every 30 s, so polling faster shows nothing new.
+        [ Sub.map RadioMsg (Radio.subscriptions model.radio)
+        , -- Overland sends every 30 s, so polling faster shows nothing new.
           Time.every 15000 (\_ -> Poll)
         , Time.every 1000 Tick
         ]
@@ -422,7 +432,8 @@ view model =
             Maybe.map .response model.latest
     in
     Html.div [ Attr.class "live" ]
-        [ Html.p [ Attr.class "live-home" ] [ Html.a [ Attr.href "/" ] [ Html.text "McTrot" ] ]
+        [ Html.map RadioMsg (Radio.view model.radio)
+        , Html.p [ Attr.class "live-home" ] [ Html.a [ Attr.href "/" ] [ Html.text "McTrot" ] ]
         , Html.h1 [] [ Html.text "Live" ]
         , Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ]
             [ Html.text (status model) ]

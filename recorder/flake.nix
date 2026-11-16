@@ -127,6 +127,7 @@
           ./host/secrets.nix
           ./host/caddy.nix
           ./host/api.nix
+          ./host/radio.nix
           ./host/vm.nix
         ];
       };

@@ -20,6 +20,28 @@
     .live h1 { margin: 0.25rem 0 0; }
     .live-status { margin: 0.25rem 0 0; min-height: 1.6em; }
     .live-visits { margin: 0 0 1rem; min-height: 1.6em; }
+    /* The radio (src/Radio.elm): top right; pinned there on a wide screen. */
+    .radio { position: absolute; top: 12px; right: 16px; z-index: 2; font-size: 0.85em; max-width: calc(100vw - 32px); }
+    .radio-bar { display: flex; align-items: center; gap: 8px; background: #111; color: #fff; border-radius: 999px; padding: 4px 6px 4px 4px; }
+    .radio button { font: inherit; border: 0; cursor: pointer; }
+    .radio-play { width: 2rem; height: 2rem; border-radius: 50%; background: #FFD100; color: #111; font-size: 0.85rem; line-height: 1; }
+    .radio-info { display: flex; flex-direction: column; line-height: 1.15; min-width: 4.5rem; max-width: 11rem; }
+    .radio-name { font-weight: bold; }
+    .radio-status { opacity: 0.8; font-size: 0.9em; overflow-wrap: anywhere; }
+    .radio-bar .radio-problem { color: #ffb3a7; opacity: 1; }
+    .radio-volume { width: 5rem; accent-color: #FFD100; }
+    .radio-station-button { background: none; color: #fff; text-decoration: underline; padding: 4px 6px; }
+    .radio button:focus-visible, .radio input:focus-visible { outline: 2px solid #FFD100; outline-offset: 2px; }
+    .radio-station { position: absolute; right: 0; top: calc(100% + 6px); width: min(20rem, calc(100vw - 32px)); background: #fff; color: #111;
+      border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15); }
+    .radio-station label { display: block; font-weight: bold; margin-bottom: 4px; }
+    .radio-station input { box-sizing: border-box; width: 100%; font: inherit; padding: 6px 8px; border: 1px solid #bbb; border-radius: 6px; }
+    .radio-station .radio-problem { color: #b42318; margin: 6px 0 0; }
+    .radio-hint { margin: 8px 0; opacity: 0.75; font-size: 0.95em; }
+    .radio-station-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .radio-station-actions button { background: #eee; padding: 6px 10px; border-radius: 6px; }
+    .radio-station-actions button[type=submit] { background: #111; color: #fff; }
+    @media (min-width: 64rem) { .radio { position: fixed; } }
     .live-weather { margin: 0 0 1rem; }
     .live-weather-when { opacity: 0.7; }
     /* The sky tiles (src/Live.elm, viewSky): a row of five on a phone; on
@@ -75,11 +97,92 @@
   <script src="js/pair-player.js"></script>
   <script src="js/live.js"></script>
   <script>
+    var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.
-    var api = new URLSearchParams(window.location.search).get("api");
-    Elm.Live.init({
+    var api = params.get("api");
+
+    // --- The radio (src/Radio.elm draws it; this plays it) ---------------
+    // The station: ?radio=<url>, or what this browser saved, or McTrot's.
+    var RADIO_DEFAULT = "https://radio.mctrot.nyc/live.mp3";
+    var RADIO_KEY = "mctrot-radio-url";
+    var savedRadio = null;
+    try { savedRadio = localStorage.getItem(RADIO_KEY); } catch (e) {}
+    var radioParam = params.get("radio");
+    var audio = new Audio();
+    audio.preload = "none";
+    // iPhones and iPads ignore a page setting the volume.
+    audio.volume = 0.5;
+    var volumeAdjustable = audio.volume === 0.5;
+    audio.volume = 1;
+
+    var app = Elm.Live.init({
       node: document.getElementById("live"),
-      flags: { api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc" }
+      flags: {
+        api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc",
+        radio: {
+          url: /^https?:\/\//.test(radioParam || "") ? radioParam : savedRadio || RADIO_DEFAULT,
+          defaultUrl: RADIO_DEFAULT,
+          volumeAdjustable: volumeAdjustable
+        }
+      }
+    });
+
+    var send = function (event) { app.ports.radioIn.send(event); };
+    var stopping = false;
+    // Browsers give the same error for a stream they can't reach and one
+    // they can't play, so a failed start asks the address directly: no
+    // answer at all means unreachable. (The answer itself can't be read
+    // from another site, but that it came is enough.)
+    var problem = function (url) {
+      var e = audio.error;
+      if (e && e.code === 3) return Promise.resolve("The stream broke off.");
+      var stop = new AbortController();
+      setTimeout(function () { stop.abort(); }, 8000);
+      return fetch(url, { mode: "no-cors", signal: stop.signal })
+        .then(function () { stop.abort(); return "That isn’t audio this browser can play (a playlist?)."; })
+        .catch(function () { return "Can’t reach the stream."; });
+    };
+    var fail = function () {
+      var url = audio.getAttribute("src");
+      if (!url) return;
+      problem(url).then(function (message) {
+        // Only if that's still the station playing.
+        if (!stopping && audio.getAttribute("src") === url) send({ event: "error", message: message });
+      });
+    };
+    audio.addEventListener("playing", function () { send({ event: "playing" }); });
+    audio.addEventListener("waiting", function () { send({ event: "waiting" }); });
+    audio.addEventListener("pause", function () { if (!stopping) send({ event: "paused" }); });
+    audio.addEventListener("ended", function () { send({ event: "ended" }); });
+    audio.addEventListener("error", function () { if (!stopping) fail(); });
+    if ("mediaSession" in navigator && window.MediaMetadata) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: "Radio", artist: "McTrot" });
+    }
+
+    app.ports.radioOut.subscribe(function (cmd) {
+      if (cmd.command === "play") {
+        stopping = false;
+        audio.src = cmd.url;
+        audio.volume = cmd.volume;
+        audio.play().catch(function (err) {
+          if (err.name === "NotAllowedError") send({ event: "error", message: "The browser wants a tap on ▶ first." });
+          else if (err.name !== "AbortError" && !audio.error) fail();
+        });
+      } else if (cmd.command === "stop") {
+        // Drop the connection, so playing again joins the stream live
+        // rather than resuming from a buffer.
+        stopping = true;
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+      } else if (cmd.command === "volume") {
+        audio.volume = cmd.volume;
+      } else if (cmd.command === "save") {
+        try {
+          if (cmd.url === null) localStorage.removeItem(RADIO_KEY);
+          else localStorage.setItem(RADIO_KEY, cmd.url);
+        } catch (e) {}
+      }
     });
   </script>
 </body>
