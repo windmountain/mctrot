@@ -243,7 +243,8 @@
               "text",
               "photo",
               "video",
-              "voice"
+              "voice",
+              "pair"
             ]
           },
           "text": {
@@ -260,7 +261,7 @@
                 "properties": {
                   "url": {
                     "type": "string",
-                    "description": "Photo: full size; video: .mp4; voice: .m4a"
+                    "description": "Photo: full size; video: .mp4; voice: .m4a; pair: the cut in its order"
                   },
                   "thumbUrl": {
                     "description": "Photo: about 400 px",
@@ -329,6 +330,73 @@
             ],
             "description": "Null for text posts"
           },
+          "pair": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "string",
+                    "enum": [
+                      "AB",
+                      "BA"
+                    ],
+                    "description": "Which camera comes first"
+                  },
+                  "a": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "description": "The clip's .mp4"
+                      },
+                      "posterUrl": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "url",
+                      "posterUrl"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "b": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "description": "The clip's .mp4"
+                      },
+                      "posterUrl": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "url",
+                      "posterUrl"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "order",
+                  "a",
+                  "b"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A DoubleTake pair's two clips (A and B cameras), for a side-by-side player; null otherwise"
+          },
           "at": {
             "anyOf": [
               {
@@ -360,11 +428,12 @@
           "type",
           "text",
           "media",
+          "pair",
           "at"
         ],
         "additionalProperties": false
       },
-      "description": "The newest posts first; photos, video and voice once processed"
+      "description": "The newest posts first; photos, video, voice and DoubleTake pairs once processed"
     }
   },
   "required": [

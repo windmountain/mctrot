@@ -10,12 +10,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Db } from "./db.ts";
 import { queueUpload } from "./jobs.ts";
 import { mediaKind } from "./media.ts";
+import { letterFromFilename } from "./pairs.ts";
 
 // Big enough for a few minutes of 1080p30 video; the page warns sooner.
 export const MAX_UPLOAD_BYTES = 1024 ** 3; // 1 GiB
 
 // Each upload says which post it is and when it was made, as tus metadata.
-type Meta = { postId: string; ts: number; contentType: string };
+// The filename only matters for DoubleTake's _A/_B (src/pairs.ts); it isn't kept.
+type Meta = { postId: string; ts: number; contentType: string; filename: string | null };
 
 function readMeta(metadata: Record<string, string | null> | undefined): Meta | string {
   const postId = metadata?.postId ?? "";
@@ -24,7 +26,7 @@ function readMeta(metadata: Record<string, string | null> | undefined): Meta | s
   if (!/^[A-Za-z0-9-]{1,100}$/.test(postId)) return "missing or bad postId";
   if (!Number.isInteger(ts) || ts <= 0) return "missing or bad ts";
   if (!mediaKind(contentType)) return `can't post a ${contentType || "file of unknown type"}`;
-  return { postId, ts, contentType };
+  return { postId, ts, contentType, filename: metadata?.filename ?? null };
 }
 
 export function registerUploads(
@@ -50,7 +52,7 @@ export function registerUploads(
       if (typeof meta === "string") throw { status_code: 400, body: meta };
       queueUpload(
         db,
-        { id: meta.postId, ts: meta.ts, kind: mediaKind(meta.contentType)! },
+        { id: meta.postId, ts: meta.ts, kind: mediaKind(meta.contentType)!, letter: letterFromFilename(meta.filename) },
         { path: join(uploadDir, upload.id), contentType: meta.contentType },
       );
       return {};

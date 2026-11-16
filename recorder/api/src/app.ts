@@ -63,7 +63,11 @@ const PostBody = z.object({
   text: z.string().trim().min(1).max(MAX_TEXT),
 });
 
-const EditBody = z.object({ text: z.string().trim().min(1).max(MAX_TEXT) });
+// A text post's new text, or a DoubleTake pair's new order.
+const EditBody = z.union([
+  z.object({ text: z.string().trim().min(1).max(MAX_TEXT) }).strict(),
+  z.object({ order: z.enum(["AB", "BA"]) }).strict(),
+]);
 
 // The upload page's files, and the WebAuthn browser library it loads.
 const webauthnBrowser = new URL(
@@ -196,11 +200,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (!writer(req, reply)) return reply;
     const { id } = req.params as { id: string };
     const body = EditBody.safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: `expected {text: 1 to ${MAX_TEXT} characters}` });
-    const result = editPost(db, id, body.data.text);
+    if (!body.success) {
+      return reply
+        .code(400)
+        .send({ error: `expected {text: 1 to ${MAX_TEXT} characters} or {order: "AB" or "BA"}` });
+    }
+    const result = editPost(db, id, body.data);
     if (result === "missing") return reply.code(404).send({ error: "no such post" });
-    if (result === "not-text") return reply.code(400).send({ error: "only text posts can be edited" });
-    return { id, text: body.data.text };
+    if (result === "wrong-type") {
+      return reply
+        .code(400)
+        .send({ error: "text is for text posts, and order for DoubleTake pairs; nothing else can be edited" });
+    }
+    return { id, ...body.data };
   });
 
   registerUploads(app, db, deps.uploadDir, writer);

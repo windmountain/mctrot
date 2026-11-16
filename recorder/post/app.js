@@ -262,7 +262,12 @@ document.addEventListener("visibilitychange", () => {
     refreshSent();
   }
 });
-setInterval(() => flush(), 5_000);
+setInterval(() => {
+  flush();
+  // The server can still be working on something already sent: a
+  // DoubleTake pair is made after both its clips have arrived.
+  if (sent?.some((i) => i.status === "processing" || i.waitingForPair)) refreshSent();
+}, 5_000);
 
 // --- Rendering ---------------------------------------------------------------
 
@@ -499,11 +504,13 @@ async function refreshSent() {
   renderSent();
 }
 
-const MEDIA_NAME = { photo: "Photo", video: "Video", voice: "Voice note" };
+const MEDIA_NAME = { photo: "Photo", video: "Video", voice: "Voice note", pair: "DoubleTake" };
 
 function sentWhat(item) {
   if (item.kind === "checkin") return "📍 Check-in";
   if (item.type === "text") return `💬 ${item.text}`;
+  // DoubleTake's two clips, paired by the server: shown as one, in its order.
+  if (item.type === "pair") return `🎬 DoubleTake · ${item.order === "BA" ? "B then A" : "A then B"}`;
   return `${MEDIA_ICON[item.type]} ${MEDIA_NAME[item.type]}`;
 }
 
@@ -531,12 +538,21 @@ function renderSent() {
         note.className = "small";
         note.textContent = item.status === "failed" ? `Failed: ${item.error ?? "processing failed"}` : "Processing on server";
         what.append(note);
+      } else if (item.waitingForPair) {
+        const note = document.createElement("div");
+        note.className = "small";
+        note.textContent = "Waiting for its other DoubleTake clip";
+        what.append(note);
       }
       const when = document.createElement("span");
       when.className = "when";
       when.textContent = dateTimeText(item.ts);
       const buttons = [];
       if (item.kind === "post" && item.type === "text") buttons.push(button("Edit", () => startEditing(item)));
+      // A pair's order is only ever set here; both cuts are already made.
+      if (item.kind === "post" && item.type === "pair" && item.status === "ready") {
+        buttons.push(button(item.order === "BA" ? "Make it A then B" : "Make it B then A", () => swapOrder(item)));
+      }
       buttons.push(
         button("Delete", async () => {
           if (await deleteOnServer(item)) {
@@ -597,6 +613,28 @@ function stopEditing() {
   $("send").textContent = "Post";
   $("composer").hidden = true;
   renderSent();
+}
+
+async function swapOrder(item) {
+  const order = item.order === "BA" ? "AB" : "BA";
+  let res;
+  try {
+    res = await api(`/posts/${encodeURIComponent(item.id)}`, { order }, "PATCH");
+  } catch {
+    flash("Can’t change the order without signal. Try again when you have some.");
+    return;
+  }
+  if (res.status === 401) {
+    showSignIn("Sign in again to change the order.");
+    return;
+  }
+  if (!res.ok) {
+    flash(`Couldn’t change the order: ${(await res.json().catch(() => ({}))).error ?? res.status}`);
+    return;
+  }
+  flash(order === "BA" ? "Now B then A" : "Now A then B");
+  // The thumbnail follows the order: reload the list.
+  refreshSent();
 }
 
 // Edits go straight to the server (not the outbox): they need signal.

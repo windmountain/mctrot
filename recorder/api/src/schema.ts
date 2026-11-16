@@ -2,7 +2,7 @@
 // has to live for one event, so when this changes, bump SCHEMA_VERSION and
 // the API starts over with an empty database (see openDb). Once
 // `recorder.live` is on (host/configuration.nix), it refuses to instead.
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SCHEMA = `
   -- Every location fix from the phone, keyed by the phone's timestamp so
@@ -48,10 +48,15 @@ export const SCHEMA = `
   -- from the GPS track, like visits. A photo, video or voice post is
   -- "processing" until the worker (src/worker.ts) has made its files,
   -- under the media folder in a folder named for the post's id.
+  --
+  -- DoubleTake records the back and front cameras at once, as two videos
+  -- named …_A.MOV and …_B.MOV with the same time and length. The worker
+  -- pairs them (src/pairs.ts) into a 'pair' post; the two clips stay as
+  -- video posts, paired_into the pair, and are no longer shown on their own.
   create table posts (
     id text primary key,
     ts integer not null,           -- ms since epoch, phone clock (when made)
-    type text not null check (type in ('text', 'photo', 'video', 'voice')),
+    type text not null check (type in ('text', 'photo', 'video', 'voice', 'pair')),
     text text,                     -- the text of a text post
     status text not null default 'ready' check (status in ('processing', 'ready', 'failed')),
     error text,                    -- why processing failed
@@ -61,6 +66,11 @@ export const SCHEMA = `
     width integer,
     height integer,
     duration_ms integer,           -- video and voice
+    letter text check (letter in ('A', 'B')), -- a video: DoubleTake's camera, from the filename
+    paired_into text,              -- a video: the pair post it's part of
+    pair_order text check (pair_order in ('AB', 'BA')), -- a pair: which clip comes first
+    alt_media_path text,           -- a pair: the other order's cut (media_path is AB's)
+    alt_poster_path text,          -- a pair: its poster
     hidden integer not null default 0,
     received_at integer not null
   ) strict;
@@ -69,7 +79,7 @@ export const SCHEMA = `
   create table jobs (
     id integer primary key,
     post_id text not null unique references posts (id),
-    upload_path text not null,     -- the finished upload (tus file store)
+    upload_path text not null,     -- the finished upload (tus file store); '' for a pair
     content_type text not null,
     status text not null default 'queued' check (status in ('queued', 'running', 'done', 'failed')),
     attempts integer not null default 0,

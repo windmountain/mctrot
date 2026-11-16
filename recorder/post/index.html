@@ -47,9 +47,9 @@
     .row .grow { flex: 1; color: var(--muted); font-size: 0.9rem; }
     #flash { min-height: 1.3em; font-weight: 600; margin: 8px 0 0; }
     ul { list-style: none; padding: 0; margin: 0; }
-    li { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid #eee; align-items: baseline; }
+    li { display: flex; flex-wrap: wrap; gap: 6px 10px; padding: 10px 0; border-top: 1px solid #eee; align-items: baseline; }
     li:first-child { border-top: 0; }
-    li .what { flex: 1; overflow-wrap: anywhere; }
+    li .what { flex: 1 1 9rem; overflow-wrap: anywhere; }
     li .when { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
     li .state { font-size: 0.85rem; white-space: nowrap; }
     li .state.sent { color: var(--ok); }
@@ -61,7 +61,7 @@
     li .progress > div { height: 100%; background: var(--ink); }
     .small { font-size: 0.9rem; color: var(--muted); }
     .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 4px; }
-    li .actions { white-space: nowrap; }
+    li .actions { white-space: nowrap; margin-left: auto; }
     li .actions button.danger { color: var(--bad); }
     li.editing { background: #fffbe6; }
     a { color: inherit; }

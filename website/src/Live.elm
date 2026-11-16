@@ -71,6 +71,25 @@ type PostContent
       -- the .mp4, its poster frame
     | Video String (Maybe String)
     | Voice String
+    | Pair PairMedia
+
+
+{-| A DoubleTake pair: the back (A) and front (B) cameras, filmed at once.
+`cut` is one video that switches cameras halfway, in the pair's order;
+`first` and `second` are the two clips in that order, for the
+side-by-side player on wide screens (js/pair-player.js).
+-}
+type alias PairMedia =
+    { cut : Clip
+    , first : Clip
+    , second : Clip
+    }
+
+
+type alias Clip =
+    { url : String
+    , posterUrl : Maybe String
+    }
 
 
 type alias Position =
@@ -152,8 +171,28 @@ postContentDecoder postType =
         "voice" ->
             Decode.map Voice (media "url" Decode.string)
 
+        "pair" ->
+            Decode.map3
+                (\cut order ( a, b ) ->
+                    if order == "BA" then
+                        Pair { cut = cut, first = b, second = a }
+
+                    else
+                        Pair { cut = cut, first = a, second = b }
+                )
+                (Decode.map2 Clip (media "url" Decode.string) (optional "posterUrl"))
+                (Decode.at [ "pair", "order" ] Decode.string)
+                (Decode.map2 Tuple.pair (Decode.at [ "pair", "a" ] clipDecoder) (Decode.at [ "pair", "b" ] clipDecoder))
+
         other ->
             Decode.fail ("unknown post type " ++ other)
+
+
+clipDecoder : Decoder Clip
+clipDecoder =
+    Decode.map2 Clip
+        (Decode.field "url" Decode.string)
+        (Decode.field "posterUrl" (Decode.nullable Decode.string))
 
 
 attemptDecoder : Decoder Attempt
@@ -614,6 +653,22 @@ viewPostContent content =
                  ]
                     ++ (posterUrl |> Maybe.map (\p -> [ Attr.attribute "poster" p ]) |> Maybe.withDefault [])
                 )
+                []
+
+        Pair { cut, first, second } ->
+            let
+                poster name clip =
+                    clip.posterUrl |> Maybe.map (Attr.attribute name) |> Maybe.withDefault (Attr.class "")
+            in
+            Html.node "mctrot-pair"
+                [ Attr.class "live-post-pair"
+                , Attr.attribute "cut" cut.url
+                , poster "cut-poster" cut
+                , Attr.attribute "first" first.url
+                , poster "first-poster" first
+                , Attr.attribute "second" second.url
+                , poster "second-poster" second
+                ]
                 []
 
         Voice url ->

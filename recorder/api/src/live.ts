@@ -10,6 +10,7 @@ import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 // zod schema is the contract. api/live.schema.json is generated from it
 // (`npm run schema`; a test fails when it's stale), and website/src/Live.elm's
 // decoder follows it.
+const clip = z.object({ url: z.string().describe("The clip's .mp4"), posterUrl: z.string().nullable() });
 const ms = (what: string) => z.number().int().describe(`${what}, ms since epoch`);
 
 export const LiveResponse = z
@@ -73,11 +74,11 @@ export const LiveResponse = z
         z.object({
           id: z.string(),
           ts: ms("When I made it"),
-          type: z.enum(["text", "photo", "video", "voice"]),
+          type: z.enum(["text", "photo", "video", "voice", "pair"]),
           text: z.string().nullable().describe("A text post's text"),
           media: z
             .object({
-              url: z.string().describe("Photo: full size; video: .mp4; voice: .m4a"),
+              url: z.string().describe("Photo: full size; video: .mp4; voice: .m4a; pair: the cut in its order"),
               thumbUrl: z.string().nullable().describe("Photo: about 400 px"),
               posterUrl: z.string().nullable().describe("Video: a frame"),
               width: z.number().int().nullable(),
@@ -86,13 +87,21 @@ export const LiveResponse = z
             })
             .nullable()
             .describe("Null for text posts"),
+          pair: z
+            .object({
+              order: z.enum(["AB", "BA"]).describe("Which camera comes first"),
+              a: clip,
+              b: clip,
+            })
+            .nullable()
+            .describe("A DoubleTake pair's two clips (A and B cameras), for a side-by-side player; null otherwise"),
           at: z
             .object({ lat: z.number(), lon: z.number() })
             .nullable()
             .describe("Where I was, from the GPS track; null when unknown"),
         }),
       )
-      .describe("The newest posts first; photos, video and voice once processed"),
+      .describe("The newest posts first; photos, video, voice and DoubleTake pairs once processed"),
   })
   .meta({ title: "McTrot /live response" });
 
@@ -121,7 +130,7 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
     stores,
     track: path,
     visits,
-    posts: recentPosts(db, mediaUrl),
+    posts: recentPosts(db, mediaUrl, 50, now),
   };
 }
 

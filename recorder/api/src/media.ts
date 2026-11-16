@@ -159,3 +159,62 @@ async function voice(input: string, dir: string, postId: string): Promise<Proces
     durationMs: durationMs(await probe(out)),
   };
 }
+
+// A DoubleTake pair's two cuts, for phones: AB plays A's first half, then
+// B's second half; BA the other way round. Made from the clips' processed
+// videos (same size, 720p), both ready in the pair's folder so changing
+// the order on the upload page is instant. The sound is A's throughout:
+// both cameras record the same microphone, and one unbroken track can't
+// click at the cut.
+export async function pairCuts(
+  aVideo: string,
+  bVideo: string,
+  mediaDir: string,
+  pairId: string,
+): Promise<Processed & { altMediaPath: string; altPosterPath: string }> {
+  const dir = join(mediaDir, pairId);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  try {
+    const [pa, pb] = await Promise.all([probe(aVideo), probe(bVideo)]);
+    const va = pa.streams?.find((s) => s.codec_type === "video");
+    const ms = Math.min(durationMs(pa) ?? 0, durationMs(pb) ?? 0);
+    if (!va?.width || !va.height || ms <= 0) throw new Error("couldn't read the clips' size and length");
+    const half = (ms / 2000).toFixed(3);
+    const cut = async (first: string, second: string, name: string) => {
+      const out = join(dir, `${name}.mp4`);
+      const fit = `scale=${va.width}:${va.height}:force_original_aspect_ratio=decrease,` +
+        `pad=${va.width}:${va.height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+      await run("ffmpeg", [
+        "-y", "-v", "error", "-i", first, "-i", second, "-i", aVideo,
+        "-filter_complex",
+        `[0:v]trim=end=${half},setpts=PTS-STARTPTS,${fit}[v0];` +
+          `[1:v]trim=start=${half},setpts=PTS-STARTPTS,${fit}[v1];` +
+          `[v0][v1]concat=n=2:v=1:a=0[v]`,
+        "-map", "[v]", "-map", "2:a?", "-map_metadata", "-1",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart",
+        out,
+      ]);
+      // Its poster is the first camera's opening frame.
+      await run("ffmpeg", ["-y", "-v", "error", "-i", out, "-frames:v", "1", "-q:v", "3", join(dir, `${name}.jpg`)]);
+    };
+    await cut(aVideo, bVideo, "ab");
+    await cut(bVideo, aVideo, "ba");
+    const p = await probe(join(dir, "ab.mp4"));
+    const v = p.streams?.find((s) => s.codec_type === "video");
+    return {
+      mediaPath: `${pairId}/ab.mp4`,
+      thumbPath: null,
+      posterPath: `${pairId}/ab.jpg`,
+      altMediaPath: `${pairId}/ba.mp4`,
+      altPosterPath: `${pairId}/ba.jpg`,
+      width: v?.width ?? null,
+      height: v?.height ?? null,
+      durationMs: durationMs(p),
+    };
+  } catch (err) {
+    rmSync(dir, { recursive: true, force: true });
+    throw new Error(describe(err));
+  }
+}
