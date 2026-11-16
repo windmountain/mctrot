@@ -65,6 +65,31 @@ let
     </icecast>
   '';
 
+  # Playlists pointing at the stream, for players that want a playlist
+  # link. Files rather than inline text: a Caddyfile treats #EXTM3U as a
+  # comment.
+  playlists = pkgs.linkFarm "mctrot-radio-playlists" [
+    {
+      name = "live.m3u";
+      path = pkgs.writeText "live.m3u" ''
+        #EXTM3U
+        #EXTINF:-1,McTrot radio
+        https://radio.mctrot.nyc/live.mp3
+      '';
+    }
+    {
+      name = "live.pls";
+      path = pkgs.writeText "live.pls" ''
+        [playlist]
+        NumberOfEntries=1
+        File1=https://radio.mctrot.nyc/live.mp3
+        Title1=McTrot radio
+        Length1=-1
+        Version=2
+      '';
+    }
+  ];
+
   hardening = {
     NoNewPrivileges = true;
     ProtectSystem = "strict";
@@ -105,8 +130,16 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "icecast.service" ];
     wants = [ "icecast.service" ];
+    # Liquidsoap type-checks its whole library at start (about 12 s on one
+    # CPU) unless it can keep the result: a cache cuts restarts to a second
+    # or two, which is how long the stream is down after a deploy or crash.
+    environment = {
+      LIQ_CACHE_USER_DIR = "/var/cache/mctrot-radio";
+      LIQ_CACHE_SYSTEM_DIR = "/var/cache/mctrot-radio";
+    };
     serviceConfig = hardening // {
       DynamicUser = true;
+      CacheDirectory = "mctrot-radio";
       LoadCredential = [ "icecast-source:${config.sops.secrets.icecast-source.path}" ];
       ExecStart = "${pkgs.liquidsoap}/bin/liquidsoap ${script}";
       Restart = "always";
@@ -116,13 +149,25 @@ in
     };
   };
 
-  # Only the stream; anything else gets a short note.
+  # The stream, and playlists pointing at it for players that prefer a
+  # playlist link (Winamp, iTunes, some radio apps). Browsers need the
+  # stream itself. Anything else gets a short note.
   services.caddy.virtualHosts."radio.mctrot.nyc".extraConfig = ''
     handle /live.mp3 {
       reverse_proxy 127.0.0.1:${toString port} {
         # Send audio on as it arrives, not in buffered chunks.
         flush_interval -1
       }
+    }
+    handle /live.m3u {
+      header Content-Type "audio/x-mpegurl"
+      root * ${playlists}
+      file_server
+    }
+    handle /live.pls {
+      header Content-Type "audio/x-scpls"
+      root * ${playlists}
+      file_server
     }
     handle {
       respond "McTrot radio: https://radio.mctrot.nyc/live.mp3" 404

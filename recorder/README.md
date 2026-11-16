@@ -382,10 +382,14 @@ on `/live`. For now it plays a 30-second 440 Hz test tone on loop, titled
 "McTrot - Test tone" (`station/test-loop.liq`); step 8 replaces it with
 the scheduled show.
 
+For players that want a playlist link rather than the stream itself,
+`https://radio.mctrot.nyc/live.m3u` and `/live.pls` point at it (browsers
+need the stream).
+
 - **Liquidsoap** (`mctrot-radio`) loops the tone, encodes 128 kbps stereo
-  MP3 and sends it to Icecast. It takes about 20 seconds to start (it
-  type-checks its whole library on one CPU), so the stream is down that
-  long after a deploy that restarts it.
+  MP3 and sends it to Icecast. Its first start after a Liquidsoap upgrade
+  takes about 20 seconds (it type-checks its whole library on one CPU);
+  after that a cache in `/var/cache/mctrot-radio` makes restarts quick.
 - **Icecast** (`icecast`) serves listeners, on 127.0.0.1 only. Caddy
   passes on `/live.mp3` and nothing else, so Icecast's admin pages aren't
   reachable from outside. Not listed in any public directory.
