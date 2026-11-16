@@ -23,6 +23,7 @@ const postDir = env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).p
 // folder, which is served at MCTROT_MEDIA_URL (media.mctrot.nyc on the box).
 const uploadDir = env.MCTROT_UPLOAD_DIR ?? "uploads";
 const mediaUrl = env.MCTROT_MEDIA_URL ?? `http://localhost:${port}/media`;
+const mediaDir = env.MCTROT_MEDIA_DIR ?? "media";
 const resetPolicy = env.MCTROT_DB_RESET === "never" ? "never" : "reset";
 
 // Secrets arrive as files via systemd's LoadCredential, so they never sit
@@ -54,6 +55,7 @@ const app = await buildApp({
   postDir,
   uploadDir,
   mediaUrl,
+  mediaDir,
   logger: true,
 });
 if (archived) {

@@ -91,6 +91,8 @@ in
       # served from media.mctrot.nyc.
       MCTROT_UPLOAD_DIR = "/var/lib/mctrot/uploads";
       MCTROT_MEDIA_URL = "https://media.mctrot.nyc";
+      # Deleting a post from the upload page deletes its files too.
+      MCTROT_MEDIA_DIR = "/var/lib/mctrot/media";
       NODE_ENV = "production";
     };
 

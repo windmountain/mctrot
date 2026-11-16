@@ -2,6 +2,7 @@
 // the worker (src/worker.ts) takes jobs one at a time and makes the post
 // ready, or failed with a reason.
 import { rmSync } from "node:fs";
+import { join } from "node:path";
 import type { Db } from "./db.ts";
 import { type MediaKind, processMedia } from "./media.ts";
 
@@ -65,13 +66,18 @@ export async function processNext(db: Db, mediaDir: string, now = Date.now): Pro
   if (!job) return false;
   try {
     const out = await processMedia(job.kind, job.upload_path, mediaDir, job.post_id);
-    db.transaction(() => {
-      db.prepare(
-        `update posts set status = 'ready', error = null, media_path = ?, thumb_path = ?,
-           poster_path = ?, width = ?, height = ?, duration_ms = ? where id = ?`,
-      ).run(out.mediaPath, out.thumbPath, out.posterPath, out.width, out.height, out.durationMs, job.post_id);
+    const stillThere = db.transaction(() => {
+      const updated = db
+        .prepare(
+          `update posts set status = 'ready', error = null, media_path = ?, thumb_path = ?,
+             poster_path = ?, width = ?, height = ?, duration_ms = ? where id = ?`,
+        )
+        .run(out.mediaPath, out.thumbPath, out.posterPath, out.width, out.height, out.durationMs, job.post_id);
       db.prepare("update jobs set status = 'done', error = null, updated_at = ? where id = ?").run(now(), job.id);
+      return updated.changes === 1;
     })();
+    // Deleted from the upload page while it was being processed.
+    if (!stillThere) rmSync(join(mediaDir, job.post_id), { recursive: true, force: true });
     // The upload (and the tus file store's .json beside it) is no longer needed.
     rmSync(job.upload_path, { force: true });
     rmSync(`${job.upload_path}.json`, { force: true });

@@ -1,12 +1,13 @@
-// The upload page: Visit, Post and Upload, from the road.
+// The upload page: Check In, Post and Upload, from the road, and a list of
+// what's been sent, where anything can be deleted and text posts edited.
 //
 // Everything I do goes into an outbox on the phone (IndexedDB) first, with
 // its own id and the time I did it, and is sent from there until the
 // server confirms it. Bad signal only delays things; retries can't
 // duplicate them (the server ignores an id it already has).
 //
-// Two lanes, so a long video upload never holds up a Visit: messages
-// (visits, text posts) and uploads (photos, videos, voice notes) send
+// Two lanes, so a long video upload never holds up a check-in: messages
+// (check-ins, text posts) and uploads (photos, videos, voice notes) send
 // independently. Uploads use tus, so a dropped upload resumes where it
 // stopped, even after the page is closed and reopened.
 //
@@ -22,7 +23,6 @@ const UPLOAD_CHUNK = 5 * 1024 * 1024;
 // --- The outbox (IndexedDB) ---------------------------------------------
 
 const DB_NAME = "mctrot-outbox";
-const KEEP_SENT_MS = 7 * 86_400_000;
 
 function openOutbox() {
   return new Promise((resolve, reject) => {
@@ -52,11 +52,11 @@ const allItems = async () => {
   return items.sort((a, b) => b.createdAt - a.createdAt);
 };
 
-// An item: { id, kind: "visit" | "post" | "upload", ts, state, error?,
+// An item: { id, kind: "visit" (a check-in) | "post" | "upload", ts, state, error?,
 //   createdAt, sentAt?, text? (post), file?, name?, type?, size?, media? (upload) }
 // state: "queued" (waiting for signal or its turn), "sending" or
 // "uploading", "processing" (uploaded; the server is working on it),
-// "sent", "failed".
+// "sent" (then it leaves the outbox for the Sent list), "failed".
 async function enqueue(kind, fields = {}) {
   const now = Date.now();
   const item = { id: crypto.randomUUID(), kind, ts: now, ...fields, state: "queued", createdAt: now };
@@ -77,9 +77,9 @@ function setOnline(value) {
   $("net").title = value ? "Reached the server" : "Can’t reach the server";
 }
 
-async function api(url, body) {
+async function api(url, body, method = "POST") {
   return fetch(url, {
-    method: "POST",
+    method,
     headers: { "content-type": "application/json" },
     credentials: "same-origin",
     body: JSON.stringify(body ?? {}),
@@ -257,7 +257,10 @@ async function pollProcessing() {
 // Retry on every chance: coming back online, reopening the page, a timer.
 addEventListener("online", () => flush());
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") flush();
+  if (document.visibilityState === "visible") {
+    flush();
+    refreshSent();
+  }
 });
 setInterval(() => flush(), 5_000);
 
@@ -276,6 +279,13 @@ const MEDIA_ICON = { photo: "📷", video: "🎬", voice: "🎙️" };
 
 function timeText(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+// Today: just the time; earlier: the date too.
+function dateTimeText(ms) {
+  const d = new Date(ms);
+  if (d.toDateString() === new Date().toDateString()) return timeText(ms);
+  return d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 const mb = (bytes) => (bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0);
@@ -319,11 +329,20 @@ function thumb(item) {
 }
 
 async function render() {
-  const now = Date.now();
-  const items = await allItems();
-  // Forget sent items after a week.
-  for (const i of items) if (i.state === "sent" && now - i.sentAt > KEEP_SENT_MS) await deleteItem(i.id);
-  const visible = items.filter((i) => !(i.state === "sent" && now - i.sentAt > KEEP_SENT_MS));
+  let items = await allItems();
+  // Sent items are on the server now: they move to the Sent list.
+  const justSent = items.filter((i) => i.state === "sent");
+  if (justSent.length) {
+    for (const i of justSent) {
+      await deleteItem(i.id);
+      URL.revokeObjectURL(previews.get(i.id));
+      previews.delete(i.id);
+    }
+    items = items.filter((i) => i.state !== "sent");
+    refreshSent();
+  }
+  outboxIds = new Set(items.map((i) => i.id));
+  const visible = items;
 
   const list = $("outbox");
   list.replaceChildren(
@@ -335,7 +354,7 @@ async function render() {
       what.className = "what";
       what.textContent =
         item.kind === "visit"
-          ? "📍 Visit"
+          ? "📍 Check-in"
           : item.kind === "post"
             ? `💬 ${item.text}`
             : `${item.name} · ${mb(item.size)} MB`;
@@ -355,6 +374,31 @@ async function render() {
       state.className = `state ${item.state}`;
       state.textContent = stateText(item);
       li.append(what, when, state);
+      // Not yet on the server: discard it here. Processing: it is on the
+      // server, so delete it there.
+      if (item.state === "queued") {
+        li.append(
+          actions(
+            button("Discard", async () => {
+              if (confirm("Discard this? It hasn’t reached the server.")) {
+                await deleteItem(item.id);
+                render();
+              }
+            }),
+          ),
+        );
+      } else if (item.state === "processing") {
+        li.append(
+          actions(
+            button("Delete", async () => {
+              if (await deleteOnServer({ kind: "post", id: item.id })) {
+                await deleteItem(item.id);
+                render();
+              }
+            }, "danger"),
+          ),
+        );
+      }
       if (item.state === "failed") {
         const actions = document.createElement("span");
         actions.className = "actions";
@@ -386,7 +430,8 @@ async function render() {
       return li;
     }),
   );
-  $("empty").hidden = visible.length > 0;
+  $("outbox-card").hidden = visible.length === 0;
+  renderSent();
 
   const count = (states) => items.filter((i) => states.includes(i.state)).length;
   const parts = [];
@@ -406,9 +451,16 @@ async function render() {
   }
 }
 
-function button(label, onClick) {
+function actions(...buttons) {
+  const span = document.createElement("span");
+  span.className = "actions";
+  span.append(...buttons);
+  return span;
+}
+
+function button(label, onClick, extraClass = "") {
   const b = document.createElement("button");
-  b.className = "secondary";
+  b.className = `secondary ${extraClass}`.trim();
   b.textContent = label;
   b.addEventListener("click", onClick);
   return b;
@@ -421,14 +473,164 @@ function flash(text) {
   flashTimer = setTimeout(() => ($("flash").textContent = ""), 3000);
 }
 
+// --- Sent: what the server has ---------------------------------------------
+
+// From GET /sent; null until first loaded.
+let sent = null;
+let sentStale = false;
+let outboxIds = new Set();
+let editing = null; // the text post being edited, if any
+
+async function refreshSent() {
+  if (needsSignIn) return;
+  try {
+    const res = await fetch("/sent", { credentials: "same-origin" });
+    if (res.status === 401) {
+      needsSignIn = true;
+      return;
+    }
+    if (!res.ok) throw new Error(String(res.status));
+    sent = (await res.json()).items;
+    sentStale = false;
+    setOnline(true);
+  } catch {
+    sentStale = true;
+  }
+  renderSent();
+}
+
+const MEDIA_NAME = { photo: "Photo", video: "Video", voice: "Voice note" };
+
+function sentWhat(item) {
+  if (item.kind === "checkin") return "📍 Check-in";
+  if (item.type === "text") return `💬 ${item.text}`;
+  return `${MEDIA_ICON[item.type]} ${MEDIA_NAME[item.type]}`;
+}
+
+function renderSent() {
+  const list = $("sent");
+  // Something still in the outbox (being processed) is shown there.
+  const rows = (sent ?? []).filter((i) => !outboxIds.has(i.id));
+  list.replaceChildren(
+    ...rows.map((item) => {
+      const li = document.createElement("li");
+      if (editing?.id === item.id) li.className = "editing";
+      if (item.thumbUrl) {
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.alt = "";
+        img.loading = "lazy";
+        img.src = item.thumbUrl;
+        li.append(img);
+      }
+      const what = document.createElement("span");
+      what.className = "what";
+      what.textContent = sentWhat(item);
+      if (item.kind === "post" && item.status !== "ready") {
+        const note = document.createElement("div");
+        note.className = "small";
+        note.textContent = item.status === "failed" ? `Failed: ${item.error ?? "processing failed"}` : "Processing on server";
+        what.append(note);
+      }
+      const when = document.createElement("span");
+      when.className = "when";
+      when.textContent = dateTimeText(item.ts);
+      const buttons = [];
+      if (item.kind === "post" && item.type === "text") buttons.push(button("Edit", () => startEditing(item)));
+      buttons.push(
+        button("Delete", async () => {
+          if (await deleteOnServer(item)) {
+            sent = sent.filter((i) => i.id !== item.id);
+            renderSent();
+          }
+        }, "danger"),
+      );
+      li.append(what, when, actions(...buttons));
+      return li;
+    }),
+  );
+  $("sent-empty").hidden = sent === null || rows.length > 0;
+  $("sent-note").hidden = !(sentStale || sent === null);
+  $("sent-note").textContent =
+    sent === null ? (sentStale ? "Can’t load the sent list without signal." : "Loading…") : "Offline: this list may be out of date.";
+}
+
+// Deleting is for good. Returns whether it's gone.
+async function deleteOnServer(item) {
+  const what = item.kind === "checkin" || item.kind === "visit" ? "this check-in" : "this post";
+  if (!confirm(`Delete ${what} for good? It disappears from /live.`)) return false;
+  const url = item.kind === "checkin" ? `/visits/${encodeURIComponent(item.id)}` : `/posts/${encodeURIComponent(item.id)}`;
+  let res;
+  try {
+    res = await api(url, undefined, "DELETE");
+  } catch {
+    flash("Can’t delete without signal. Try again when you have some.");
+    return false;
+  }
+  if (res.status === 401) {
+    showSignIn("Sign in again to delete.");
+    return false;
+  }
+  // Already gone counts as deleted.
+  if (!res.ok && res.status !== 404) {
+    flash(`Couldn’t delete: ${(await res.json().catch(() => ({}))).error ?? res.status}`);
+    return false;
+  }
+  flash("Deleted");
+  return true;
+}
+
+function startEditing(item) {
+  editing = item;
+  $("text").value = item.text;
+  $("count").textContent = `${item.text.length} / 1000`;
+  $("send").textContent = "Save";
+  $("composer").hidden = false;
+  $("text").focus();
+  renderSent();
+}
+
+function stopEditing() {
+  editing = null;
+  $("text").value = "";
+  $("count").textContent = "0 / 1000";
+  $("send").textContent = "Post";
+  $("composer").hidden = true;
+  renderSent();
+}
+
+// Edits go straight to the server (not the outbox): they need signal.
+async function saveEdit(text) {
+  let res;
+  try {
+    res = await api(`/posts/${encodeURIComponent(editing.id)}`, { text }, "PATCH");
+  } catch {
+    flash("Can’t save the edit without signal. Try again when you have some.");
+    return;
+  }
+  if (res.status === 401) {
+    showSignIn("Sign in again to save the edit.");
+    return;
+  }
+  if (!res.ok) {
+    flash(`Couldn’t save: ${(await res.json().catch(() => ({}))).error ?? res.status}`);
+    return;
+  }
+  const saved = (await res.json()).text;
+  sent = sent.map((i) => (i.id === editing.id ? { ...i, text: saved } : i));
+  stopEditing();
+  flash("Edit saved");
+}
+
 // --- Buttons -------------------------------------------------------------
 
 $("visit").addEventListener("click", async () => {
   await enqueue("visit");
-  flash("Visit saved");
+  flash("Checked in");
 });
 
 $("post").addEventListener("click", () => {
+  if (editing) stopEditing();
   $("composer").hidden = false;
   $("text").focus();
 });
@@ -438,12 +640,14 @@ $("text").addEventListener("input", () => {
 });
 
 $("cancel").addEventListener("click", () => {
-  $("composer").hidden = true;
+  if (editing) stopEditing();
+  else $("composer").hidden = true;
 });
 
 $("send").addEventListener("click", async () => {
   const text = $("text").value.trim();
   if (!text) return;
+  if (editing) return saveEdit(text);
   // The time is when I hit Post, not when it reaches the server.
   await enqueue("post", { text });
   $("text").value = "";
@@ -495,6 +699,7 @@ function signedIn() {
   $("signin").hidden = true;
   $("app").hidden = false;
   flush();
+  refreshSent();
 }
 
 async function checkSession() {

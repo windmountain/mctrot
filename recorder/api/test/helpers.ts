@@ -23,6 +23,7 @@ export const ORIGIN = "https://api.example.test";
 
 export async function setup({ ingestToken }: { ingestToken?: string } = { ingestToken: TOKEN }) {
   const { db } = openDb(":memory:");
+  const mediaDir = mkdtempSync(join(tmpdir(), "mctrot-media-"));
   const app = await buildApp({
     db,
     plan: PLAN,
@@ -36,8 +37,9 @@ export async function setup({ ingestToken }: { ingestToken?: string } = { ingest
     postDir: process.env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).pathname,
     uploadDir: mkdtempSync(join(tmpdir(), "mctrot-uploads-")),
     mediaUrl: "https://media.example.test",
+    mediaDir,
   });
-  return { db, app };
+  return { db, app, mediaDir };
 }
 
 // A location as Overland sends it.

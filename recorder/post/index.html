@@ -60,6 +60,10 @@
     li .progress { height: 4px; background: #eee; border-radius: 2px; margin-top: 6px; overflow: hidden; }
     li .progress > div { height: 100%; background: var(--ink); }
     .small { font-size: 0.9rem; color: var(--muted); }
+    .card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 4px; }
+    li .actions { white-space: nowrap; }
+    li .actions button.danger { color: var(--bad); }
+    li.editing { background: #fffbe6; }
     a { color: inherit; }
   </style>
 </head>
@@ -87,7 +91,7 @@
     <!-- Shown once signed in. -->
     <section id="app" hidden>
       <div class="buttons">
-        <button id="visit" class="big">Visit</button>
+        <button id="visit" class="big">Check In</button>
         <button id="post" class="big">Post</button>
         <button id="upload" class="big">Upload</button>
       </div>
@@ -104,9 +108,18 @@
         </div>
       </div>
 
-      <div class="card">
+      <!-- What hasn't reached the server yet (or is being processed there). -->
+      <div id="outbox-card" class="card" hidden>
+        <h2>Outbox</h2>
         <ul id="outbox"></ul>
-        <p id="empty" class="small">Nothing sent yet.</p>
+      </div>
+
+      <!-- What the server has: delete anything, edit text posts. -->
+      <div class="card">
+        <h2>Sent</h2>
+        <p id="sent-note" class="small" hidden></p>
+        <ul id="sent"></ul>
+        <p id="sent-empty" class="small" hidden>Nothing sent yet.</p>
       </div>
 
       <p class="small">

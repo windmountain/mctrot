@@ -59,6 +59,7 @@ test("GET /live without a route plan: no stores", async () => {
     postDir: ".",
     uploadDir: (await import("node:os")).tmpdir(),
     mediaUrl: "http://localhost/media",
+    mediaDir: (await import("node:os")).tmpdir(),
   });
   const body = (await app.inject({ url: "/live" })).json();
   assert.deepEqual(body.stores, []);

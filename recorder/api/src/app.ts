@@ -7,6 +7,7 @@ import { startAttempt, stopAttempt } from "./attempts.ts";
 import { requireToken, same } from "./auth.ts";
 import { type Db, dbStatus } from "./db.ts";
 import { live } from "./live.ts";
+import { deleteCheckin, deletePost, editPost, sentItems } from "./manage.ts";
 import {
   authenticate,
   authenticationOptions,
@@ -42,6 +43,8 @@ export type AppDeps = {
   // folder is served (e.g. "https://media.mctrot.nyc").
   uploadDir: string;
   mediaUrl: string;
+  // The media folder itself, so a deleted post's files go too.
+  mediaDir: string;
   logger?: boolean;
 };
 
@@ -59,6 +62,8 @@ const PostBody = z.object({
   type: z.literal("text"),
   text: z.string().trim().min(1).max(MAX_TEXT),
 });
+
+const EditBody = z.object({ text: z.string().trim().min(1).max(MAX_TEXT) });
 
 // The upload page's files, and the WebAuthn browser library it loads.
 const webauthnBrowser = new URL(
@@ -162,6 +167,42 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { id: body.data.id, ts, recorded };
   });
 
+  // --- Fixing mistakes from the upload page --------------------------------
+
+  // Everything sent, newest first, whatever its status: the page's list of
+  // what can be deleted or edited.
+  app.get("/sent", async (req, reply) => {
+    if (!writer(req, reply)) return reply;
+    reply.header("cache-control", "no-store");
+    return { items: sentItems(db, deps.mediaUrl) };
+  });
+
+  // Deleting is for good: there's no undo.
+  app.delete("/visits/:id", async (req, reply) => {
+    if (!writer(req, reply)) return reply;
+    const { id } = req.params as { id: string };
+    if (!deleteCheckin(db, id)) return reply.code(404).send({ error: "no such check-in" });
+    return { deleted: id };
+  });
+
+  app.delete("/posts/:id", async (req, reply) => {
+    if (!writer(req, reply)) return reply;
+    const { id } = req.params as { id: string };
+    if (!deletePost(db, id, deps.mediaDir)) return reply.code(404).send({ error: "no such post" });
+    return { deleted: id };
+  });
+
+  app.patch("/posts/:id", async (req, reply) => {
+    if (!writer(req, reply)) return reply;
+    const { id } = req.params as { id: string };
+    const body = EditBody.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: `expected {text: 1 to ${MAX_TEXT} characters}` });
+    const result = editPost(db, id, body.data.text);
+    if (result === "missing") return reply.code(404).send({ error: "no such post" });
+    if (result === "not-text") return reply.code(400).send({ error: "only text posts can be edited" });
+    return { id, text: body.data.text };
+  });
+
   registerUploads(app, db, deps.uploadDir, writer);
 
   // Where uploaded posts are: "processing" until the worker is done. The
@@ -229,6 +270,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // --- The upload page ------------------------------------------------------
 
+  // Thumbnails in the page's Sent list come from the media host.
+  const mediaOrigin = new URL(deps.mediaUrl).origin;
   for (const [path, { file, type }] of Object.entries(POST_FILES)) {
     app.get(path, async (_req, reply) => {
       const body = readFileSync(typeof file === "string" ? join(deps.postDir, file) : file);
@@ -237,7 +280,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       // Only this origin's own scripts and requests; no third parties.
       reply.header(
         "content-security-policy",
-        "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'",
+        `default-src 'self'; img-src 'self' data: blob: ${mediaOrigin}; media-src 'self' blob:; style-src 'self' 'unsafe-inline'`,
       );
       return body;
     });

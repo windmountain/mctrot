@@ -4,7 +4,7 @@ module Live exposing (main)
 
 Polls the recorder's `GET /live` (recorder/api/src/live.ts; contract in
 recorder/api/live.schema.json) every 15 seconds and draws the latest
-position on the site's Manhattan map.
+position and the path walked on the site's Manhattan map.
 
 -}
 
@@ -15,6 +15,7 @@ import Html.Keyed
 import Http
 import Json.Decode as Decode exposing (Decoder)
 import MctrotMapData
+import NewYorkTime
 import Projection
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
@@ -47,6 +48,7 @@ type alias LiveResponse =
     , position : Maybe Position
     , attempt : Maybe Attempt
     , stores : List Store
+    , track : List (List ( Float, Float ))
     , visits : List Visit
     , posts : List Post
     }
@@ -103,13 +105,21 @@ type Visit
 
 liveDecoder : Decoder LiveResponse
 liveDecoder =
-    Decode.map6 LiveResponse
+    Decode.map7 LiveResponse
         (Decode.field "serverTs" Decode.int)
         (Decode.field "position" (Decode.nullable positionDecoder))
         (Decode.field "attempt" (Decode.nullable attemptDecoder))
         (Decode.field "stores" (Decode.list storeDecoder))
+        (Decode.field "track" (Decode.list (Decode.list latLonDecoder)))
         (Decode.field "visits" (Decode.list visitDecoder))
         (Decode.field "posts" (Decode.list postDecoder))
+
+
+{-| A point of the track: [lat, lon].
+-}
+latLonDecoder : Decoder ( Float, Float )
+latLonDecoder =
+    Decode.map2 Tuple.pair (Decode.index 0 Decode.float) (Decode.index 1 Decode.float)
 
 
 postDecoder : Decoder Post
@@ -327,7 +337,7 @@ status model =
                     "No position yet." ++ problem
 
                 Just position ->
-                    "Last position " ++ duration (now - position.ts) ++ " ago." ++ problem
+                    "Last position " ++ when now position.ts ++ "." ++ problem
 
         _ ->
             if model.failing then
@@ -389,6 +399,18 @@ isMatched visit =
             False
 
 
+{-| "12 min ago" for the first two hours, then the date and time in New
+York, for every visitor: "November 21, 5:34 AM EST".
+-}
+when : Int -> Int -> String
+when now ts =
+    if now - ts < 2 * 3600000 then
+        duration (now - ts) ++ " ago"
+
+    else
+        NewYorkTime.format ts
+
+
 duration : Int -> String
 duration ms =
     let
@@ -435,16 +457,20 @@ viewMap response =
 
         ( done, todo ) =
             List.partition (\s -> List.member s.id visited) stores
+
+        track =
+            Maybe.map .track response |> Maybe.withDefault []
     in
     Html.div [ Attr.class "live-map" ]
         [ Svg.svg
             [ SvgAttr.viewBox MctrotMapData.mapViewBox
             , SvgAttr.class "live-map-svg"
             , Attr.attribute "role" "img"
-            , Attr.attribute "aria-label" "Map of Manhattan with every store, the ones visited, and my last position"
+            , Attr.attribute "aria-label" "Map of Manhattan with every store, the ones visited, the path I've walked and my last position"
             ]
             (Svg.path [ SvgAttr.class "borough", SvgAttr.d MctrotMapData.boroughPath ] []
-                :: List.map (viewStore "live-store" "120") todo
+                :: List.map viewTrack track
+                ++ List.map (viewStore "live-store" "120") todo
                 ++ List.map (viewStore "live-store live-store-visited" "200") done
                 ++ (placed |> Maybe.map (\xy -> [ viewMe xy ]) |> Maybe.withDefault [])
             )
@@ -454,6 +480,28 @@ viewMap response =
           else
             Html.text ""
         ]
+
+
+{-| One stretch of the path walked (the server splits it where GPS was lost).
+-}
+viewTrack : List ( Float, Float ) -> Svg Msg
+viewTrack segment =
+    Svg.polyline
+        [ SvgAttr.class "live-track"
+        , SvgAttr.points
+            (segment
+                |> List.map
+                    (\( lat, lon ) ->
+                        let
+                            ( x, y ) =
+                                Projection.toMap { lat = lat, lon = lon }
+                        in
+                        String.fromFloat (toFloat (round (x * 10)) / 10) ++ "," ++ String.fromFloat (toFloat (round (y * 10)) / 10)
+                    )
+                |> String.join " "
+            )
+        ]
+        []
 
 
 viewStore : String -> String -> Store -> Svg Msg
@@ -513,7 +561,7 @@ viewPosts model =
                             ( post.id
                             , Html.li [ Attr.class "live-post" ]
                                 [ viewPostContent post.content
-                                , Html.p [ Attr.class "live-post-when" ] [ Html.text (duration (now - post.ts) ++ " ago") ]
+                                , Html.p [ Attr.class "live-post-when" ] [ Html.text (when now post.ts) ]
                                 ]
                             )
                         )

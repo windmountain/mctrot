@@ -3,6 +3,7 @@ import { latestAttempt } from "./attempts.ts";
 import type { Db } from "./db.ts";
 import type { RoutePlan } from "./plan.ts";
 import { recentPosts } from "./posts.ts";
+import { NO_ATTEMPT_WINDOW_MS, track } from "./track.ts";
 import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 
 // The /live response: everything the public page needs, in one call. This
@@ -42,6 +43,11 @@ export const LiveResponse = z
         }),
       )
       .describe("The route plan's stores"),
+    track: z
+      .array(z.array(z.tuple([z.number(), z.number()])))
+      .describe(
+        "The path walked as [lat, lon] lines, simplified, split where GPS was lost: this attempt's, or the last day's before any attempt",
+      ),
     visits: z
       .array(
         z.discriminatedUnion("status", [
@@ -105,7 +111,18 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
       )
     : [];
   const stores = plan.stores.map(({ id, name, address, lat, lon }) => ({ id, name, address, lat, lon }));
-  return { serverTs: now, position: position ?? null, attempt, stores, visits, posts: recentPosts(db, mediaUrl) };
+  const path = attempt
+    ? track(db, attempt.startedAt, attempt.endedAt ?? Number.MAX_SAFE_INTEGER)
+    : track(db, now - NO_ATTEMPT_WINDOW_MS, Number.MAX_SAFE_INTEGER);
+  return {
+    serverTs: now,
+    position: position ?? null,
+    attempt,
+    stores,
+    track: path,
+    visits,
+    posts: recentPosts(db, mediaUrl),
+  };
 }
 
 export function liveJsonSchema() {
