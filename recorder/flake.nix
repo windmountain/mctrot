@@ -88,6 +88,17 @@
             exec ssh -t "''${1:-${host}}" mctrot-wipe
           '');
         };
+
+        # Move every recorded GPS point so the walk is centered on Union
+        # Square (asks first; refused while recorder.live is on).
+        # Usage: nix run .#dislocate [-- <target>]
+        dislocate = {
+          type = "app";
+          program = toString (lpkgs.writeShellScript "recorder-dislocate" ''
+            set -eu
+            exec ssh -t "''${1:-${host}}" mctrot-dislocate
+          '');
+        };
       };
     in
     {

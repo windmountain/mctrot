@@ -63,6 +63,9 @@ buildNpmPackage {
     cp -r package.json src node_modules $out/lib/api/
     makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-api \
       --add-flags $out/lib/api/src/main.ts
+    # The raw tool; on the box, use mctrot-dislocate (host/api.nix).
+    makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-dislocate-db \
+      --add-flags $out/lib/api/src/dislocate.ts
     runHook postInstall
   '';
 

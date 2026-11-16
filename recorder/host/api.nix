@@ -1,8 +1,45 @@
-{ config, pkgs, version, ... }:
+{ config, lib, pkgs, version, ... }:
 
 let
   api = pkgs.callPackage ../api/package.nix { };
   port = 3000;
+  dbPath = "/var/lib/mctrot/db/recorder.sqlite";
+  services = lib.escapeShellArgs config.recorder.dataServices;
+
+  # Moves every GPS point so the walk is centered on Union Square, keeping
+  # its shape (api/src/dislocate.ts). Stops the services that use the data
+  # around the change, so nothing writes points mid-move; Overland queues
+  # meanwhile. Run from the laptop with `nix run .#dislocate`.
+  dislocate = pkgs.writeShellApplication {
+    name = "mctrot-dislocate";
+    runtimeInputs = with pkgs; [ coreutils util-linux systemd ];
+    text = ''
+      if ${lib.boolToString config.recorder.live}; then
+        echo "recorder.live is on: refusing to move event data." >&2
+        exit 1
+      fi
+      if [ ! -e ${dbPath} ]; then
+        echo "No database yet; nothing to move."
+        exit 0
+      fi
+      # As the API's user, so any files SQLite creates stay writable by it.
+      as_api() {
+        runuser -u mctrot -- env MCTROT_DB=${dbPath} \
+          ${api}/bin/mctrot-dislocate-db "$@"
+      }
+
+      as_api plan
+      echo "Services stopped and restarted around it: ${services}"
+      read -r -p 'Type "dislocate" to continue: ' answer
+      [ "$answer" = dislocate ] || { echo "Aborted; nothing moved."; exit 1; }
+
+      systemctl stop ${services}
+      # Restart the services even if the move fails.
+      restart() { systemctl start ${services}; }
+      trap restart EXIT
+      as_api apply
+    '';
+  };
 in
 {
   users.users.mctrot = {
@@ -23,7 +60,7 @@ in
     environment = {
       HOST = "127.0.0.1";
       PORT = toString port;
-      MCTROT_DB = "/var/lib/mctrot/db/recorder.sqlite";
+      MCTROT_DB = dbPath;
       MCTROT_VERSION = version;
       # When the schema changes (SCHEMA_VERSION in api/src/schema.ts), the
       # API moves the old database aside as a .bak and starts empty, until
@@ -60,6 +97,8 @@ in
       # No MemoryDenyWriteExecute: V8's JIT needs writable+executable memory.
     };
   };
+
+  environment.systemPackages = [ dislocate ];
 
   services.caddy.virtualHosts."api.mctrot.nyc".extraConfig = ''
     reverse_proxy 127.0.0.1:${toString port}

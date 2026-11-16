@@ -50,6 +50,8 @@ Design doc: recorder/DESIGN.md
   (nixos-anywhere; wipes its disk, not the Volume).
 - `nix run .#wipe`: delete all event data on the box (asks first;
   refused while `recorder.live` is on).
+- `nix run .#dislocate`: move all recorded points so the walk is centered
+  on Union Square (asks first; refused while `recorder.live` is on).
 - `nix run .#deploy`: push changes to `root@recorder.mctrot.nyc`.
   Both build on the Droplet, so no Linux builder is needed for them.
   Run them from inside the repo: they read the flake from git, and the

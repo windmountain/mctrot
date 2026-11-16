@@ -52,8 +52,9 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        The event is on: protect its data. Refuses `mctrot-wipe`, and a
-        schema change stops the API instead of setting the database aside.
+        The event is on: protect its data. Refuses `mctrot-wipe` and
+        `mctrot-dislocate`, and a schema change stops the API instead of
+        setting the database aside.
       '';
     };
     dataServices = lib.mkOption {

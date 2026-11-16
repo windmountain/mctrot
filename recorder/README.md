@@ -184,6 +184,21 @@ that use it, empties it, and starts them again. Config, secrets, SSH keys
 and HTTPS certificates are untouched. Overland's queue on the phone isn't:
 anything still waiting there uploads after the wipe.
 
+**Making a test walk look like Manhattan:**
+
+```
+nix run .#dislocate
+```
+
+Moves every recorded point so the walk is centered on Union Square
+(40.735556, -73.990556), keeping its shape and distances. It shows the
+point count, where the walk is now and how far it would move, asks you to
+type `dislocate`, then stops the API, moves the points in one transaction
+and starts the API again (even if the move fails). Overland queues
+meanwhile. Running it twice moves nothing the second time. Points that
+arrive afterwards, including Overland's queue, land where they were really
+recorded.
+
 **Before the event:** set `recorder.live = true` in
-`host/configuration.nix` and deploy. Then `wipe` refuses, and a schema
-change stops the API instead of setting the database aside.
+`host/configuration.nix` and deploy. Then `wipe` and `dislocate` refuse,
+and a schema change stops the API instead of setting the database aside.

@@ -349,7 +349,7 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 - [ ] Prepare the route plan (base exported by scripts/export\_route\_plan.py): McDonald's in visiting order, with coordinates, miles to the next stop, and expected arrival and departure times
 - [ ] Pick the event date and the radio start time
 - [ ] Configure start time (`radio.startAt` in the flake)
-- [ ] Before going live, set `recorder.live = true` in `recorder/host/configuration.nix` and deploy: it blocks `nix run .#wipe` and stops a schema change from setting event data aside
+- [ ] Before going live, set `recorder.live = true` in `recorder/host/configuration.nix` and deploy: it blocks `nix run .#wipe` and `nix run .#dislocate` and stops a schema change from setting event data aside
 - [ ] Check music licensing for the radio file
 - [x] Create the DigitalOcean Droplet and Volume
 - [x] Add the DNS records at Namecheap
