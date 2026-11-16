@@ -31,5 +31,10 @@
   };
   boot.loader.grub.configurationLimit = 10;
 
+  # Before going live, set this to true and deploy: it protects event data
+  # (no mctrot-wipe, no database reset on a schema change). See
+  # host/recorder.nix.
+  recorder.live = false;
+
   system.stateVersion = "26.05";
 }

@@ -78,6 +78,16 @@
               --build-host "$target"
           '');
         };
+
+        # Delete all event data on the box (asks first; refused while
+        # recorder.live is on). Usage: nix run .#wipe [-- <target>]
+        wipe = {
+          type = "app";
+          program = toString (lpkgs.writeShellScript "recorder-wipe" ''
+            set -eu
+            exec ssh -t "''${1:-${host}}" mctrot-wipe
+          '');
+        };
       };
     in
     {
@@ -89,6 +99,7 @@
         modules = [
           disko.nixosModules.disko
           sops-nix.nixosModules.sops
+          ./host/recorder.nix
           ./host/configuration.nix
           ./host/disko.nix
           ./host/digitalocean.nix

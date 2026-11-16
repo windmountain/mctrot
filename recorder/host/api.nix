@@ -11,6 +11,8 @@ in
   };
   users.groups.mctrot = { };
 
+  recorder.dataServices = [ "mctrot-api.service" ];
+
   systemd.services.mctrot-api = {
     description = "McTrot recorder API";
     wantedBy = [ "multi-user.target" ];
@@ -24,10 +26,9 @@ in
       MCTROT_DB = "/var/lib/mctrot/db/recorder.sqlite";
       MCTROT_VERSION = version;
       # When the schema changes (SCHEMA_VERSION in api/src/schema.ts), the
-      # API moves the old database aside as a .bak and starts empty.
-      # BEFORE GOING LIVE: set to "never", so a schema change refuses to
-      # start instead of setting event data aside.
-      MCTROT_DB_RESET = "allow";
+      # API moves the old database aside as a .bak and starts empty, until
+      # recorder.live is on; then it refuses to start instead.
+      MCTROT_DB_RESET = if config.recorder.live then "never" else "allow";
       NODE_ENV = "production";
     };
 
