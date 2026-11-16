@@ -692,6 +692,71 @@
       ],
       "additionalProperties": false,
       "description": "Sun times for today in New York, at the weather's place"
+    },
+    "sky": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "The minute it's for, ms since epoch"
+        },
+        "sun": {
+          "type": "object",
+          "properties": {
+            "elevation": {
+              "type": "number",
+              "description": "Degrees above the horizon; negative below"
+            },
+            "azimuth": {
+              "type": "number",
+              "description": "Compass bearing, 0 north, 90 east"
+            }
+          },
+          "required": [
+            "elevation",
+            "azimuth"
+          ],
+          "additionalProperties": false
+        },
+        "squares": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Where to look: \"Low in the SW, toward the sun\""
+              },
+              "elevation": {
+                "type": "number"
+              },
+              "azimuth": {
+                "type": "number"
+              },
+              "color": {
+                "type": "string",
+                "description": "CSS hex colour"
+              }
+            },
+            "required": [
+              "label",
+              "elevation",
+              "azimuth",
+              "color"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "at",
+        "sun",
+        "squares"
+      ],
+      "additionalProperties": false,
+      "description": "The sky's colour in a few directions, simulated from the sun and the latest weather (src/sky.ts)"
     }
   },
   "required": [
@@ -703,7 +768,8 @@
     "visits",
     "posts",
     "weather",
-    "sun"
+    "sun",
+    "sky"
   ],
   "additionalProperties": false,
   "title": "McTrot /live response"

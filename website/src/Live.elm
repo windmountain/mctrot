@@ -53,6 +53,16 @@ type alias LiveResponse =
     , posts : List Post
     , weather : Maybe Weather
     , sun : Sun
+    , sky : List SkySquare
+    }
+
+
+{-| The sky's colour in one direction, simulated by the recorder from the
+sun's position and the latest weather (recorder/api/src/sky.ts).
+-}
+type alias SkySquare =
+    { label : String
+    , color : String
     }
 
 
@@ -166,6 +176,15 @@ liveDecoder =
         |> andMap (Decode.field "posts" (Decode.list postDecoder))
         |> andMap (Decode.field "weather" (Decode.nullable weatherDecoder))
         |> andMap (Decode.field "sun" sunDecoder)
+        |> andMap
+            (Decode.at [ "sky", "squares" ]
+                (Decode.list
+                    (Decode.map2 SkySquare
+                        (Decode.field "label" Decode.string)
+                        (Decode.field "color" Decode.string)
+                    )
+                )
+            )
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -407,6 +426,7 @@ view model =
             [ Html.text (status model) ]
         , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
         , viewWeather model
+        , viewSky response
         , viewMap response
         , viewSun response
         , viewPosts model
@@ -450,6 +470,36 @@ viewWeather model =
                 [ Html.text (capitalize first ++ ". " ++ wind)
                 , Html.span [ Attr.class "live-weather-when" ]
                     [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
+                ]
+
+        _ ->
+            Html.text ""
+
+
+{-| The sky now, as coloured squares, each labelled with where to look.
+-}
+viewSky : Maybe LiveResponse -> Html Msg
+viewSky response =
+    case Maybe.map .sky response of
+        Just ((_ :: _) as squares) ->
+            Html.figure [ Attr.class "live-sky" ]
+                [ Html.ul []
+                    (List.map
+                        (\square ->
+                            Html.li []
+                                [ Html.span
+                                    [ Attr.class "live-sky-swatch"
+                                    , Attr.style "background-color" square.color
+                                    , Attr.attribute "role" "img"
+                                    , Attr.attribute "aria-label" (square.label ++ ": " ++ square.color)
+                                    ]
+                                    []
+                                , Html.span [ Attr.class "live-sky-label" ] [ Html.text square.label ]
+                                ]
+                        )
+                        squares
+                    )
+                , Html.figcaption [] [ Html.text "The sky now, simulated from the sun and the weather." ]
                 ]
 
         _ ->

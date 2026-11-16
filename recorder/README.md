@@ -360,3 +360,15 @@ ssh root@recorder.mctrot.nyc systemctl list-timers mctrot-weather   # next run
 ssh root@recorder.mctrot.nyc journalctl -u mctrot-weather -n 5      # last fetches
 curl -s https://api.mctrot.nyc/live | jq '.weather, .sun'
 ```
+
+### The sky's colour
+
+`/live` shows the sky's colour in five directions (overhead, and high and
+low toward and away from the sun), simulated by `api/src/sky.ts` from the
+sun's position and the latest weather: sunlight scattered once through
+the air (Rayleigh for blue, Mie for haze from the reported visibility,
+ozone for twilight's blue), blended toward a grey or sunset-lit cloud deck
+by cloud cover, plus Manhattan's glow at night, shown as an eye adapted to
+the light would see it. Worked out at most once a minute. A plausible sky,
+not a photograph: deep twilight comes out darker than it really is, and
+broken cloud is averaged.

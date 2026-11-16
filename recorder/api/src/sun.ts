@@ -96,3 +96,19 @@ export function sunTimes(date: string, lat: number, lon: number): SunTimes {
     astronomicalDusk: at(-18, false),
   };
 }
+
+// Where the sun is at a moment: degrees above the horizon (negative below;
+// no allowance for the air bending its light) and compass bearing (0 north,
+// 90 east).
+export function sunPosition(ms: number, lat: number, lon: number): { elevation: number; azimuth: number } {
+  const { dec, eot } = sunAt(ms);
+  const minutesUtc = (((ms % 86_400_000) + 86_400_000) % 86_400_000) / MINUTE;
+  const solarTime = minutesUtc + eot + 4 * lon; // true solar time, minutes
+  const hourAngle = (solarTime / 4 - 180) * RAD;
+  const phi = lat * RAD;
+  const sinEl = Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(hourAngle);
+  const elevation = Math.asin(Math.max(-1, Math.min(1, sinEl))) / RAD;
+  const az =
+    Math.atan2(Math.sin(hourAngle), Math.cos(hourAngle) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi)) / RAD + 180;
+  return { elevation, azimuth: ((az % 360) + 360) % 360 };
+}

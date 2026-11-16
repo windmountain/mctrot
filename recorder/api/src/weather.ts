@@ -14,6 +14,8 @@ export const WEATHER_POINT = { name: "Central Manhattan", lat: 40.7831, lon: -73
 const FIELDS = [
   "temperature_2m", "apparent_temperature", "relative_humidity_2m", "precipitation", "weather_code",
   "cloud_cover", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m", "is_day",
+  // For the sky's colours (src/sky.ts); kept only in the raw column.
+  "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "visibility",
 ] as const;
 
 export const WEATHER_URL =
@@ -68,6 +70,40 @@ export type Weather = {
   windFrom: string | null; // compass point, "NW"
   isDay: boolean | null;
 };
+
+// What the sky model needs from the latest reading, from its raw reply:
+// cloud cover by height (0–100) and visibility (feet). Null fields when the
+// reading predates them or Open-Meteo left them out.
+export type SkyInputs = {
+  observedAt: number;
+  cloudCoverPct: number | null;
+  lowPct: number | null;
+  midPct: number | null;
+  highPct: number | null;
+  visibilityFt: number | null;
+};
+
+export function latestSkyInputs(db: Db): SkyInputs | null {
+  const r = db.prepare("select observed_at, cloud_cover_pct, raw from weather order by fetched_at desc limit 1").get() as
+    | { observed_at: number; cloud_cover_pct: number | null; raw: string }
+    | undefined;
+  if (!r) return null;
+  let current: Record<string, unknown> = {};
+  try {
+    current = (JSON.parse(r.raw) as { current?: Record<string, unknown> }).current ?? {};
+  } catch {
+    // An unreadable raw reply only loses the extra detail.
+  }
+  const n = (k: string) => (typeof current[k] === "number" ? (current[k] as number) : null);
+  return {
+    observedAt: r.observed_at,
+    cloudCoverPct: r.cloud_cover_pct,
+    lowPct: n("cloud_cover_low"),
+    midPct: n("cloud_cover_mid"),
+    highPct: n("cloud_cover_high"),
+    visibilityFt: n("visibility"),
+  };
+}
 
 export function latestWeather(db: Db): Weather | null {
   const r = db.prepare("select * from weather order by fetched_at desc limit 1").get() as

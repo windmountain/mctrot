@@ -3,9 +3,10 @@ import { latestAttempt } from "./attempts.ts";
 import type { Db } from "./db.ts";
 import type { RoutePlan } from "./plan.ts";
 import { recentPosts } from "./posts.ts";
+import { skyNow } from "./sky.ts";
 import { newYorkDate, sunTimes } from "./sun.ts";
 import { NO_ATTEMPT_WINDOW_MS, track } from "./track.ts";
-import { latestWeather, WEATHER_POINT } from "./weather.ts";
+import { latestSkyInputs, latestWeather, WEATHER_POINT } from "./weather.ts";
 import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 
 // The /live response: everything the public page needs, in one call. This
@@ -140,6 +141,23 @@ export const LiveResponse = z
         astronomicalDusk: msOrNull("18° below, setting"),
       })
       .describe("Sun times for today in New York, at the weather's place"),
+    sky: z
+      .object({
+        at: ms("The minute it's for"),
+        sun: z.object({
+          elevation: z.number().describe("Degrees above the horizon; negative below"),
+          azimuth: z.number().describe("Compass bearing, 0 north, 90 east"),
+        }),
+        squares: z.array(
+          z.object({
+            label: z.string().describe('Where to look: "Low in the SW, toward the sun"'),
+            elevation: z.number(),
+            azimuth: z.number(),
+            color: z.string().describe("CSS hex colour"),
+          }),
+        ),
+      })
+      .describe("The sky's colour in a few directions, simulated from the sun and the latest weather (src/sky.ts)"),
   })
   .meta({ title: "McTrot /live response" });
 
@@ -174,6 +192,7 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
       return w ? { place: WEATHER_POINT, ...w } : null;
     })(),
     sun: sunTimes(newYorkDate(now), WEATHER_POINT.lat, WEATHER_POINT.lon),
+    sky: skyNow(now, WEATHER_POINT.lat, WEATHER_POINT.lon, latestSkyInputs(db)),
   };
 }
 
