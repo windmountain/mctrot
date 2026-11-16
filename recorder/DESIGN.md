@@ -327,7 +327,7 @@ The biggest risk is the single server going down mid-run; location and posts sur
 Each step adds one layer, stays deployed, and ends with a small demo. Riskiest parts (location, radio scheduling) come early; test attempts run through the real pipeline, with `/live` unlinked until launch.
 
 - [ ] **1. Flake skeleton, local only.** Repo, flake, NixOS config with Caddy in a local VM (`nixos-rebuild build-vm`). Demo: `curl localhost` says hello.
-- [ ] **2. The real server.** Droplet + Volume, nixos-anywhere, Namecheap DNS, Caddy certificate. Demo: `https://api.mctrot.nyc` says hello.
+- [x] **2. The real server.** Droplet + Volume, nixos-anywhere, Namecheap DNS, Caddy certificate. Demo: `https://api.mctrot.nyc` says hello.
 - [ ] **3. API skeleton.** Node 26 package, systemd unit, SQLite on the Volume, sops-nix secrets. Demo: `GET /health` shows version, database and uptime; a deploy changes the version.
 - [ ] **4. Location ingest.** `POST /ingest` with token. Demo: Overland on a walk around the block; `GET /debug/points?last=10`.
 - [ ] **5. First `/live`.** Last position in JSON; bare Netlify page with a dot on a map. Demo: refresh during a walk.
@@ -350,7 +350,7 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 - [ ] Pick the event date and the radio start time
 - [ ] Configure start time (`radio.startAt` in the flake)
 - [ ] Check music licensing for the radio file
-- [ ] Create the DigitalOcean Droplet and Volume
-- [ ] Add the DNS records at Namecheap
+- [x] Create the DigitalOcean Droplet and Volume
+- [x] Add the DNS records at Namecheap
 - [ ] Set up Overland on the phone and register the passkey on the upload page
 - [ ] Set the iPhone camera to 1080p30 before the run
