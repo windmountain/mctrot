@@ -65,10 +65,47 @@ let
     </icecast>
   '';
 
-  # Playlists pointing at the stream, for players that want a playlist
-  # link. Files rather than inline text: a Caddyfile treats #EXTM3U as a
-  # comment.
-  playlists = pkgs.linkFarm "mctrot-radio-playlists" [
+  # The station's small website: a home page listing the stream and the
+  # playlists, and the playlists themselves, for players that want a
+  # playlist link. Files rather than inline text: a Caddyfile treats
+  # #EXTM3U as a comment.
+  playlists = pkgs.linkFarm "mctrot-radio-site" [
+    {
+      name = "index.html";
+      path = pkgs.writeText "index.html" ''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>McTrot radio</title>
+          <meta name="robots" content="noindex">
+          <style>
+            body { font: 1.05rem/1.5 -apple-system, Helvetica, Arial, sans-serif; max-width: 34rem; margin: 2rem auto; padding: 0 16px; color: #0D0D08; background: #fff; }
+            h1 { margin: 0 0 0.5rem; }
+            dt { font-weight: bold; margin-top: 1rem; }
+            dd { margin: 0.2rem 0 0; overflow-wrap: anywhere; }
+            code { font-size: 0.95em; }
+            .note { color: #6b6648; font-size: 0.9em; }
+            @media (prefers-color-scheme: dark) { body { color: #f2f0e6; background: #111; } a { color: #FFD100; } .note { color: #b8b39a; } }
+          </style>
+        </head>
+        <body>
+          <h1>McTrot radio</h1>
+          <p>The soundtrack to a walk to every McDonald’s in Manhattan. Listen along on <a href="https://mctrot.nyc/live">mctrot.nyc/live</a>, or in any radio app with one of these:</p>
+          <dl>
+            <dt>Stream (MP3, 128 kbps)</dt>
+            <dd><a href="/live.mp3"><code>https://radio.mctrot.nyc/live.mp3</code></a></dd>
+            <dt>Playlist (M3U)</dt>
+            <dd><a href="/live.m3u"><code>https://radio.mctrot.nyc/live.m3u</code></a></dd>
+            <dt>Playlist (PLS)</dt>
+            <dd><a href="/live.pls"><code>https://radio.mctrot.nyc/live.pls</code></a></dd>
+          </dl>
+          <p class="note">VLC, Apple Music (File › Open Stream URL) and most radio apps take the stream URL; some older players want a playlist.</p>
+        </body>
+        </html>
+      '';
+    }
     {
       name = "live.m3u";
       path = pkgs.writeText "live.m3u" ''
@@ -169,8 +206,14 @@ in
       root * ${playlists}
       file_server
     }
+    # The home page, at / (http:// redirects here: Caddy does that for
+    # every site).
+    handle / {
+      root * ${playlists}
+      file_server
+    }
     handle {
-      respond "McTrot radio: https://radio.mctrot.nyc/live.mp3" 404
+      respond "Not here. McTrot radio: https://radio.mctrot.nyc/" 404
     }
   '';
 }

@@ -384,7 +384,8 @@ the scheduled show.
 
 For players that want a playlist link rather than the stream itself,
 `https://radio.mctrot.nyc/live.m3u` and `/live.pls` point at it (browsers
-need the stream).
+need the stream). `https://radio.mctrot.nyc/` (and `http://`, which
+redirects) is a small page listing all three.
 
 - **Liquidsoap** (`mctrot-radio`) loops the tone, encodes 128 kbps stereo
   MP3 and sends it to Icecast. Its first start after a Liquidsoap upgrade
