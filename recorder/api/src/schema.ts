@@ -2,7 +2,7 @@
 // has to live for one event, so when this changes, bump SCHEMA_VERSION and
 // the API starts over with an empty database (see openDb). Once
 // `recorder.live` is on (host/configuration.nix), it refuses to instead.
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const SCHEMA = `
   -- Every location fix from the phone, keyed by the phone's timestamp so
