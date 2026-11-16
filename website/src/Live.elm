@@ -524,8 +524,8 @@ viewPosts model =
             Html.text ""
 
 
-{-| Media from media.mctrot.nyc: a photo's thumbnail linking to its full
-size, and video and voice that only fetch their headers until played.
+{-| Media from media.mctrot.nyc: a photo (its thumbnail or full size,
+whichever is sharp on this screen) linking to its full size, and video and voice that only fetch their headers until played.
 -}
 viewPostContent : PostContent -> Html Msg
 viewPostContent content =
@@ -536,10 +536,23 @@ viewPostContent content =
         Photo url thumbUrl ->
             Html.a [ Attr.href url, Attr.class "live-post-photo" ]
                 [ Html.img
-                    [ Attr.src (Maybe.withDefault url thumbUrl)
-                    , Attr.alt "Photo"
-                    , Attr.attribute "loading" "lazy"
-                    ]
+                    ([ Attr.src url
+                     , Attr.alt "Photo"
+                     , Attr.attribute "loading" "lazy"
+                     ]
+                        ++ (case thumbUrl of
+                                -- Long sides 400 and 1600 px: the browser
+                                -- takes the thumbnail only where it's sharp
+                                -- (a small 1x screen); phones get full size.
+                                Just thumb ->
+                                    [ Attr.attribute "srcset" (thumb ++ " 400w, " ++ url ++ " 1600w")
+                                    , Attr.attribute "sizes" "(min-width: 30rem) 28rem, calc(100vw - 32px)"
+                                    ]
+
+                                Nothing ->
+                                    []
+                           )
+                    )
                     []
                 ]
 

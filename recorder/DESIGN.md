@@ -353,7 +353,7 @@ Each step adds one layer, stays deployed, and ends with a small demo. Riskiest p
 - [ ] **7. Radio, part 1.** Icecast + Liquidsoap on a test loop with a fixed title. Demo: VLC plays `radio.mctrot.nyc/live.mp3`.
 - [ ] **8. Radio, part 2.** Scheduled start, cue sheet, on-air log, now-playing in `/live`. Demo: 10-minute file with four cues starting in five minutes; titles change on time; a restart resumes at the right spot.
 - [x] **9. Posting, part 1.** Passkey sign-in, text-only posts, the **Visit** button, and the outbox (brought forward from step 11). Demo: "hello" from the phone shows in `/live`.
-- [ ] **10. Posting, part 2.** tus uploads and photo processing, then video and voice. Demo: a photo appears with its thumbnail.
+- [x] **10. Posting, part 2.** tus uploads and photo processing, then video and voice. Demo: a photo appears with its thumbnail.
 - [ ] **11. Outbox and progress.** Demo: three posts in airplane mode land after reconnecting.
 - [ ] **12. Weather, stats, burndown data.** Demo: `/live` shows the forecast and miles walked on the test route.
 - [ ] **13. Archive.** Demo: a replay page for the walk-around-the-block attempt.
