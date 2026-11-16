@@ -1,0 +1,28 @@
+{
+  "name": "mctrot-recorder-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The recorder's API: ingest, attempts, /live, uploads.",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "dev": "node --watch src/main.ts",
+    "check": "tsc",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.2.0",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.2.0": true
+  }
+}
