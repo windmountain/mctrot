@@ -2,6 +2,7 @@ import { z } from "zod";
 import { latestAttempt } from "./attempts.ts";
 import type { Db } from "./db.ts";
 import type { RoutePlan } from "./plan.ts";
+import { recentPosts } from "./posts.ts";
 import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 
 // The /live response: everything the public page needs, in one call. This
@@ -61,6 +62,20 @@ export const LiveResponse = z
         ]),
       )
       .describe("This attempt's Visit taps in time order, each matched to a store by GPS"),
+    posts: z
+      .array(
+        z.object({
+          id: z.string(),
+          ts: ms("When I wrote it"),
+          type: z.literal("text"),
+          text: z.string(),
+          at: z
+            .object({ lat: z.number(), lon: z.number() })
+            .nullable()
+            .describe("Where I was, from the GPS track; null when unknown"),
+        }),
+      )
+      .describe("The newest posts first"),
   })
   .meta({ title: "McTrot /live response" });
 
@@ -79,7 +94,7 @@ export function live(db: Db, plan: RoutePlan, now = Date.now()): Live {
       )
     : [];
   const stores = plan.stores.map(({ id, name, address, lat, lon }) => ({ id, name, address, lat, lon }));
-  return { serverTs: now, position: position ?? null, attempt, stores, visits };
+  return { serverTs: now, position: position ?? null, attempt, stores, visits, posts: recentPosts(db) };
 }
 
 export function liveJsonSchema() {

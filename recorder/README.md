@@ -269,3 +269,33 @@ Without `<mctrot:stop>`, a waypoint's id is its position in the file and
 its address is its `<desc>` (the converter warns). The `/live` page draws
 whatever stores the plan has; ones outside Manhattan are off its map,
 but the visit count still works.
+
+## The upload page (posting from the road)
+
+`https://api.mctrot.nyc/post`, served by the API from `post/` (plain HTML
+and JS, no build step). Three buttons: **Visit** (a visit tap), **Post**
+(text), **Upload** (photos and video; not yet).
+
+**Setting up a phone, once:**
+
+1. Open `https://api.mctrot.nyc/post`, open "Use the ingest token
+   instead", and paste the token
+   (`sops decrypt --extract '["ingest-token"]' secrets/recorder.yaml`).
+2. Tap **Add Face ID to this phone**.
+3. Share → **Add to Home Screen**.
+
+From then on, **Sign in with Face ID**; a session lasts 180 days. The
+token always works as a fallback.
+
+**The outbox:** every tap goes into IndexedDB on the phone first, with its
+own id and the time I tapped, and is sent from there until the server
+confirms it: on every tap, on reopening the page, on coming back online,
+and every 10 s. Each item shows *Waiting for signal*, *Sending…*,
+*Sent ✓* or *Failed* (with Retry and Discard), and the home-screen icon
+shows a badge with what hasn't reached the server. Being signed out never
+loses anything; it waits until you sign in again. Uploads only happen
+while the page is open (iOS has no background sync for web apps).
+
+**Secrets:** the session cookie is signed with `session-secret` in
+`secrets/recorder.yaml`; passkeys are stored in the database (so `wipe`
+removes them: set up Face ID again after a wipe).

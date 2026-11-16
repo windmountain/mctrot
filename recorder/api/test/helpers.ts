@@ -16,14 +16,21 @@ export const PLAN: RoutePlan = {
 };
 
 // setup({}) runs without an ingest token configured.
-export function setup({ ingestToken }: { ingestToken?: string } = { ingestToken: TOKEN }) {
+export const ORIGIN = "https://api.example.test";
+
+export async function setup({ ingestToken }: { ingestToken?: string } = { ingestToken: TOKEN }) {
   const { db } = openDb(":memory:");
-  const app = buildApp({
+  const app = await buildApp({
     db,
     plan: PLAN,
     version: "abc1234",
     startedAt: new Date(Date.now() - 5000),
     ingestToken,
+    sessionSecret: "test-session-secret-0123456789abcdef",
+    origin: ORIGIN,
+    rpID: "example.test",
+    // recorder/post/; the Nix build points this at its copy.
+    postDir: process.env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).pathname,
   });
   return { db, app };
 }

@@ -201,6 +201,63 @@
         ]
       },
       "description": "This attempt's Visit taps in time order, each matched to a store by GPS"
+    },
+    "posts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "When I wrote it, ms since epoch"
+          },
+          "type": {
+            "type": "string",
+            "const": "text"
+          },
+          "text": {
+            "type": "string"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "lat",
+                  "lon"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where I was, from the GPS track; null when unknown"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "type",
+          "text",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "description": "The newest posts first"
     }
   },
   "required": [
@@ -208,7 +265,8 @@
     "position",
     "attempt",
     "stores",
-    "visits"
+    "visits",
+    "posts"
   ],
   "additionalProperties": false,
   "title": "McTrot /live response"

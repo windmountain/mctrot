@@ -5,7 +5,7 @@ import { LiveResponse, liveJsonSchema } from "../src/live.ts";
 import { auth, feature, setup } from "./helpers.ts";
 
 test("GET /live before any points: position is null", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   const res = await app.inject({ url: "/live" });
   assert.equal(res.statusCode, 200);
   assert.equal(res.json().position, null);
@@ -13,7 +13,7 @@ test("GET /live before any points: position is null", async () => {
 });
 
 test("GET /live returns the latest point, without a token, readable cross-origin", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   await app.inject({
     method: "POST",
     url: "/ingest",
@@ -47,14 +47,24 @@ test("GET /live without a route plan: no stores", async () => {
   const { buildApp } = await import("../src/app.ts");
   const { openDb } = await import("../src/db.ts");
   const { NO_PLAN } = await import("../src/plan.ts");
-  const app = buildApp({ db: openDb(":memory:").db, plan: NO_PLAN, version: "x", startedAt: new Date(), ingestToken: "t" });
+  const app = await buildApp({
+    db: openDb(":memory:").db,
+    plan: NO_PLAN,
+    version: "x",
+    startedAt: new Date(),
+    ingestToken: "t",
+    sessionSecret: undefined,
+    origin: "http://localhost",
+    rpID: "localhost",
+    postDir: ".",
+  });
   const body = (await app.inject({ url: "/live" })).json();
   assert.deepEqual(body.stores, []);
   assert.ok(LiveResponse.safeParse(body).success);
 });
 
 test("GET /live lists stores with only the contract's fields", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   const body = (await app.inject({ url: "/live" })).json();
   assert.deepEqual(Object.keys(body.stores[0]).sort(), ["address", "id", "lat", "lon", "name"]);
 });

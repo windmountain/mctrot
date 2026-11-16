@@ -12,5 +12,7 @@
     defaultSopsFile = ../secrets/recorder.yaml;
     age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
     secrets.ingest-token = { };
+    # Signs the upload page's session cookie (api/src/session.ts).
+    secrets.session-secret = { };
   };
 }

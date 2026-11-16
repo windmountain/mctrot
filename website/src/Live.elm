@@ -47,6 +47,16 @@ type alias LiveResponse =
     , attempt : Maybe Attempt
     , stores : List Store
     , visits : List Visit
+    , posts : List Post
+    }
+
+
+{-| A text post, newest first in the list.
+-}
+type alias Post =
+    { id : String
+    , ts : Int
+    , text : String
     }
 
 
@@ -82,12 +92,21 @@ type Visit
 
 liveDecoder : Decoder LiveResponse
 liveDecoder =
-    Decode.map5 LiveResponse
+    Decode.map6 LiveResponse
         (Decode.field "serverTs" Decode.int)
         (Decode.field "position" (Decode.nullable positionDecoder))
         (Decode.field "attempt" (Decode.nullable attemptDecoder))
         (Decode.field "stores" (Decode.list storeDecoder))
         (Decode.field "visits" (Decode.list visitDecoder))
+        (Decode.field "posts" (Decode.list postDecoder))
+
+
+postDecoder : Decoder Post
+postDecoder =
+    Decode.map3 Post
+        (Decode.field "id" Decode.string)
+        (Decode.field "ts" Decode.int)
+        (Decode.field "text" Decode.string)
 
 
 attemptDecoder : Decoder Attempt
@@ -228,6 +247,7 @@ view model =
             [ Html.text (status model) ]
         , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
         , viewMap response
+        , viewPosts model
         ]
 
 
@@ -438,3 +458,26 @@ onMap placed =
 viewBoxNumbers : List Float
 viewBoxNumbers =
     MctrotMapData.mapViewBox |> String.words |> List.filterMap String.toFloat
+
+
+viewPosts : Model -> Html Msg
+viewPosts model =
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            if List.isEmpty response.posts then
+                Html.text ""
+
+            else
+                Html.ul [ Attr.class "live-posts" ]
+                    (List.map
+                        (\post ->
+                            Html.li [ Attr.class "live-post" ]
+                                [ Html.p [ Attr.class "live-post-text" ] [ Html.text post.text ]
+                                , Html.p [ Attr.class "live-post-when" ] [ Html.text (duration (now - post.ts) ++ " ago") ]
+                                ]
+                        )
+                        response.posts
+                    )
+
+        _ ->
+            Html.text ""

@@ -26,7 +26,7 @@ buildNpmPackage {
   nodejs = nodejs_26;
   # Update after changing package-lock.json:
   #   nix run nixpkgs#prefetch-npm-deps -- package-lock.json
-  npmDepsHash = "sha256-Kj23ae+QrHO7qWlCwMPUArMgrxd1ldvDeRUtgdHiFzw=";
+  npmDepsHash = "sha256-6jn4GqUU8Q8sZ9hJyiawlpa36unk8op4DzZoneegGyM=";
 
   nativeBuildInputs = [ python3 makeWrapper ]
     ++ lib.optional stdenv.hostPlatform.isDarwin cctools;
@@ -53,7 +53,7 @@ buildNpmPackage {
   checkPhase = ''
     runHook preCheck
     node_modules/.bin/tsc
-    node --test test/
+    MCTROT_POST_DIR=${../post} node --test test/
     runHook postCheck
   '';
 
@@ -62,6 +62,9 @@ buildNpmPackage {
     npm prune --omit=dev --no-save --offline
     mkdir -p $out/lib/api $out/bin
     cp -r package.json src node_modules $out/lib/api/
+    # The upload page (recorder/post/), served by the API; main.ts finds it
+    # at ../../post from its own file.
+    cp -r ${../post} $out/lib/post
     makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-api \
       --add-flags $out/lib/api/src/main.ts
     # The raw tool; on the box, use mctrot-dislocate (host/api.nix).

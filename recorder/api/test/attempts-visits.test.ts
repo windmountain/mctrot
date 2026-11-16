@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { auth, feature, setup } from "./helpers.ts";
 
-const post = (app: ReturnType<typeof setup>["app"], url: string, payload?: object) =>
+const post = (app: Awaited<ReturnType<typeof setup>>["app"], url: string, payload?: object) =>
   app.inject({ method: "POST", url, headers: auth, ...(payload ? { payload } : {}) });
 
 test("attempts: start, start again (same one), stop, stop again (409)", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   const first = await post(app, "/attempts/start");
   assert.equal(first.statusCode, 201);
   const again = await post(app, "/attempts/start");
@@ -19,14 +19,14 @@ test("attempts: start, start again (same one), stop, stop again (409)", async ()
 });
 
 test("attempts and visits need the token", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   for (const url of ["/attempts/start", "/attempts/stop", "/visits"]) {
     assert.equal((await app.inject({ method: "POST", url })).statusCode, 401, url);
   }
 });
 
 test("a retried tap with the same id is recorded once", async () => {
-  const { app, db } = setup();
+  const { app, db } = await setup();
   const tap = { ts: "2026-12-05T12:00:00Z", id: "tap-1" };
   assert.equal((await post(app, "/visits", tap)).statusCode, 201);
   const retry = await post(app, "/visits", tap);
@@ -36,14 +36,14 @@ test("a retried tap with the same id is recorded once", async () => {
 });
 
 test("a tap without a time is now", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   const before = Date.now();
   const res = await post(app, "/visits");
   assert.ok(res.json().ts >= before && res.json().ts <= Date.now());
 });
 
 test("/live: a tap at store A during an attempt counts as a visit to A", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   await post(app, "/attempts/start");
   const now = Date.now();
   const iso = (ms: number) => new Date(ms).toISOString();
@@ -65,7 +65,7 @@ test("/live: a tap at store A during an attempt counts as a visit to A", async (
 });
 
 test("/live: taps outside the attempt don't count", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   await post(app, "/visits", { ts: Date.now() - 3_600_000 }); // an hour before
   await post(app, "/attempts/start");
   const body = (await app.inject({ url: "/live" })).json();
@@ -73,7 +73,7 @@ test("/live: taps outside the attempt don't count", async () => {
 });
 
 test("/live: no attempt yet means no visits", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   await post(app, "/visits");
   const body = (await app.inject({ url: "/live" })).json();
   assert.equal(body.attempt, null);

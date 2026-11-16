@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { auth, feature, setup, TOKEN } from "./helpers.ts";
 
-const ingest = (app: ReturnType<typeof setup>["app"], locations: unknown[], headers = auth) =>
+const ingest = (app: Awaited<ReturnType<typeof setup>>["app"], locations: unknown[], headers = auth) =>
   app.inject({ method: "POST", url: "/ingest", headers, payload: { locations } });
 
-const count = (db: ReturnType<typeof setup>["db"]) =>
+const count = (db: Awaited<ReturnType<typeof setup>>["db"]) =>
   db.prepare("select count(*) from points").pluck().get();
 
 test("stores a batch and answers the way Overland expects", async () => {
-  const { app, db } = setup();
+  const { app, db } = await setup();
   const res = await ingest(app, [
     feature("2026-11-16T10:00:00-0500"),
     feature("2026-11-16T10:00:30-0500"),
@@ -26,7 +26,7 @@ test("stores a batch and answers the way Overland expects", async () => {
 });
 
 test("a retried batch stores nothing twice", async () => {
-  const { app, db } = setup();
+  const { app, db } = await setup();
   const batch = [feature("2026-11-16T10:00:00Z"), feature("2026-11-16T10:00:30Z")];
   await ingest(app, batch);
   const res = await ingest(app, batch);
@@ -35,7 +35,7 @@ test("a retried batch stores nothing twice", async () => {
 });
 
 test("bad points are skipped without failing the batch", async () => {
-  const { app, db } = setup();
+  const { app, db } = await setup();
   const res = await ingest(app, [
     feature("2026-11-16T10:00:00Z"),
     feature("not a time"),
@@ -48,7 +48,7 @@ test("bad points are skipped without failing the batch", async () => {
 });
 
 test("iOS 'unknown' values (-1) are stored as null", async () => {
-  const { app, db } = setup();
+  const { app, db } = await setup();
   await ingest(app, [
     feature("2026-11-16T10:00:00Z", -73.98, 40.75, { speed: -1, horizontal_accuracy: -1, battery_level: -1 }),
   ]);
@@ -57,7 +57,7 @@ test("iOS 'unknown' values (-1) are stored as null", async () => {
 });
 
 test("rejects a missing or wrong token", async () => {
-  const { app, db } = setup();
+  const { app, db } = await setup();
   const batch = [feature("2026-11-16T10:00:00Z")];
   assert.equal((await ingest(app, batch, {} as typeof auth)).statusCode, 401);
   assert.equal((await ingest(app, batch, { authorization: "Bearer nope" })).statusCode, 401);
@@ -65,7 +65,7 @@ test("rejects a missing or wrong token", async () => {
 });
 
 test("without a configured token, ingest is 503 so Overland retries", async () => {
-  const { app } = setup({});
+  const { app } = await setup({});
   const res = await ingest(app, [feature("2026-11-16T10:00:00Z")], {
     authorization: `Bearer ${TOKEN}`,
   });
@@ -73,13 +73,13 @@ test("without a configured token, ingest is 503 so Overland retries", async () =
 });
 
 test("a body without locations is a 400", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   const res = await app.inject({ method: "POST", url: "/ingest", headers: auth, payload: { hi: 1 } });
   assert.equal(res.statusCode, 400);
 });
 
 test("GET /debug/points returns the newest points, token required", async () => {
-  const { app } = setup();
+  const { app } = await setup();
   await ingest(app, [
     feature("2026-11-16T10:00:00Z"),
     feature("2026-11-16T10:02:00Z"),

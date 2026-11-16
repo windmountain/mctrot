@@ -10,9 +10,15 @@ function bearer(req: FastifyRequest): string | undefined {
 }
 
 // Compare digests so the comparison takes the same time for any input.
-function same(a: string, b: string): boolean {
+export function same(a: string, b: string): boolean {
   const digest = (s: string) => createHash("sha256").update(s).digest();
   return timingSafeEqual(digest(a), digest(b));
+}
+
+// Whether the request carries the token, as "Authorization: Bearer ...".
+export function tokenMatches(expected: string | undefined, req: FastifyRequest): boolean {
+  const given = bearer(req);
+  return expected !== undefined && given !== undefined && same(given, expected);
 }
 
 // Returns true if the request may continue; otherwise it has replied.

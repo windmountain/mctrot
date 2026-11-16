@@ -2,7 +2,7 @@
 // has to live for one event, so when this changes, bump SCHEMA_VERSION and
 // the API starts over with an empty database (see openDb). Once
 // `recorder.live` is on (host/configuration.nix), it refuses to instead.
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SCHEMA = `
   -- Every location fix from the phone, keyed by the phone's timestamp so
@@ -32,5 +32,26 @@ export const SCHEMA = `
     id text primary key,           -- from the phone, so retries don't duplicate
     ts integer not null,           -- ms since epoch, phone clock
     received_at integer not null   -- ms since epoch, server clock
+  ) strict;
+
+  -- Passkeys allowed to sign in to the upload page (Face ID on my phone).
+  create table passkeys (
+    id text primary key,           -- credential id, base64url
+    public_key blob not null,
+    counter integer not null,
+    transports text not null,      -- JSON array
+    created_at integer not null
+  ) strict;
+
+  -- What I post from the road. id comes from the phone's outbox, so a
+  -- retried upload can't post twice. Where it was posted is worked out
+  -- from the GPS track, like visits.
+  create table posts (
+    id text primary key,
+    ts integer not null,           -- ms since epoch, phone clock (when written)
+    type text not null check (type in ('text')),
+    text text not null,
+    hidden integer not null default 0,
+    received_at integer not null
   ) strict;
 `;

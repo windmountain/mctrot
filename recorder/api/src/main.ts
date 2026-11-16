@@ -13,6 +13,12 @@ const dbPath = env.MCTROT_DB ?? "dev.sqlite";
 const version = env.MCTROT_VERSION ?? "dev";
 // JSON made from the route GPX (tools/route_plan.py); unset means no stores.
 const planPath = env.MCTROT_ROUTE_PLAN || undefined;
+// Where the upload page is served from, and its passkeys' domain. On the box:
+// https://api.mctrot.nyc and mctrot.nyc (host/api.nix).
+const origin = env.MCTROT_ORIGIN ?? `http://localhost:${port}`;
+const rpID = env.MCTROT_RP_ID ?? "localhost";
+// The upload page's files: recorder/post/, next to this package.
+const postDir = env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).pathname;
 const resetPolicy = env.MCTROT_DB_RESET === "never" ? "never" : "reset";
 
 // Secrets arrive as files via systemd's LoadCredential, so they never sit
@@ -28,15 +34,20 @@ function readSecret(name: string): string | undefined {
 }
 
 const ingestToken = readSecret("ingest-token") ?? (env.MCTROT_INGEST_TOKEN || undefined);
+const sessionSecret = readSecret("session-secret") ?? (env.MCTROT_SESSION_SECRET || undefined);
 
 const plan = loadPlan(planPath);
 const { db, archived } = openDb(dbPath, resetPolicy);
-const app = buildApp({
+const app = await buildApp({
   db,
   plan,
   version,
   startedAt: new Date(),
   ingestToken,
+  sessionSecret,
+  origin,
+  rpID,
+  postDir,
   logger: true,
 });
 if (archived) {

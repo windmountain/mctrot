@@ -75,6 +75,10 @@ in
       # API moves the old database aside as a .bak and starts empty, until
       # recorder.live is on; then it refuses to start instead.
       MCTROT_DB_RESET = if config.recorder.live then "never" else "allow";
+      # The upload page (api.mctrot.nyc/post) and its passkeys. The
+      # passkey's domain is mctrot.nyc, so it keeps working on any subdomain.
+      MCTROT_ORIGIN = "https://api.mctrot.nyc";
+      MCTROT_RP_ID = "mctrot.nyc";
       NODE_ENV = "production";
     };
 
@@ -87,6 +91,7 @@ in
       StateDirectoryMode = "0750";
       LoadCredential = [
         "ingest-token:${config.sops.secrets.ingest-token.path}"
+        "session-secret:${config.sops.secrets.session-secret.path}"
       ];
       Restart = "always";
       RestartSec = 2;
