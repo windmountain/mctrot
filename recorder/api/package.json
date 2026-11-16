@@ -11,7 +11,8 @@
     "start": "node src/main.ts",
     "dev": "node --watch src/main.ts",
     "check": "tsc",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "schema": "node src/write-schema.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.2.0",

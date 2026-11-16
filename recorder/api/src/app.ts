@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { requireToken } from "./auth.ts";
 import { type Db, dbStatus } from "./db.ts";
+import { live } from "./live.ts";
 import { lastPoints, OverlandBatch, storePoints } from "./points.ts";
 
 export type AppDeps = {
@@ -43,6 +44,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const result = storePoints(db, batch.data.locations);
     req.log.info(result, "ingest");
     return { result: "ok" };
+  });
+
+  // The public page's one call (website/live.html, on another origin).
+  // Public data, so any origin may read it; never cached, it's live.
+  app.get("/live", async (_req, reply) => {
+    reply.header("access-control-allow-origin", "*");
+    reply.header("cache-control", "no-store");
+    return live(db);
   });
 
   // The latest stored points, newest first. Token-protected: it's my

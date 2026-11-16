@@ -202,3 +202,26 @@ recorded.
 **Before the event:** set `recorder.live = true` in
 `host/configuration.nix` and deploy. Then `wipe` and `dislocate` refuse,
 and a schema change stops the API instead of setting the database aside.
+
+## /live (step 5)
+
+`GET https://api.mctrot.nyc/live` is public (any origin, never cached):
+the latest point, and the server's clock so the page can show how old it
+is. Its shape is `api/src/live.ts`; `api/live.schema.json` is generated
+from it with `npm run schema` (a test fails when it's stale), and
+`website/src/Live.elm`'s decoder follows it.
+
+The page is `website/live.html` + `website/src/Live.elm`, built into
+`website/build/` by `website/build.sh` like the rest of the site, and
+unlinked (`noindex`) until launch. It draws on the simulator's Manhattan
+map: `website/src/Projection.elm` turns latitude/longitude into that
+map's coordinates (EPSG:2263, rotated 29°), and `ProjectionTest` checks
+every McDonald's lands on its dot.
+
+To try the page against a local API:
+
+```
+cd recorder/api && nix develop .. -c npm run dev     # API on :3000
+open "website/build/live.html"                        # or any static server, then:
+# http://localhost:<port>/live.html?api=http://localhost:3000
+```

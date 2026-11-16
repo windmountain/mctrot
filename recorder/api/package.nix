@@ -17,6 +17,7 @@ buildNpmPackage {
       ./package.json
       ./package-lock.json
       ./tsconfig.json
+      ./live.schema.json
       ./src
       ./test
     ];

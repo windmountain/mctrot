@@ -3,7 +3,8 @@
 # assets (including geo/route-legs.json, which the simulator fetches for its
 # GPX export, and sim/, the simulator's own share image and manifest), and
 # compiles the Elm programs into build/js/: the simulator, the mega search
-# page, and the mega search's worker (alongside js/'s hand-written scripts).
+# page, the mega search's worker, and /live (alongside js/'s hand-written
+# scripts).
 # Run inside `devenv shell` (for elm and terser). Does not regenerate map
 # data; run scripts/export_simulator_data.py for that (see README).
 set -euo pipefail
@@ -35,3 +36,4 @@ compile() {
 compile Simulator simulator
 compile MegaSearch mega-search
 compile MegaSearchWorker mega-search-worker-elm
+compile Live live

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>McTrot Live</title>
+  <meta name="description" content="Where I am during a McTrot attempt, live.">
+  <!-- Unlinked until launch: keep it out of search results. -->
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#FFD100">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/mctrot-map.css">
+  <style>
+    .live { max-width: var(--measure); margin: 0 auto; padding: 1rem 16px 2rem; }
+    .live-home { margin: 0; }
+    .live h1 { margin: 0.25rem 0 0; }
+    .live-status { margin: 0.25rem 0 1rem; min-height: 1.6em; }
+    .live-map-svg { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto; }
+    .live-store { fill: #FF0000; }
+    .live-me { fill: #fff; stroke: #FFD100; stroke-width: 3px; vector-effect: non-scaling-stroke; }
+    .live-note { text-align: center; }
+  </style>
+</head>
+<body>
+  <main id="main">
+    <div id="live">
+      <noscript>
+        <p><a href="/">McTrot</a></p>
+        <h1>Live</h1>
+        <p>This page shows where I am during a McTrot attempt. It requires JavaScript.</p>
+      </noscript>
+    </div>
+  </main>
+
+  <script src="js/live.js"></script>
+  <script>
+    // ?api=http://localhost:3000 points the page at a local recorder.
+    var api = new URLSearchParams(window.location.search).get("api");
+    Elm.Live.init({
+      node: document.getElementById("live"),
+      flags: { api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc" }
+    });
+  </script>
+</body>
+</html>

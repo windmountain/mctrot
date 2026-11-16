@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "serverTs": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "description": "Server clock, ms since epoch"
+    },
+    "position": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ts": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "When the phone recorded it, ms since epoch"
+            },
+            "lat": {
+              "type": "number"
+            },
+            "lon": {
+              "type": "number"
+            },
+            "accuracy": {
+              "description": "Horizontal accuracy in metres",
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "ts",
+            "lat",
+            "lon",
+            "accuracy"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The latest recorded point; null before any"
+    }
+  },
+  "required": [
+    "serverTs",
+    "position"
+  ],
+  "additionalProperties": false,
+  "title": "McTrot /live response"
+}
