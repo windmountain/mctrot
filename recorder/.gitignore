@@ -1,0 +1,6 @@
+# nix build outputs
+result
+result-*
+
+# disk image left behind by `nix run .#vm`
+*.qcow2
