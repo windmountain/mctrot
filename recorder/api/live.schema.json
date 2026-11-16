@@ -214,14 +214,99 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991,
-            "description": "When I wrote it, ms since epoch"
+            "description": "When I made it, ms since epoch"
           },
           "type": {
             "type": "string",
-            "const": "text"
+            "enum": [
+              "text",
+              "photo",
+              "video",
+              "voice"
+            ]
           },
           "text": {
-            "type": "string"
+            "description": "A text post's text",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Photo: full size; video: .mp4; voice: .m4a"
+                  },
+                  "thumbUrl": {
+                    "description": "Photo: about 400 px",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "posterUrl": {
+                    "description": "Video: a frame",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "height": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "durationMs": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "url",
+                  "thumbUrl",
+                  "posterUrl",
+                  "width",
+                  "height",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for text posts"
           },
           "at": {
             "anyOf": [
@@ -253,11 +338,12 @@
           "ts",
           "type",
           "text",
+          "media",
           "at"
         ],
         "additionalProperties": false
       },
-      "description": "The newest posts first"
+      "description": "The newest posts first; photos, video and voice once processed"
     }
   },
   "required": [

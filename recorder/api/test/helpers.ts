@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { buildApp } from "../src/app.ts";
 import { openDb } from "../src/db.ts";
 import type { RoutePlan } from "../src/plan.ts";
@@ -31,6 +34,8 @@ export async function setup({ ingestToken }: { ingestToken?: string } = { ingest
     rpID: "example.test",
     // recorder/post/; the Nix build points this at its copy.
     postDir: process.env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).pathname,
+    uploadDir: mkdtempSync(join(tmpdir(), "mctrot-uploads-")),
+    mediaUrl: "https://media.example.test",
   });
   return { db, app };
 }

@@ -66,22 +66,33 @@ export const LiveResponse = z
       .array(
         z.object({
           id: z.string(),
-          ts: ms("When I wrote it"),
-          type: z.literal("text"),
-          text: z.string(),
+          ts: ms("When I made it"),
+          type: z.enum(["text", "photo", "video", "voice"]),
+          text: z.string().nullable().describe("A text post's text"),
+          media: z
+            .object({
+              url: z.string().describe("Photo: full size; video: .mp4; voice: .m4a"),
+              thumbUrl: z.string().nullable().describe("Photo: about 400 px"),
+              posterUrl: z.string().nullable().describe("Video: a frame"),
+              width: z.number().int().nullable(),
+              height: z.number().int().nullable(),
+              durationMs: z.number().int().nullable(),
+            })
+            .nullable()
+            .describe("Null for text posts"),
           at: z
             .object({ lat: z.number(), lon: z.number() })
             .nullable()
             .describe("Where I was, from the GPS track; null when unknown"),
         }),
       )
-      .describe("The newest posts first"),
+      .describe("The newest posts first; photos, video and voice once processed"),
   })
   .meta({ title: "McTrot /live response" });
 
 export type Live = z.infer<typeof LiveResponse>;
 
-export function live(db: Db, plan: RoutePlan, now = Date.now()): Live {
+export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()): Live {
   const position = db
     .prepare("select ts, lat, lon, accuracy from points order by ts desc limit 1")
     .get() as Live["position"] | undefined;
@@ -94,7 +105,7 @@ export function live(db: Db, plan: RoutePlan, now = Date.now()): Live {
       )
     : [];
   const stores = plan.stores.map(({ id, name, address, lat, lon }) => ({ id, name, address, lat, lon }));
-  return { serverTs: now, position: position ?? null, attempt, stores, visits, posts: recentPosts(db) };
+  return { serverTs: now, position: position ?? null, attempt, stores, visits, posts: recentPosts(db, mediaUrl) };
 }
 
 export function liveJsonSchema() {

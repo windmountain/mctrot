@@ -4,6 +4,10 @@ let
   api = pkgs.callPackage ../api/package.nix { };
   port = 3000;
   dbPath = "/var/lib/mctrot/db/recorder.sqlite";
+  # On the Volume, owned by mctrot: the database, uploads waiting for the
+  # worker, and the worker's output. Both services list all three (with
+  # the same mode), so neither one's start changes the other's.
+  stateDirs = [ "mctrot/db" "mctrot/uploads" "mctrot/media" ];
   services = lib.escapeShellArgs config.recorder.dataServices;
 
   # The route plan GPX as the JSON the API reads, converted at build time
@@ -55,7 +59,11 @@ in
   };
   users.groups.mctrot = { };
 
-  recorder.dataServices = [ "mctrot-api.service" ];
+  recorder.dataServices = [ "mctrot-api.service" "mctrot-worker.service" ];
+
+  # Caddy serves the media folder (media.mctrot.nyc, below); the group
+  # lets it read there while the Volume's folders stay closed to others.
+  users.users.caddy.extraGroups = [ "mctrot" ];
 
   systemd.services.mctrot-api = {
     description = "McTrot recorder API";
@@ -79,6 +87,10 @@ in
       # passkey's domain is mctrot.nyc, so it keeps working on any subdomain.
       MCTROT_ORIGIN = "https://api.mctrot.nyc";
       MCTROT_RP_ID = "mctrot.nyc";
+      # Finished uploads wait here for the worker; the worker's results are
+      # served from media.mctrot.nyc.
+      MCTROT_UPLOAD_DIR = "/var/lib/mctrot/uploads";
+      MCTROT_MEDIA_URL = "https://media.mctrot.nyc";
       NODE_ENV = "production";
     };
 
@@ -86,8 +98,7 @@ in
       ExecStart = "${api}/bin/mctrot-api";
       User = "mctrot";
       Group = "mctrot";
-      # Creates /var/lib/mctrot/db on the Volume, owned by mctrot.
-      StateDirectory = "mctrot/db";
+      StateDirectory = stateDirs;
       StateDirectoryMode = "0750";
       LoadCredential = [
         "ingest-token:${config.sops.secrets.ingest-token.path}"
@@ -112,9 +123,64 @@ in
     };
   };
 
+  # Turns uploads into the photos, video and voice notes /live shows
+  # (api/src/worker.ts). Low priority, as DESIGN.md asks: processing a video
+  # must never starve the radio of CPU or disk.
+  systemd.services.mctrot-worker = {
+    description = "McTrot media worker";
+    wantedBy = [ "multi-user.target" ];
+    # The API sets up the database's schema; the worker only uses it.
+    after = [ "mctrot-api.service" ];
+    unitConfig.RequiresMountsFor = "/var/lib/mctrot";
+    path = [ pkgs.vips pkgs.ffmpeg-headless ];
+
+    environment = {
+      MCTROT_DB = dbPath;
+      MCTROT_MEDIA_DIR = "/var/lib/mctrot/media";
+      NODE_ENV = "production";
+    };
+
+    serviceConfig = {
+      ExecStart = "${api}/bin/mctrot-worker";
+      User = "mctrot";
+      Group = "mctrot";
+      StateDirectory = stateDirs;
+      StateDirectoryMode = "0750";
+      # Files it makes are readable by the group, so Caddy can serve them.
+      UMask = "0027";
+      Nice = 19;
+      CPUQuota = "50%";
+      IOSchedulingClass = "idle";
+      Restart = "always";
+      RestartSec = 5;
+
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+      PrivateNetwork = true; # it only reads and writes files
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      LockPersonality = true;
+    };
+  };
+
   environment.systemPackages = [ dislocate ];
 
   services.caddy.virtualHosts."api.mctrot.nyc".extraConfig = ''
     reverse_proxy 127.0.0.1:${toString port}
+  '';
+
+  # The worker's output, straight from disk. File names never change once
+  # a post is ready, so browsers (and any CDN later) may keep them forever.
+  # Range requests (video scrubbing) come with file_server.
+  services.caddy.virtualHosts."media.mctrot.nyc".extraConfig = ''
+    root * /var/lib/mctrot/media
+    file_server
+    header Cache-Control "public, max-age=31536000, immutable"
+    header Access-Control-Allow-Origin *
   '';
 }

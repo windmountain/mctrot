@@ -11,6 +11,7 @@ position on the site's Manhattan map.
 import Browser
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Keyed
 import Http
 import Json.Decode as Decode exposing (Decoder)
 import MctrotMapData
@@ -51,13 +52,23 @@ type alias LiveResponse =
     }
 
 
-{-| A text post, newest first in the list.
+{-| A post, newest first in the list: text, or a photo, video or voice
+note once the server has processed it.
 -}
 type alias Post =
     { id : String
     , ts : Int
-    , text : String
+    , content : PostContent
     }
+
+
+type PostContent
+    = Text String
+      -- full size, thumbnail
+    | Photo String (Maybe String)
+      -- the .mp4, its poster frame
+    | Video String (Maybe String)
+    | Voice String
 
 
 type alias Position =
@@ -106,7 +117,33 @@ postDecoder =
     Decode.map3 Post
         (Decode.field "id" Decode.string)
         (Decode.field "ts" Decode.int)
-        (Decode.field "text" Decode.string)
+        (Decode.field "type" Decode.string |> Decode.andThen postContentDecoder)
+
+
+postContentDecoder : String -> Decoder PostContent
+postContentDecoder postType =
+    let
+        media field =
+            Decode.at [ "media", field ]
+
+        optional field =
+            media field (Decode.nullable Decode.string)
+    in
+    case postType of
+        "text" ->
+            Decode.map Text (Decode.field "text" Decode.string)
+
+        "photo" ->
+            Decode.map2 Photo (media "url" Decode.string) (optional "thumbUrl")
+
+        "video" ->
+            Decode.map2 Video (media "url" Decode.string) (optional "posterUrl")
+
+        "voice" ->
+            Decode.map Voice (media "url" Decode.string)
+
+        other ->
+            Decode.fail ("unknown post type " ++ other)
 
 
 attemptDecoder : Decoder Attempt
@@ -468,16 +505,61 @@ viewPosts model =
                 Html.text ""
 
             else
-                Html.ul [ Attr.class "live-posts" ]
+                -- Keyed by post, so a video that's playing keeps playing
+                -- when a newer post arrives above it.
+                Html.Keyed.ul [ Attr.class "live-posts" ]
                     (List.map
                         (\post ->
-                            Html.li [ Attr.class "live-post" ]
-                                [ Html.p [ Attr.class "live-post-text" ] [ Html.text post.text ]
+                            ( post.id
+                            , Html.li [ Attr.class "live-post" ]
+                                [ viewPostContent post.content
                                 , Html.p [ Attr.class "live-post-when" ] [ Html.text (duration (now - post.ts) ++ " ago") ]
                                 ]
+                            )
                         )
                         response.posts
                     )
 
         _ ->
             Html.text ""
+
+
+{-| Media from media.mctrot.nyc: a photo's thumbnail linking to its full
+size, and video and voice that only fetch their headers until played.
+-}
+viewPostContent : PostContent -> Html Msg
+viewPostContent content =
+    case content of
+        Text text ->
+            Html.p [ Attr.class "live-post-text" ] [ Html.text text ]
+
+        Photo url thumbUrl ->
+            Html.a [ Attr.href url, Attr.class "live-post-photo" ]
+                [ Html.img
+                    [ Attr.src (Maybe.withDefault url thumbUrl)
+                    , Attr.alt "Photo"
+                    , Attr.attribute "loading" "lazy"
+                    ]
+                    []
+                ]
+
+        Video url posterUrl ->
+            Html.video
+                ([ Attr.src url
+                 , Attr.controls True
+                 , Attr.attribute "preload" "metadata"
+                 , Attr.attribute "playsinline" ""
+                 , Attr.class "live-post-video"
+                 ]
+                    ++ (posterUrl |> Maybe.map (\p -> [ Attr.attribute "poster" p ]) |> Maybe.withDefault [])
+                )
+                []
+
+        Voice url ->
+            Html.audio
+                [ Attr.src url
+                , Attr.controls True
+                , Attr.attribute "preload" "metadata"
+                , Attr.class "live-post-voice"
+                ]
+                []

@@ -1,15 +1,23 @@
-// The upload page: Visit, Post and (later) Upload, from the road.
+// The upload page: Visit, Post and Upload, from the road.
 //
 // Everything I do goes into an outbox on the phone (IndexedDB) first, with
 // its own id and the time I did it, and is sent from there until the
 // server confirms it. Bad signal only delays things; retries can't
 // duplicate them (the server ignores an id it already has).
 //
+// Two lanes, so a long video upload never holds up a Visit: messages
+// (visits, text posts) and uploads (photos, videos, voice notes) send
+// independently. Uploads use tus, so a dropped upload resumes where it
+// stopped, even after the page is closed and reopened.
+//
 // Signs in with a passkey (Face ID), or the ingest token the first time.
 // See recorder/DESIGN.md, "Posts".
 
 const $ = (id) => document.getElementById(id);
 const webauthn = window.SimpleWebAuthnBrowser;
+
+const MAX_UPLOAD_BYTES = 1024 ** 3; // as the server (api/src/uploads.ts)
+const UPLOAD_CHUNK = 5 * 1024 * 1024;
 
 // --- The outbox (IndexedDB) ---------------------------------------------
 
@@ -44,8 +52,11 @@ const allItems = async () => {
   return items.sort((a, b) => b.createdAt - a.createdAt);
 };
 
-// An item: { id, kind: "visit" | "post", ts, text?, state, error?, createdAt, sentAt? }
-// state: "queued" (waiting for signal or its turn), "sending", "sent", "failed".
+// An item: { id, kind: "visit" | "post" | "upload", ts, state, error?,
+//   createdAt, sentAt?, text? (post), file?, name?, type?, size?, media? (upload) }
+// state: "queued" (waiting for signal or its turn), "sending" or
+// "uploading", "processing" (uploaded; the server is working on it),
+// "sent", "failed".
 async function enqueue(kind, fields = {}) {
   const now = Date.now();
   const item = { id: crypto.randomUUID(), kind, ts: now, ...fields, state: "queued", createdAt: now };
@@ -59,11 +70,11 @@ async function enqueue(kind, fields = {}) {
 
 let online = null; // null until the first request: unknown
 let needsSignIn = false;
-let flushing = false;
 
-function request(item) {
-  if (item.kind === "visit") return { url: "/visits", body: { id: item.id, ts: item.ts } };
-  return { url: "/posts", body: { id: item.id, ts: item.ts, type: "text", text: item.text } };
+function setOnline(value) {
+  online = value;
+  $("net").className = "dot " + (value ? "online" : "offline");
+  $("net").title = value ? "Reached the server" : "Can’t reach the server";
 }
 
 async function api(url, body) {
@@ -75,57 +86,172 @@ async function api(url, body) {
   });
 }
 
-// Sends queued items oldest first; stops at the first one that can't go
-// now (no signal, signed out), so order is kept and nothing is skipped.
-async function flush() {
-  if (flushing || needsSignIn) return;
-  flushing = true;
-  try {
-    const queued = (await allItems()).filter((i) => i.state === "queued").reverse();
-    for (const item of queued) {
-      item.state = "sending";
-      await putItem(item);
-      await render();
-      let res;
-      try {
-        const { url, body } = request(item);
-        res = await api(url, body);
-      } catch {
-        // No signal. Try again later.
-        item.state = "queued";
-        await putItem(item);
-        setOnline(false);
-        break;
-      }
-      setOnline(true);
-      if (res.ok) {
-        item.state = "sent";
-        item.sentAt = Date.now();
-        delete item.error;
-      } else if (res.status === 401) {
-        item.state = "queued";
-        needsSignIn = true;
-      } else if (res.status >= 500) {
-        item.state = "queued";
-        item.error = `Server error ${res.status}; will retry`;
-      } else {
-        item.state = "failed";
-        item.error = (await res.json().catch(() => ({}))).error ?? `Rejected (${res.status})`;
-      }
-      await putItem(item);
-      if (item.state === "queued") break;
-    }
-  } finally {
-    flushing = false;
-    await render();
-    if (needsSignIn) showSignIn("Signed out; sign in again. Nothing in the outbox is lost.");
-  }
+function flush() {
+  flushMessages();
+  flushUploads();
+  pollProcessing();
 }
 
-function setOnline(value) {
-  online = value;
-  $("net").className = "dot " + (value ? "online" : "offline");
-  $("net").title = value ? "Reached the server" : "Can’t reach the server";
+// Each lane sends its queued items oldest first and stops at the first
+// that can't go now (no signal, signed out), so nothing is skipped.
+function lane(isMine, send) {
+  let busy = false;
+  return async function run() {
+    if (busy || needsSignIn) return;
+    busy = true;
+    try {
+      const queued = (await allItems()).filter((i) => i.state === "queued" && isMine(i)).reverse();
+      for (const item of queued) {
+        const outcome = await send(item);
+        if (outcome !== "next") break;
+      }
+    } finally {
+      busy = false;
+      await render();
+      if (needsSignIn) showSignIn("Signed out; sign in again. Nothing in the outbox is lost.");
+    }
+  };
+}
+
+// Records how a send went; says whether the lane may carry on.
+async function settle(item, result) {
+  if (result.ok) {
+    setOnline(true);
+    Object.assign(item, result.ok);
+    delete item.error;
+  } else if (result.offline) {
+    setOnline(false);
+    item.state = "queued";
+  } else if (result.signIn) {
+    setOnline(true);
+    item.state = "queued";
+    needsSignIn = true;
+  } else if (result.retryLater) {
+    setOnline(true);
+    item.state = "queued";
+    item.error = result.retryLater;
+  } else {
+    setOnline(true);
+    item.state = "failed";
+    item.error = result.failed;
+  }
+  await putItem(item);
+  return item.state === "queued" ? "stop" : "next";
+}
+
+const flushMessages = lane(
+  (i) => i.kind !== "upload",
+  async (item) => {
+    item.state = "sending";
+    await putItem(item);
+    await render();
+    const body =
+      item.kind === "visit"
+        ? { url: "/visits", json: { id: item.id, ts: item.ts } }
+        : { url: "/posts", json: { id: item.id, ts: item.ts, type: "text", text: item.text } };
+    let res;
+    try {
+      res = await api(body.url, body.json);
+    } catch {
+      return settle(item, { offline: true });
+    }
+    if (res.ok) return settle(item, { ok: { state: "sent", sentAt: Date.now() } });
+    if (res.status === 401) return settle(item, { signIn: true });
+    if (res.status >= 500) return settle(item, { retryLater: `Server error ${res.status}; will retry` });
+    return settle(item, { failed: (await res.json().catch(() => ({}))).error ?? `Rejected (${res.status})` });
+  },
+);
+
+// Upload progress lives in memory (writing IndexedDB on every event would
+// be slow); a reopened page starts from what tus says the server has.
+const progress = new Map();
+
+const flushUploads = lane(
+  (i) => i.kind === "upload",
+  async (item) => {
+    item.state = "uploading";
+    await putItem(item);
+    await render();
+    const result = await uploadFile(item);
+    progress.delete(item.id);
+    if (result.ok) {
+      // Uploaded; the server processes it next (see pollProcessing).
+      return settle(item, { ok: { state: "processing", uploadedAt: Date.now() } });
+    }
+    return settle(item, result);
+  },
+);
+
+function uploadFile(item) {
+  return new Promise((resolve) => {
+    const upload = new window.tus.Upload(item.file, {
+      endpoint: "/uploads",
+      chunkSize: UPLOAD_CHUNK,
+      retryDelays: [0, 1000, 3000, 6000],
+      metadata: { postId: item.id, ts: String(item.ts), filetype: item.type, filename: item.name },
+      // Resume by the outbox id, even after the page is closed.
+      fingerprint: async () => `mctrot-upload-${item.id}`,
+      removeFingerprintOnSuccess: true,
+      onProgress(sent, total) {
+        progress.set(item.id, { sent, total });
+        scheduleRender();
+      },
+      onSuccess: () => resolve({ ok: true }),
+      onError(err) {
+        const res = err.originalResponse;
+        const status = res?.getStatus?.() ?? 0;
+        if (status === 401) resolve({ signIn: true });
+        else if (status >= 400 && status < 500) resolve({ failed: res.getBody() || `Rejected (${status})` });
+        else if (status >= 500) resolve({ retryLater: `Server error ${status}; will retry` });
+        else resolve({ offline: true });
+      },
+    });
+    upload
+      .findPreviousUploads()
+      .then((previous) => {
+        if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
+        upload.start();
+      })
+      .catch(() => upload.start());
+  });
+}
+
+// Uploaded items wait for the server's worker; ask how they're doing.
+let polling = false;
+async function pollProcessing() {
+  if (polling) return;
+  const waiting = (await allItems()).filter((i) => i.state === "processing");
+  if (!waiting.length) return;
+  polling = true;
+  try {
+    const ids = waiting.map((i) => i.id).join(",");
+    const res = await fetch(`/posts/status?ids=${encodeURIComponent(ids)}`, { credentials: "same-origin" });
+    if (res.status === 401) {
+      needsSignIn = true;
+      return;
+    }
+    if (!res.ok) return;
+    const statuses = await res.json();
+    for (const item of waiting) {
+      const s = statuses[item.id];
+      if (s?.status === "ready") {
+        item.state = "sent";
+        item.sentAt = Date.now();
+        delete item.file; // free the phone's storage
+        await putItem(item);
+      } else if (s?.status === "failed") {
+        item.state = "failed";
+        item.error = s.error ?? "Processing failed";
+        item.processingFailed = true;
+        await putItem(item);
+      }
+    }
+  } catch {
+    // No signal; try again later.
+  } finally {
+    polling = false;
+    render();
+  }
 }
 
 // Retry on every chance: coming back online, reopening the page, a timer.
@@ -133,19 +259,63 @@ addEventListener("online", () => flush());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") flush();
 });
-setInterval(() => flush(), 10_000);
+setInterval(() => flush(), 5_000);
 
 // --- Rendering ---------------------------------------------------------------
 
 const STATE_TEXT = {
   queued: "Waiting for signal",
   sending: "Sending…",
+  uploading: "Uploading…",
+  processing: "Processing on server",
   sent: "Sent ✓",
   failed: "Failed",
 };
 
+const MEDIA_ICON = { photo: "📷", video: "🎬", voice: "🎙️" };
+
 function timeText(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+const mb = (bytes) => (bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0);
+
+// A local preview of a photo, from the file in the outbox.
+const previews = new Map();
+function previewUrl(item) {
+  if (!previews.has(item.id)) previews.set(item.id, URL.createObjectURL(item.file));
+  return previews.get(item.id);
+}
+
+let renderTimer;
+function scheduleRender() {
+  if (!renderTimer) renderTimer = setTimeout(() => ((renderTimer = null), render()), 300);
+}
+
+function stateText(item) {
+  if (item.state === "uploading") {
+    const p = progress.get(item.id);
+    if (p && p.total) {
+      return `Uploading ${Math.floor((p.sent / p.total) * 100)}% · ${mb(p.sent)} of ${mb(p.total)} MB`;
+    }
+  }
+  if (item.state === "queued" && item.error) return item.error;
+  return STATE_TEXT[item.state];
+}
+
+function thumb(item) {
+  if (item.kind !== "upload") return null;
+  if (item.media === "photo" && item.file) {
+    const img = document.createElement("img");
+    img.className = "thumb";
+    img.alt = "";
+    img.src = previewUrl(item);
+    return img;
+  }
+  const span = document.createElement("span");
+  span.className = "thumb icon";
+  span.textContent = MEDIA_ICON[item.media] ?? "📎";
+  return span;
 }
 
 async function render() {
@@ -159,15 +329,31 @@ async function render() {
   list.replaceChildren(
     ...visible.slice(0, 50).map((item) => {
       const li = document.createElement("li");
+      const t = thumb(item);
+      if (t) li.append(t);
       const what = document.createElement("span");
       what.className = "what";
-      what.textContent = item.kind === "visit" ? "📍 Visit" : `💬 ${item.text}`;
+      what.textContent =
+        item.kind === "visit"
+          ? "📍 Visit"
+          : item.kind === "post"
+            ? `💬 ${item.text}`
+            : `${item.name} · ${mb(item.size)} MB`;
+      if (item.state === "uploading") {
+        const p = progress.get(item.id);
+        const bar = document.createElement("div");
+        bar.className = "progress";
+        const fill = document.createElement("div");
+        fill.style.width = `${p && p.total ? (p.sent / p.total) * 100 : 0}%`;
+        bar.append(fill);
+        what.append(bar);
+      }
       const when = document.createElement("span");
       when.className = "when";
       when.textContent = timeText(item.ts);
       const state = document.createElement("span");
       state.className = `state ${item.state}`;
-      state.textContent = item.state === "queued" && item.error ? item.error : STATE_TEXT[item.state];
+      state.textContent = stateText(item);
       li.append(what, when, state);
       if (item.state === "failed") {
         const actions = document.createElement("span");
@@ -175,20 +361,26 @@ async function render() {
         const reason = document.createElement("div");
         reason.className = "small";
         reason.textContent = item.error ?? "";
-        const retry = button("Retry", async () => {
-          item.state = "queued";
-          delete item.error;
-          await putItem(item);
-          flush();
-        });
-        const discard = button("Discard", async () => {
-          if (confirm("Discard this for good? It hasn’t reached the server.")) {
-            await deleteItem(item.id);
-            render();
-          }
-        });
-        actions.append(retry, discard);
         what.append(reason);
+        // A file the server couldn't process won't do better a second time.
+        if (!item.processingFailed) {
+          actions.append(
+            button("Retry", async () => {
+              item.state = "queued";
+              delete item.error;
+              await putItem(item);
+              flush();
+            }),
+          );
+        }
+        actions.append(
+          button("Discard", async () => {
+            if (confirm("Discard this for good? It hasn’t reached the server.")) {
+              await deleteItem(item.id);
+              render();
+            }
+          }),
+        );
         li.append(actions);
       }
       return li;
@@ -196,15 +388,21 @@ async function render() {
   );
   $("empty").hidden = visible.length > 0;
 
-  const pending = items.filter((i) => i.state === "queued" || i.state === "sending").length;
-  const failed = items.filter((i) => i.state === "failed").length;
+  const count = (states) => items.filter((i) => states.includes(i.state)).length;
   const parts = [];
-  if (pending) parts.push(`${pending} waiting`);
+  const uploading = count(["uploading"]);
+  const waiting = count(["queued", "sending"]);
+  const processing = count(["processing"]);
+  const failed = count(["failed"]);
+  if (uploading) parts.push(`${uploading} uploading`);
+  if (waiting) parts.push(`${waiting} waiting`);
+  if (processing) parts.push(`${processing} processing`);
   if (failed) parts.push(`${failed} failed`);
   $("summary").textContent = parts.length ? parts.join(" · ") : online === false ? "Offline" : "All sent";
   // The home-screen icon's badge counts what hasn't reached the server.
+  const pending = uploading + waiting + failed;
   if ("setAppBadge" in navigator) {
-    (pending + failed ? navigator.setAppBadge(pending + failed) : navigator.clearAppBadge()).catch(() => {});
+    (pending ? navigator.setAppBadge(pending) : navigator.clearAppBadge()).catch(() => {});
   }
 }
 
@@ -220,7 +418,7 @@ let flashTimer;
 function flash(text) {
   $("flash").textContent = text;
   clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => ($("flash").textContent = ""), 2500);
+  flashTimer = setTimeout(() => ($("flash").textContent = ""), 3000);
 }
 
 // --- Buttons -------------------------------------------------------------
@@ -252,6 +450,36 @@ $("send").addEventListener("click", async () => {
   $("count").textContent = "0 / 1000";
   $("composer").hidden = true;
   flash("Post saved");
+});
+
+$("upload").addEventListener("click", () => $("file").click());
+
+function mediaOf(type) {
+  if (type.startsWith("image/")) return "photo";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "voice";
+  return null;
+}
+
+$("file").addEventListener("change", async () => {
+  const file = $("file").files[0];
+  $("file").value = "";
+  if (!file) return;
+  // Caught here, before anything is queued.
+  const media = mediaOf(file.type);
+  if (!media) {
+    flash(`Can’t post that kind of file (${file.type || file.name}).`);
+    return;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    flash(`Too big: ${mb(file.size)} MB (the limit is ${mb(MAX_UPLOAD_BYTES)} MB). Try a shorter clip.`);
+    return;
+  }
+  // When it was made: a photo just taken is "now"; one picked from the
+  // library keeps its own time, if the phone gives it.
+  const ts = file.lastModified && file.lastModified < Date.now() ? file.lastModified : Date.now();
+  await enqueue("upload", { ts, file, name: file.name, type: file.type, size: file.size, media });
+  flash(`${media === "photo" ? "Photo" : media === "video" ? "Video" : "Voice note"} saved`);
 });
 
 // --- Signing in ------------------------------------------------------------

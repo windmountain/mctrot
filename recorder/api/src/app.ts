@@ -16,8 +16,10 @@ import {
 } from "./passkeys.ts";
 import type { RoutePlan } from "./plan.ts";
 import { lastPoints, OverlandBatch, storePoints } from "./points.ts";
+import { postStatuses } from "./jobs.ts";
 import { MAX_TEXT, recordTextPost } from "./posts.ts";
 import { endSession, hasSession, requireWriter, startSession } from "./session.ts";
+import { registerUploads } from "./uploads.ts";
 import { recordTap } from "./visits.ts";
 
 export type AppDeps = {
@@ -36,6 +38,10 @@ export type AppDeps = {
   rpID: string;
   // The upload page's files (recorder/post/).
   postDir: string;
+  // Where finished uploads wait for the worker, and where the media
+  // folder is served (e.g. "https://media.mctrot.nyc").
+  uploadDir: string;
+  mediaUrl: string;
   logger?: boolean;
 };
 
@@ -59,11 +65,13 @@ const webauthnBrowser = new URL(
   "../node_modules/@simplewebauthn/browser/dist/bundle/index.umd.min.js",
   import.meta.url,
 );
+const tusBrowser = new URL("../node_modules/tus-js-client/dist/tus.min.js", import.meta.url);
 const POST_FILES: Record<string, { file: string | URL; type: string }> = {
   "/post": { file: "index.html", type: "text/html; charset=utf-8" },
   "/post/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
   "/post/manifest.webmanifest": { file: "manifest.webmanifest", type: "application/manifest+json" },
   "/post/webauthn.js": { file: webauthnBrowser, type: "text/javascript; charset=utf-8" },
+  "/post/tus.js": { file: tusBrowser, type: "text/javascript; charset=utf-8" },
   // Its icons, "McTrot / CTRL" (scripts/render_studio_icons.mjs).
   "/post/icons/favicon.svg": { file: "icons/favicon.svg", type: "image/svg+xml" },
   "/post/icons/favicon.ico": { file: "icons/favicon.ico", type: "image/x-icon" },
@@ -154,6 +162,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { id: body.data.id, ts, recorded };
   });
 
+  registerUploads(app, db, deps.uploadDir, writer);
+
+  // Where uploaded posts are: "processing" until the worker is done. The
+  // upload page polls this for what's in its outbox.
+  app.get("/posts/status", async (req, reply) => {
+    if (!writer(req, reply)) return reply;
+    const ids = String((req.query as { ids?: string }).ids ?? "")
+      .split(",")
+      .filter(Boolean)
+      .slice(0, 100);
+    return postStatuses(db, ids);
+  });
+
   // --- Signing in to the upload page --------------------------------------
 
   app.get("/auth/me", async (req) => ({
@@ -216,7 +237,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       // Only this origin's own scripts and requests; no third parties.
       reply.header(
         "content-security-policy",
-        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'",
+        "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'",
       );
       return body;
     });
@@ -229,7 +250,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/live", async (_req, reply) => {
     reply.header("access-control-allow-origin", "*");
     reply.header("cache-control", "no-store");
-    return live(db, plan);
+    return live(db, plan, deps.mediaUrl);
   });
 
   // The latest stored points, newest first. Token-protected: it's my

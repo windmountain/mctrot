@@ -147,10 +147,11 @@
         };
       };
 
-      # `nix develop` (from recorder/): Node for the API, sops for secrets.
+      # `nix develop` (from recorder/): Node for the API, sops for secrets, and
+      # the media tools the API's worker runs (vips, ffmpeg).
       devShells = forLaptops (lpkgs: {
         default = lpkgs.mkShell {
-          packages = [ lpkgs.nodejs_26 lpkgs.sops lpkgs.ssh-to-age ];
+          packages = [ lpkgs.nodejs_26 lpkgs.sops lpkgs.ssh-to-age lpkgs.vips lpkgs.ffmpeg-headless ];
         };
       });
 

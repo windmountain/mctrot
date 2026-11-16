@@ -19,6 +19,10 @@ const origin = env.MCTROT_ORIGIN ?? `http://localhost:${port}`;
 const rpID = env.MCTROT_RP_ID ?? "localhost";
 // The upload page's files: recorder/post/, next to this package.
 const postDir = env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).pathname;
+// Finished uploads wait here for the worker; the worker writes the media
+// folder, which is served at MCTROT_MEDIA_URL (media.mctrot.nyc on the box).
+const uploadDir = env.MCTROT_UPLOAD_DIR ?? "uploads";
+const mediaUrl = env.MCTROT_MEDIA_URL ?? `http://localhost:${port}/media`;
 const resetPolicy = env.MCTROT_DB_RESET === "never" ? "never" : "reset";
 
 // Secrets arrive as files via systemd's LoadCredential, so they never sit
@@ -48,6 +52,8 @@ const app = await buildApp({
   origin,
   rpID,
   postDir,
+  uploadDir,
+  mediaUrl,
   logger: true,
 });
 if (archived) {

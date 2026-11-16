@@ -2,7 +2,7 @@
 // has to live for one event, so when this changes, bump SCHEMA_VERSION and
 // the API starts over with an empty database (see openDb). Once
 // `recorder.live` is on (host/configuration.nix), it refuses to instead.
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const SCHEMA = `
   -- Every location fix from the phone, keyed by the phone's timestamp so
@@ -45,13 +45,36 @@ export const SCHEMA = `
 
   -- What I post from the road. id comes from the phone's outbox, so a
   -- retried upload can't post twice. Where it was posted is worked out
-  -- from the GPS track, like visits.
+  -- from the GPS track, like visits. A photo, video or voice post is
+  -- "processing" until the worker (src/worker.ts) has made its files,
+  -- under the media folder in a folder named for the post's id.
   create table posts (
     id text primary key,
-    ts integer not null,           -- ms since epoch, phone clock (when written)
-    type text not null check (type in ('text')),
-    text text not null,
+    ts integer not null,           -- ms since epoch, phone clock (when made)
+    type text not null check (type in ('text', 'photo', 'video', 'voice')),
+    text text,                     -- the text of a text post
+    status text not null default 'ready' check (status in ('processing', 'ready', 'failed')),
+    error text,                    -- why processing failed
+    media_path text,               -- photo: full size; video: .mp4; voice: .m4a
+    thumb_path text,               -- photo: ~400 px
+    poster_path text,              -- video: a frame
+    width integer,
+    height integer,
+    duration_ms integer,           -- video and voice
     hidden integer not null default 0,
     received_at integer not null
+  ) strict;
+
+  -- Media waiting to be processed: one per uploaded file.
+  create table jobs (
+    id integer primary key,
+    post_id text not null unique references posts (id),
+    upload_path text not null,     -- the finished upload (tus file store)
+    content_type text not null,
+    status text not null default 'queued' check (status in ('queued', 'running', 'done', 'failed')),
+    attempts integer not null default 0,
+    error text,
+    created_at integer not null,
+    updated_at integer not null
   ) strict;
 `;

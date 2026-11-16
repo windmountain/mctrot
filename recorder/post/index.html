@@ -55,6 +55,10 @@
     li .state.sent { color: var(--ok); }
     li .state.failed { color: var(--bad); }
     li .actions button { padding: 4px 8px; font-size: 0.8rem; margin-left: 4px; }
+    li .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; align-self: center; }
+    li .thumb.icon { display: grid; place-items: center; background: #f4efd2; font-size: 1.3rem; }
+    li .progress { height: 4px; background: #eee; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    li .progress > div { height: 100%; background: var(--ink); }
     .small { font-size: 0.9rem; color: var(--muted); }
     a { color: inherit; }
   </style>
@@ -85,8 +89,10 @@
       <div class="buttons">
         <button id="visit" class="big">Visit</button>
         <button id="post" class="big">Post</button>
-        <button id="upload" class="big" disabled title="Coming soon">Upload</button>
+        <button id="upload" class="big">Upload</button>
       </div>
+      <!-- Photos, videos, voice notes: on iPhone, the camera, Photos or Files. -->
+      <input id="file" type="file" accept="image/*,video/*,audio/*" hidden>
       <p id="flash" aria-live="polite"></p>
 
       <div id="composer" class="card" hidden>
@@ -111,6 +117,7 @@
   </main>
 
   <script src="/post/webauthn.js"></script>
+  <script src="/post/tus.js"></script>
   <script src="/post/app.js" type="module"></script>
 </body>
 </html>

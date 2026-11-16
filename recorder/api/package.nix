@@ -2,6 +2,8 @@
 , stdenv
 , buildNpmPackage
 , nodejs_26
+, vips
+, ffmpeg-headless
 , python3
 , cctools
 , makeWrapper
@@ -26,7 +28,7 @@ buildNpmPackage {
   nodejs = nodejs_26;
   # Update after changing package-lock.json:
   #   nix run nixpkgs#prefetch-npm-deps -- package-lock.json
-  npmDepsHash = "sha256-6jn4GqUU8Q8sZ9hJyiawlpa36unk8op4DzZoneegGyM=";
+  npmDepsHash = "sha256-d42sYY45G4g+00WRUBBkG20qb983UvyNRRisFqAo0i0=";
 
   nativeBuildInputs = [ python3 makeWrapper ]
     ++ lib.optional stdenv.hostPlatform.isDarwin cctools;
@@ -46,6 +48,9 @@ buildNpmPackage {
     rm -rf node_modules/better-sqlite3/prebuilds
     runHook postBuild
   '';
+
+  # The media tests run the real tools.
+  nativeCheckInputs = [ vips ffmpeg-headless ];
 
   # Node runs the TypeScript directly, so "checking" is the whole build:
   # type-check, then the tests against an in-memory database.
@@ -67,6 +72,10 @@ buildNpmPackage {
     cp -r ${../post} $out/lib/post
     makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-api \
       --add-flags $out/lib/api/src/main.ts
+    # The media worker (its own service, host/api.nix); needs vips and
+    # ffmpeg on PATH, which its unit provides.
+    makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-worker \
+      --add-flags $out/lib/api/src/worker.ts
     # The raw tool; on the box, use mctrot-dislocate (host/api.nix).
     makeWrapper ${nodejs_26}/bin/node $out/bin/mctrot-dislocate-db \
       --add-flags $out/lib/api/src/dislocate.ts

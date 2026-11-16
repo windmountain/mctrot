@@ -290,11 +290,42 @@ token always works as a fallback.
 **The outbox:** every tap goes into IndexedDB on the phone first, with its
 own id and the time I tapped, and is sent from there until the server
 confirms it: on every tap, on reopening the page, on coming back online,
-and every 10 s. Each item shows *Waiting for signal*, *Sending…*,
-*Sent ✓* or *Failed* (with Retry and Discard), and the home-screen icon
-shows a badge with what hasn't reached the server. Being signed out never
-loses anything; it waits until you sign in again. Uploads only happen
-while the page is open (iOS has no background sync for web apps).
+and every 5 s. Each item shows *Waiting for signal*, *Sending…*,
+*Uploading 45% · 12 of 26 MB*, *Processing on server*, *Sent ✓* or
+*Failed* (with Retry and Discard), and the home-screen icon shows a badge
+with what hasn't reached the server. Being signed out never loses
+anything; it waits until you sign in again. Visits and text posts send in
+their own lane, so a long video upload never holds them up. Uploads only
+happen while the page is open (iOS has no background sync for web apps).
+
+## Uploads: photos, video, voice (step 10)
+
+**Upload** takes a photo, video or voice note (on iPhone: the camera,
+Photos or Files), up to 1 GiB. Files go over tus (`/uploads`), so a
+dropped upload resumes where it stopped, even after reopening the page.
+A finished upload becomes a *processing* post and a job; the **worker**
+(`mctrot-worker`, `api/src/worker.ts`) takes jobs one at a time, at low
+priority (`Nice=19`, half a CPU, idle I/O) so it can't starve the radio:
+
+| Upload | Becomes | With |
+| --- | --- | --- |
+| Photo (HEIC, JPEG, …) | `full.jpg`, ~1600 px long side | `thumb.jpg`, ~400 px |
+| Video | `video.mp4`, H.264, 720p short side, plays while loading | `poster.jpg` |
+| Voice note | `voice.m4a`, AAC | |
+
+All metadata is stripped (a photo's EXIF holds where it was taken), and
+photos are turned upright. Results go to `/var/lib/mctrot/media/<post id>/`,
+served by Caddy at `https://media.mctrot.nyc/<post id>/…` with permanent
+caching; `/live` shows a post once it's processed. A file that fails
+three times shows *Failed* with the reason on the page.
+
+```
+ssh root@recorder.mctrot.nyc journalctl -u mctrot-worker -f   # what the worker is doing
+```
+
+iPhone HEIC photos are grids of ~48 tiles, which libheif refuses by
+default (more than 16); the worker lifts that limit for HEIF, since only
+I can upload. `api/test/fixtures/tiled.heic` (20 tiles) keeps it tested.
 
 **Secrets:** the session cookie is signed with `session-secret` in
 `secrets/recorder.yaml`; passkeys are stored in the database (so `wipe`
