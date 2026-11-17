@@ -1,4 +1,4 @@
-port module Radio exposing (Flags, Model, Msg, init, subscriptions, update, view)
+port module Radio exposing (Flags, Model, Msg, init, links, subscriptions, update, view)
 
 {-| The radio player in /live's top-right corner: play and stop McTrot
 radio (recorder/host/radio.nix), set the volume, and find its links for

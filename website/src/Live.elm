@@ -1,16 +1,33 @@
-module Live exposing (main)
+port module Live exposing (main)
 
 {-| mctrot.nyc/live: where I am during a McTrot attempt.
 
 Polls the recorder's `GET /live` (recorder/api/src/live.ts; contract in
-recorder/api/live.schema.json) every 15 seconds and draws the latest
-position and the path walked on the site's Manhattan map.
+recorder/api/live.schema.json) every 15 seconds.
+
+One program for five addresses, routed here (Netlify serves live.html for
+all of them; website/_redirects):
+
+  - /live: everything on one page, as it has been
+  - /live/map, /live/blog, /live/timeline, /live/stats: one view each,
+    taking over the page
+
+All five share the title, the radio, the tab switcher and the footer.
+Switching tabs doesn't reload the page, so the radio keeps playing.
+
+Elm runs in its own element (Browser.element), not over the whole page
+(Browser.application): browser extensions add things to <body>, and an
+application, which owns the body, crashes when they do. So the address
+is handled here through two ports and a few lines in live.html:
+`navigate` (pushState) and `pathChanged` (Back and Forward).
 
 -}
 
 import Browser
+import Browser.Dom
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Events as Events
 import Html.Keyed
 import Http
 import Json.Decode as Decode exposing (Decoder)
@@ -22,6 +39,8 @@ import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Task
 import Time
+import Url exposing (Url)
+import Url.Parser as Parser exposing ((</>))
 
 
 main : Program Flags Model Msg
@@ -34,11 +53,115 @@ main =
         }
 
 
+{-| Show this path in the address bar (a new history entry), and set the
+page's title.
+-}
+port navigate : { path : String, title : String } -> Cmd msg
+
+
+{-| The page's title, for the first view.
+-}
+port setTitle : String -> Cmd msg
+
+
+{-| The path after Back or Forward.
+-}
+port pathChanged : (String -> msg) -> Sub msg
+
+
+
+-- ROUTES
+
+
+type Route
+    = Overview
+    | MapTab
+    | BlogTab
+    | TimelineTab
+    | StatsTab
+
+
+{-| /live (or /live.html, as a plain file server has it) is the overview;
+anything unknown under /live shows it too.
+-}
+routeFromUrl : Url -> Route
+routeFromUrl url =
+    Parser.parse routeParser url |> Maybe.withDefault Overview
+
+
+routeFromPath : String -> Route
+routeFromPath path =
+    Url.fromString ("https://mctrot.nyc" ++ path)
+        |> Maybe.map routeFromUrl
+        |> Maybe.withDefault Overview
+
+
+pathOf : Route -> String
+pathOf route =
+    case List.filter (\( r, _, _ ) -> r == route) tabs of
+        ( _, _, path ) :: _ ->
+            path
+
+        [] ->
+            "/live"
+
+
+titleOf : Route -> String
+titleOf route =
+    case List.filter (\( r, _, _ ) -> r == route) tabs of
+        ( _, label, _ ) :: _ ->
+            "McTrot 5 · " ++ label
+
+        [] ->
+            "McTrot 5 · Live"
+
+
+routeParser : Parser.Parser (Route -> a) a
+routeParser =
+    Parser.oneOf
+        [ Parser.map MapTab (Parser.s "live" </> Parser.s "map")
+        , Parser.map BlogTab (Parser.s "live" </> Parser.s "blog")
+        , Parser.map TimelineTab (Parser.s "live" </> Parser.s "timeline")
+        , Parser.map StatsTab (Parser.s "live" </> Parser.s "stats")
+        ]
+
+
+tabs : List ( Route, String, String )
+tabs =
+    [ ( MapTab, "Map", "/live/map" )
+    , ( BlogTab, "Blog", "/live/blog" )
+    , ( TimelineTab, "Timeline", "/live/timeline" )
+    , ( StatsTab, "Stats", "/live/stats" )
+    ]
+
+
+routeName : Route -> String
+routeName route =
+    case route of
+        Overview ->
+            "overview"
+
+        MapTab ->
+            "map"
+
+        BlogTab ->
+            "blog"
+
+        TimelineTab ->
+            "timeline"
+
+        StatsTab ->
+            "stats"
+
+
 {-| `api`: the recorder's base URL, e.g. "https://api.mctrot.nyc".
 -}
 type alias Flags =
     { api : String
     , radio : Radio.Flags
+
+    -- location.pathname: which view to start on
+    , path : String
     }
 
 
@@ -160,9 +283,16 @@ type alias Store =
     }
 
 
-{-| A Visit tap, matched to a store by GPS on the server.
+{-| A check-in: when I tapped, and the store the server matched it to by
+GPS.
 -}
-type Visit
+type alias Visit =
+    { tapTs : Int
+    , match : Match
+    }
+
+
+type Match
     = Matched String
     | Pending
     | Unmatched
@@ -311,6 +441,11 @@ storeDecoder =
 
 visitDecoder : Decoder Visit
 visitDecoder =
+    Decode.map2 Visit (Decode.field "tapTs" Decode.int) matchDecoder
+
+
+matchDecoder : Decoder Match
+matchDecoder =
     Decode.field "status" Decode.string
         |> Decode.andThen
             (\statusName ->
@@ -348,6 +483,7 @@ type alias Model =
     , failing : Bool
     , now : Maybe Time.Posix
     , radio : Radio.Model
+    , route : Route
     }
 
 
@@ -363,8 +499,18 @@ type alias Fetched =
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { api = flags.api, latest = Nothing, failing = False, now = Nothing, radio = Radio.init flags.radio }
-    , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now ]
+    let
+        route =
+            routeFromPath flags.path
+    in
+    ( { api = flags.api
+      , latest = Nothing
+      , failing = False
+      , now = Nothing
+      , radio = Radio.init flags.radio
+      , route = route
+      }
+    , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route) ]
     )
 
 
@@ -378,11 +524,48 @@ type Msg
     | Received LiveResponse Time.Posix
     | Tick Time.Posix
     | RadioMsg Radio.Msg
+    | Navigate Route
+    | PathChanged String
+    | NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        -- A tab (or the title) clicked: switch views without reloading,
+        -- so the radio keeps playing.
+        Navigate route ->
+            ( { model | route = route }
+            , Cmd.batch
+                [ navigate { path = pathOf route, title = titleOf route }
+                , if route == TimelineTab then
+                    scrollTimelineToNow
+
+                  else
+                    Cmd.none
+                ]
+            )
+
+        -- Back or Forward.
+        PathChanged path ->
+            let
+                route =
+                    routeFromPath path
+            in
+            ( { model | route = route }
+            , Cmd.batch
+                [ setTitle (titleOf route)
+                , if route == TimelineTab then
+                    scrollTimelineToNow
+
+                  else
+                    Cmd.none
+                ]
+            )
+
+        NoOp ->
+            ( model, Cmd.none )
+
         RadioMsg radioMsg ->
             Radio.update radioMsg model.radio
                 |> Tuple.mapBoth (\radio -> { model | radio = radio }) (Cmd.map RadioMsg)
@@ -399,11 +582,26 @@ update msg model =
 
         Received response at ->
             ( { model | latest = Just (Fetched response at), failing = False, now = Just at }
-            , Cmd.none
+              -- The first data on the timeline: start at the newest end.
+            , if model.route == TimelineTab && model.latest == Nothing then
+                scrollTimelineToNow
+
+              else
+                Cmd.none
             )
 
         Tick now ->
             ( { model | now = Just now }, Cmd.none )
+
+
+{-| The timeline runs oldest to newest, left to right: open it at the
+newest end.
+-}
+scrollTimelineToNow : Cmd Msg
+scrollTimelineToNow =
+    Browser.Dom.getViewportOf "timeline"
+        |> Task.andThen (\v -> Browser.Dom.setViewportOf "timeline" v.scene.width 0)
+        |> Task.attempt (\_ -> NoOp)
 
 
 fetch : String -> Cmd Msg
@@ -415,6 +613,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Sub.map RadioMsg (Radio.subscriptions model.radio)
+        , pathChanged PathChanged
         , -- Overland sends every 30 s, so polling faster shows nothing new.
           Time.every 15000 (\_ -> Poll)
         , Time.every 1000 Tick
@@ -427,16 +626,125 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    Html.div [ Attr.class ("app page-" ++ routeName model.route) ]
+        [ -- Title, radio and view switcher stay at the top as the page
+          -- scrolls (live.html, .app-top).
+          Html.div [ Attr.class "app-top" ] [ viewHeader model, viewTabs model.route ]
+        , Html.main_ [ Attr.id "main", Attr.class ("app-main tab-" ++ routeName model.route) ]
+            (case model.route of
+                Overview ->
+                    viewOverview model
+
+                MapTab ->
+                    viewMapTab model
+
+                BlogTab ->
+                    viewBlogTab model
+
+                TimelineTab ->
+                    viewTimelineTab model
+
+                StatsTab ->
+                    viewStatsTab model
+            )
+        , viewFooter
+        ]
+
+
+viewHeader : Model -> Html Msg
+viewHeader model =
+    Html.header [ Attr.class "app-header" ]
+        [ Html.div [ Attr.class "app-title" ]
+            [ Html.h1 [] [ link Overview [] [ Html.text "McTROT 5" ] ]
+            , Html.p [ Attr.class "app-subtitle" ] [ Html.text "EATING AT EVERY McDONALD’S IN MANHATTAN ON ONE WALK" ]
+            ]
+        , Html.map RadioMsg (Radio.view model.radio)
+        ]
+
+
+{-| The views, as a row of radio-button-style segments: links, so each
+has its own address, with the current one marked.
+-}
+viewTabs : Route -> Html Msg
+viewTabs current =
+    Html.nav [ Attr.class "app-tabs", Attr.attribute "aria-label" "Views" ]
+        [ Html.ul []
+            (List.map
+                (\( route, label, href ) ->
+                    Html.li []
+                        [ link route
+                            (if route == current then
+                                [ Attr.attribute "aria-current" "page" ]
+
+                             else
+                                []
+                            )
+                            [ Html.text label ]
+                        ]
+                )
+                tabs
+            )
+        ]
+
+
+{-| A link to one of the views: a real link (it can be opened in a new
+tab, copied, bookmarked), but a plain click switches views in place.
+-}
+link : Route -> List (Html.Attribute Msg) -> List (Html Msg) -> Html Msg
+link route attributes children =
+    Html.a
+        (Attr.href (pathOf route)
+            :: Events.preventDefaultOn "click" (plainClick (Navigate route))
+            :: attributes
+        )
+        children
+
+
+{-| A left click without Cmd, Ctrl, Shift or Alt: handled here. Anything
+else (open in a new tab, say) is left to the browser.
+-}
+plainClick : msg -> Decoder ( msg, Bool )
+plainClick msg =
+    Decode.map5
+        (\button ctrl meta shift alt ->
+            if button == 0 && not (ctrl || meta || shift || alt) then
+                Decode.succeed ( msg, True )
+
+            else
+                Decode.fail "not a plain click"
+        )
+        (Decode.field "button" Decode.int)
+        (Decode.field "ctrlKey" Decode.bool)
+        (Decode.field "metaKey" Decode.bool)
+        (Decode.field "shiftKey" Decode.bool)
+        (Decode.field "altKey" Decode.bool)
+        |> Decode.andThen identity
+
+
+viewFooter : Html Msg
+viewFooter =
+    Html.footer [ Attr.class "app-footer" ]
+        [ Html.a [ Attr.href "/" ] [ Html.text "mctrot.nyc" ]
+        , Html.span [ Attr.class "app-footer-radio" ]
+            (Html.text "Radio: "
+                :: (Radio.links
+                        |> List.map (\( label, url ) -> Html.a [ Attr.href url ] [ Html.text label ])
+                        |> List.intersperse (Html.text " · ")
+                   )
+            )
+        ]
+
+
+{-| Plain /live: everything on one page, as it was before the tabs.
+-}
+viewOverview : Model -> List (Html Msg)
+viewOverview model =
     let
         response =
             Maybe.map .response model.latest
     in
-    Html.div [ Attr.class "live" ]
-        [ Html.map RadioMsg (Radio.view model.radio)
-        , Html.p [ Attr.class "live-home" ] [ Html.a [ Attr.href "/" ] [ Html.text "McTrot" ] ]
-        , Html.h1 [] [ Html.text "Live" ]
-        , Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ]
-            [ Html.text (status model) ]
+    [ Html.div [ Attr.class "live" ]
+        [ viewStatus model
         , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
         , viewWeather model
         , viewSky response
@@ -444,6 +752,110 @@ view model =
         , viewSun response
         , viewPosts model
         ]
+    ]
+
+
+viewStatus : Model -> Html Msg
+viewStatus model =
+    Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ] [ Html.text (status model) ]
+
+
+{-| The map, filling the page. (Zooming comes in a later pass.)
+-}
+viewMapTab : Model -> List (Html Msg)
+viewMapTab model =
+    [ viewStatus model
+    , viewMap (Maybe.map .response model.latest)
+    ]
+
+
+{-| The posts, newest first, scrolling down the page.
+-}
+viewBlogTab : Model -> List (Html Msg)
+viewBlogTab model =
+    [ viewPosts model ]
+
+
+{-| Posts and check-ins in time order, oldest to newest, scrolling
+sideways.
+-}
+viewTimelineTab : Model -> List (Html Msg)
+viewTimelineTab model =
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            let
+                storeName id =
+                    List.filter (\store -> store.id == id) response.stores
+                        |> List.head
+                        |> Maybe.map .name
+                        |> Maybe.withDefault "a McDonald’s"
+
+                checkIn visit =
+                    let
+                        what =
+                            case visit.match of
+                                Matched id ->
+                                    "Checked in at " ++ storeName id
+
+                                Pending ->
+                                    "Checked in (finding which McDonald’s…)"
+
+                                Unmatched ->
+                                    "Checked in (no McDonald’s nearby)"
+                    in
+                    ( visit.tapTs
+                    , "visit-" ++ String.fromInt visit.tapTs
+                    , Html.p [ Attr.class "timeline-checkin" ] [ Html.text ("📍 " ++ what) ]
+                    )
+
+                items =
+                    (List.map (\post -> ( post.ts, post.id, viewPostContent post.content )) response.posts
+                        ++ List.map checkIn response.visits
+                    )
+                        |> List.sortBy (\( ts, _, _ ) -> ts)
+            in
+            if List.isEmpty items then
+                [ Html.p [ Attr.class "tab-empty" ] [ Html.text "Nothing yet." ] ]
+
+            else
+                [ Html.Keyed.ol [ Attr.id "timeline", Attr.class "timeline" ]
+                    (List.map
+                        (\( ts, key, content ) ->
+                            ( key
+                            , Html.li [ Attr.class "timeline-item" ]
+                                [ Html.p [ Attr.class "timeline-when" ] [ Html.text (when now ts) ]
+                                , content
+                                ]
+                            )
+                        )
+                        items
+                    )
+                ]
+
+        _ ->
+            [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
+
+
+{-| A grid of cells filling the page. (How it subdivides and collapses
+comes in a later pass.)
+-}
+viewStatsTab : Model -> List (Html Msg)
+viewStatsTab model =
+    let
+        response =
+            Maybe.map .response model.latest
+
+        cell title body =
+            Html.section [ Attr.class "stats-cell" ] (Html.h2 [] [ Html.text title ] :: body)
+    in
+    [ Html.div [ Attr.class "stats-grid" ]
+        [ cell "Attempt" [ Html.p [] [ Html.text (visitsLine model) ] ]
+        , cell "Position" [ Html.p [] [ Html.text (status model) ] ]
+        , cell "Weather" [ viewWeather model ]
+        , cell "Sky" [ viewSky response ]
+        , cell "Sun" [ viewSun response ]
+        ]
+    ]
 
 
 {-| "54°F, clear, feels like 47°F. Wind 9 mph from the NW, gusts 12 mph."
@@ -626,7 +1038,7 @@ visitsLine model =
                 Just attempt ->
                     let
                         count status_ =
-                            List.length (List.filter status_ response.visits)
+                            List.length (List.filter (.match >> status_) response.visits)
 
                         matched =
                             count isMatched
@@ -657,9 +1069,9 @@ visitsLine model =
             ""
 
 
-isMatched : Visit -> Bool
-isMatched visit =
-    case visit of
+isMatched : Match -> Bool
+isMatched match =
+    case match of
         Matched _ ->
             True
 
@@ -715,7 +1127,7 @@ viewMap response =
                 |> Maybe.withDefault []
                 |> List.filterMap
                     (\v ->
-                        case v of
+                        case v.match of
                             Matched id ->
                                 Just id
 

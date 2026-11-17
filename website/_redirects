@@ -1,0 +1,4 @@
+# Netlify: /live's views (/live/map, /live/blog, /live/timeline,
+# /live/stats) are one page, live.html, which routes them itself
+# (src/Live.elm). 200: serve it there, without a redirect.
+/live/*  /live.html  200

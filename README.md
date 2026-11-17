@@ -126,6 +126,17 @@ devenv shell -- website/build.sh   # copies public pages/assets, compiles the El
 
 Elm tests: `cd website && elm-test`.
 
+Preview the site the way Netlify serves it (pretty URLs, and `website/_redirects`, so `/live/map` and the other `/live` views work):
+
+```
+preview-website   # build, serve at http://localhost:8000/live, rebuild on every save in website/
+serve-website     # just serve website/build/ as it is
+```
+
+Both take an optional port (`preview-website 9000`). They're devenv scripts, so run them in the devenv shell (or with `devenv shell -- preview-website`); the server itself is `scripts/serve_site.mjs`.
+
+`/live` reads the real recorder; add `?api=http://localhost:3000` to use a local one.
+
 The simulator uses the site's icons but has its own share image and web app manifest in `website/sim/`. The share image's source is a hand-editable SVG (`og.svg`, with each element grouped by name); render the PNG from it with headless Chrome:
 
 ```

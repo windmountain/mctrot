@@ -84,6 +84,37 @@
     bash website/build.sh
   '';
 
+  # Serve website/build/ as Netlify does (pretty URLs and website/_redirects,
+  # so /live/map and the other /live views work), as it is now: no build.
+  # Usage: serve-website [port]   (default 8000)
+  scripts.serve-website.exec = ''
+    set -euo pipefail
+    cd "$DEVENV_ROOT"
+
+    node scripts/serve_site.mjs "''${1:-8000}"
+  '';
+
+  # Build the site, serve it (as serve-website), and rebuild whenever a
+  # file in website/ is saved; reload the browser to see the change.
+  # Ctrl-C stops both. Usage: preview-website [port]   (default 8000)
+  scripts.preview-website.exec = ''
+    set -euo pipefail
+    cd "$DEVENV_ROOT"
+
+    bash website/build.sh
+    node scripts/serve_site.mjs "''${1:-8000}" &
+    server=$!
+    trap 'kill "$server" 2>/dev/null' EXIT
+    trap 'exit 0' INT TERM
+
+    echo "Watching website/ and rebuilding on save. Ctrl-C to stop."
+    # entr -d also stops when a file is added, so the list is found again.
+    while true; do
+      find website/src website/css website/js website/*.html website/_redirects -type f \
+        | entr -dnp bash website/build.sh || true
+    done
+  '';
+
   # Interactively name (or rename) locations, then save every nickname to
   # data/nicknames.json -- committed, unlike the rest of data/, and not
   # managed by datapackage.json/fetch.py. Needs a loaded database (run-all).

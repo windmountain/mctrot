@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>McTrot Live</title>
+  <title>McTrot 5 · Live</title>
   <meta name="description" content="Where I am during a McTrot attempt, live.">
   <!-- Unlinked until launch: keep it out of search results. -->
   <meta name="robots" content="noindex">
@@ -12,16 +12,68 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#FFD100">
 
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/mctrot-map.css">
+  <!-- Absolute paths: this page is also served at /live/map and the rest. -->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/mctrot-map.css">
   <style>
+    /* The shell, the same on every view (src/Live.elm): header with the
+       title and the radio, the view switcher, the view, a footer. */
+    .app { flex: 1; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+    /* Stays put while the overview and the blog scroll (the other views
+       fit the screen anyway); the radio's Links panel opens over the page. */
+    .app-top { position: sticky; top: 0; z-index: 5; background: var(--bg); box-shadow: 0 1px 0 var(--rule); }
+    .app-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 16px 10px; }
+    .app-title h1 { margin: 0; font-size: clamp(1.75rem, 7vw, 2.5rem); line-height: 1; letter-spacing: -0.02em; color: var(--ink-1); }
+    .app-title h1 a { text-decoration: none; }
+    .app-subtitle { margin: 4px 0 0; font-size: 0.7rem; line-height: 1.3; font-weight: bold; letter-spacing: 0.08em; color: var(--ink-1); }
+    .app-tabs { background: var(--bg); padding: 0 16px 12px; }
+    .app-tabs ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 30rem; border: 2px solid var(--ink-1); border-radius: 999px; overflow: hidden; }
+    .app-tabs li { flex: 1; }
+    .app-tabs li + li a { border-left: 2px solid var(--ink-1); }
+    .app-tabs a { display: block; text-align: center; padding: 6px 4px; font-weight: bold; font-size: 0.9rem; text-decoration: none; color: var(--ink-1); }
+    .app-tabs a[aria-current="page"] { background: var(--ink-1); color: var(--bg); }
+    .app-tabs a:focus-visible { outline-offset: -4px; }
+    .app-main { flex: 1; min-height: 0; }
+    .app-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 8px 16px; font-size: 0.8rem; color: var(--ink-1); }
+    /* Map, timeline and stats take exactly the screen; the overview and
+       the blog scroll like a page. */
+    /* (flex: none: in the body's flex column, flex: 1 would override the
+       height and let the view grow with its content.) */
+    .page-map, .page-timeline, .page-stats { flex: none; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+    .tab-empty { padding: 1rem 16px; text-align: center; }
+
+    /* Map */
+    .tab-map { display: flex; flex-direction: column; padding: 8px 16px; }
+    .tab-map .live-status { text-align: center; margin: 0 0 4px; min-height: 0; }
+    .tab-map .live-map { flex: 1; min-height: 0; }
+    .tab-map .live-map-svg { width: 100%; height: 100%; max-width: none; }
+
+    /* Blog */
+    .tab-blog .live-posts { margin: 1rem auto 2rem; padding: 0 16px; }
+
+    /* Timeline: oldest to newest, left to right */
+    .tab-timeline { display: flex; }
+    .timeline { flex: 1; list-style: none; margin: 0; padding: 12px 16px; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; }
+    .timeline-item { flex: 0 0 min(18rem, 80vw); overflow-y: auto; border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; scroll-snap-align: start; }
+    .timeline-when { margin: 0 0 6px; font-size: 0.85em; opacity: 0.7; }
+    .timeline-checkin { margin: 0; font-weight: bold; }
+    .timeline .live-post-photo img, .timeline .live-post-video { max-height: 50vh; }
+
+    /* Stats: a grid filling the screen */
+    .tab-stats { overflow: auto; }
+    .stats-grid { height: 100%; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); grid-auto-rows: minmax(10rem, 1fr); }
+    /* Rules drawn by each cell, so a part-filled last row stays white. */
+    .stats-cell { padding: 12px 16px; overflow: auto; box-shadow: 1px 0 0 var(--rule), 0 1px 0 var(--rule); }
+    .stats-cell h2 { margin: 0 0 6px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-1); }
+    .stats-cell .live-weather, .stats-cell .live-sky { margin: 0; }
+    .stats-cell .live-sun { margin: 0; }
+
+    /* The overview (plain /live) */
     .live { max-width: var(--measure); margin: 0 auto; padding: 1rem 16px 2rem; }
-    .live-home { margin: 0; }
-    .live h1 { margin: 0.25rem 0 0; }
     .live-status { margin: 0.25rem 0 0; min-height: 1.6em; }
     .live-visits { margin: 0 0 1rem; min-height: 1.6em; }
-    /* The radio (src/Radio.elm): top right; pinned there on a wide screen. */
-    .radio { position: absolute; top: 12px; right: 16px; z-index: 2; font-size: 0.85em; max-width: calc(100vw - 32px); }
+    /* The radio (src/Radio.elm), at the header's right. */
+    .radio { position: relative; z-index: 2; font-size: 0.85em; max-width: calc(100vw - 32px); }
     .radio-bar { display: flex; align-items: center; gap: 8px; background: #111; color: #fff; border-radius: 999px; padding: 4px 6px 4px 4px; }
     .radio button { font: inherit; border: 0; cursor: pointer; }
     .radio-play { width: 2rem; height: 2rem; border-radius: 50%; background: #FFD100; color: #111; font-size: 0.85rem; line-height: 1; }
@@ -37,18 +89,17 @@
     .radio-links dt { font-weight: bold; margin-top: 6px; }
     .radio-links dt:first-child { margin-top: 0; }
     .radio-links dd { margin: 2px 0 0; overflow-wrap: anywhere; }
-    @media (min-width: 64rem) { .radio { position: fixed; } }
     .live-weather { margin: 0 0 1rem; }
     .live-weather-when { opacity: 0.7; }
-    /* The sky tiles (src/Live.elm, viewSky): a row of five on a phone; on
-       a wide screen, a column pinned to the bottom-left corner. */
+    /* The sky tiles (src/Live.elm, viewSky): a row of five; on the
+       overview on a wide screen, a column pinned to the bottom-left corner. */
     .live-sky { margin: 0 0 1rem; }
     .live-sky ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
     .live-sky li { font-size: 0.75em; line-height: 1.25; text-align: center; }
     .live-sky-swatch { display: block; aspect-ratio: 1; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); margin-bottom: 0.25rem; }
     @media (min-width: 64rem) {
-      .live-sky { position: fixed; left: 16px; bottom: 16px; width: 3.5rem; margin: 0; z-index: 1; }
-      .live-sky ul { grid-template-columns: 1fr; }
+      .page-overview .live-sky { position: fixed; left: 16px; bottom: 16px; width: 3.5rem; margin: 0; z-index: 1; }
+      .page-overview .live-sky ul { grid-template-columns: 1fr; }
     }
     .live-sun { margin: 1rem auto 0; border-collapse: collapse; font-size: 0.9em; }
     .live-sun caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
@@ -75,23 +126,23 @@
     /* A DoubleTake pair: on a wide screen, both cameras side by side,
        wider than the feed (js/pair-player.js). */
     @media (min-width: 48rem) {
-      .live-post-pair { position: relative; left: 50%; width: min(44rem, calc(100vw - 32px)); transform: translateX(-50%); }
+      .live-posts .live-post-pair { position: relative; left: 50%; width: min(44rem, calc(100vw - 32px)); transform: translateX(-50%); }
     }
   </style>
 </head>
 <body>
-  <main id="main">
-    <div id="live">
-      <noscript>
-        <p><a href="/">McTrot</a></p>
-        <h1>Live</h1>
-        <p>This page shows where I am during a McTrot attempt. It requires JavaScript.</p>
-      </noscript>
-    </div>
-  </main>
+  <!-- Elm draws the page here (src/Live.elm). Its own element, not the
+       whole body: extensions add things to <body>, which would crash an
+       Elm program that owned it. -->
+  <div id="app"></div>
+  <noscript>
+    <p><a href="/">McTrot</a></p>
+    <h1>McTROT 5</h1>
+    <p>This page shows where I am during a McTrot attempt. It requires JavaScript.</p>
+  </noscript>
 
-  <script src="js/pair-player.js"></script>
-  <script src="js/live.js"></script>
+  <script src="/js/pair-player.js"></script>
+  <script src="/js/live.js"></script>
   <script>
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.
@@ -106,12 +157,23 @@
     audio.volume = 1;
 
     var app = Elm.Live.init({
-      node: document.getElementById("live"),
+      node: document.getElementById("app"),
       flags: {
+        path: location.pathname,
         api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc",
         radio: { volumeAdjustable: volumeAdjustable }
       }
     });
+
+    // --- The address (src/Live.elm's navigate, setTitle, pathChanged) -----
+    // ?api=… stays on the address as views change, for local testing.
+    app.ports.navigate.subscribe(function (page) {
+      history.pushState(null, "", page.path + location.search);
+      document.title = page.title;
+      window.scrollTo(0, 0);
+    });
+    app.ports.setTitle.subscribe(function (title) { document.title = title; });
+    window.addEventListener("popstate", function () { app.ports.pathChanged.send(location.pathname); });
 
     var send = function (event) { app.ports.radioIn.send(event); };
     var stopping = false;

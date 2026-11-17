@@ -21,7 +21,7 @@ done
 cp -R css geo sim build/
 cp favicon.svg favicon.ico favicon-16.png favicon-32.png favicon-48.png \
   apple-touch-icon.png icon-192.png icon-512.png \
-  site.webmanifest og-image.png robots.txt sitemap.xml build/
+  site.webmanifest og-image.png robots.txt sitemap.xml _redirects build/
 
 cp js/*.js build/js/
 
@@ -37,3 +37,12 @@ compile Simulator simulator
 compile MegaSearch mega-search
 compile MegaSearchWorker mega-search-worker-elm
 compile Live live
+
+# live.html's scripts and stylesheets get their contents' fingerprint in
+# the address (/js/live.js?v=3f9a…), so a browser never runs a stale copy
+# it kept from before a change: a changed file has a new address.
+for asset in js/live.js js/pair-player.js css/style.css css/mctrot-map.css; do
+  hash=$(shasum -a 256 "build/$asset" | cut -c1-10)
+  sed -i.bak "s|\"/$asset\"|\"/$asset?v=$hash\"|" build/live.html
+done
+rm build/live.html.bak
