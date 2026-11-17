@@ -30,17 +30,13 @@
     .radio-status { opacity: 0.8; font-size: 0.9em; overflow-wrap: anywhere; }
     .radio-bar .radio-problem { color: #ffb3a7; opacity: 1; }
     .radio-volume { width: 5rem; accent-color: #FFD100; }
-    .radio-station-button { background: none; color: #fff; text-decoration: underline; padding: 4px 6px; }
-    .radio button:focus-visible, .radio input:focus-visible { outline: 2px solid #FFD100; outline-offset: 2px; }
-    .radio-station { position: absolute; right: 0; top: calc(100% + 6px); width: min(20rem, calc(100vw - 32px)); background: #fff; color: #111;
-      border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15); }
-    .radio-station label { display: block; font-weight: bold; margin-bottom: 4px; }
-    .radio-station input { box-sizing: border-box; width: 100%; font: inherit; padding: 6px 8px; border: 1px solid #bbb; border-radius: 6px; }
-    .radio-station .radio-problem { color: #b42318; margin: 6px 0 0; }
-    .radio-hint { margin: 8px 0; opacity: 0.75; font-size: 0.95em; }
-    .radio-station-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .radio-station-actions button { background: #eee; padding: 6px 10px; border-radius: 6px; }
-    .radio-station-actions button[type=submit] { background: #111; color: #fff; }
+    .radio-links-button { background: none; color: #fff; text-decoration: underline; padding: 4px 6px; }
+    .radio button:focus-visible, .radio input:focus-visible, .radio a:focus-visible { outline: 2px solid #FFD100; outline-offset: 2px; }
+    .radio-links { position: absolute; right: 0; top: calc(100% + 6px); width: min(20rem, calc(100vw - 32px)); box-sizing: border-box; margin: 0;
+      background: #fff; color: #111; border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15); }
+    .radio-links dt { font-weight: bold; margin-top: 6px; }
+    .radio-links dt:first-child { margin-top: 0; }
+    .radio-links dd { margin: 2px 0 0; overflow-wrap: anywhere; }
     @media (min-width: 64rem) { .radio { position: fixed; } }
     .live-weather { margin: 0 0 1rem; }
     .live-weather-when { opacity: 0.7; }
@@ -102,12 +98,6 @@
     var api = params.get("api");
 
     // --- The radio (src/Radio.elm draws it; this plays it) ---------------
-    // The station: ?radio=<url>, or what this browser saved, or McTrot's.
-    var RADIO_DEFAULT = "https://radio.mctrot.nyc/live.mp3";
-    var RADIO_KEY = "mctrot-radio-url";
-    var savedRadio = null;
-    try { savedRadio = localStorage.getItem(RADIO_KEY); } catch (e) {}
-    var radioParam = params.get("radio");
     var audio = new Audio();
     audio.preload = "none";
     // iPhones and iPads ignore a page setting the volume.
@@ -119,11 +109,7 @@
       node: document.getElementById("live"),
       flags: {
         api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc",
-        radio: {
-          url: /^https?:\/\//.test(radioParam || "") ? radioParam : savedRadio || RADIO_DEFAULT,
-          defaultUrl: RADIO_DEFAULT,
-          volumeAdjustable: volumeAdjustable
-        }
+        radio: { volumeAdjustable: volumeAdjustable }
       }
     });
 
@@ -177,11 +163,6 @@
         audio.load();
       } else if (cmd.command === "volume") {
         audio.volume = cmd.volume;
-      } else if (cmd.command === "save") {
-        try {
-          if (cmd.url === null) localStorage.removeItem(RADIO_KEY);
-          else localStorage.setItem(RADIO_KEY, cmd.url);
-        } catch (e) {}
       }
     });
   </script>
