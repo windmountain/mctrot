@@ -28,11 +28,11 @@ test("the sun's position: high in the south at noon, rising in the ESE on the wa
   assert.ok(Math.abs(rise.elevation) < 1 && rise.azimuth > 110 && rise.azimuth < 125, JSON.stringify(rise));
 });
 
-test("clear midday: blue overhead, and the south (toward the sun) brighter than the north", () => {
+test("clear midday: blue zenith (overhead), and the south (toward the sun) brighter than the north", () => {
   const noon = "2026-11-21T17:00:00Z";
-  const overhead = tile(noon, "Overhead");
-  const [r, , b] = rgb(overhead);
-  assert.ok(b > r + 40, `overhead is blue: ${overhead}`);
+  const zenith = tile(noon, "Zenith");
+  const [r, , b] = rgb(zenith);
+  assert.ok(b > r + 40, `zenith is blue: ${zenith}`);
   assert.ok(bright(tile(noon, "SE")) > bright(tile(noon, "NE")), "SE brighter than NE");
   assert.ok(bright(tile(noon, "SW")) > bright(tile(noon, "NW")), "SW brighter than NW");
 });
@@ -69,7 +69,7 @@ test("/live has the sky: overhead, then NE, NW, SE, SW", async () => {
   const body = (await app.inject({ url: "/live" })).json();
   assert.deepEqual(
     body.sky.squares.map((q: { label: string }) => q.label),
-    ["Overhead", "NE", "NW", "SE", "SW"],
+    ["Zenith", "NE", "NW", "SE", "SW"],
   );
   for (const q of body.sky.squares) assert.match(q.color, /^#[0-9a-f]{6}$/);
 });

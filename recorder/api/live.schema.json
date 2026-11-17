@@ -727,7 +727,7 @@
             "properties": {
               "label": {
                 "type": "string",
-                "description": "Where to look: \"Overhead\", or a compass point 10° above the horizon: \"NE\", \"NW\", \"SE\", \"SW\""
+                "description": "Where to look: \"Zenith\", or a compass point 10° above the horizon: \"NE\", \"NW\", \"SE\", \"SW\""
               },
               "elevation": {
                 "type": "number"

@@ -197,7 +197,7 @@ function hex(light: RGB, adaptation: number): string {
 }
 
 export type SkySquare = {
-  label: string; // "Overhead", "NE", …
+  label: string; // "Zenith", "NE", …
   elevation: number; // degrees above the horizon
   azimuth: number; // compass bearing
   color: string; // "#5b8bd0"
@@ -243,7 +243,7 @@ export function sky(ms: number, lat: number, lon: number, weather: SkyInputs | n
   );
 
   const views: [string, number, number][] = [
-    ["Overhead", 90, 0],
+    ["Zenith", 90, 0],
     ["NE", TILE_ELEVATION, 45],
     ["NW", TILE_ELEVATION, 315],
     ["SE", TILE_ELEVATION, 135],

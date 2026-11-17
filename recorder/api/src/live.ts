@@ -150,7 +150,7 @@ export const LiveResponse = z
         }),
         squares: z.array(
           z.object({
-            label: z.string().describe('Where to look: "Overhead", or a compass point 10° above the horizon: "NE", "NW", "SE", "SW"'),
+            label: z.string().describe('Where to look: "Zenith", or a compass point 10° above the horizon: "NE", "NW", "SE", "SW"'),
             elevation: z.number(),
             azimuth: z.number(),
             color: z.string().describe("CSS hex colour"),
