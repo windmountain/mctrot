@@ -275,11 +275,16 @@ type alias Attempt =
     }
 
 
+{-| A store in the route plan, in planned order, with its planned
+arrival (ms since epoch; Nothing in a hand-written plan).
+-}
 type alias Store =
     { id : String
     , name : String
+    , address : String
     , lat : Float
     , lon : Float
+    , arrive : Maybe Int
     }
 
 
@@ -432,11 +437,14 @@ attemptDecoder =
 
 storeDecoder : Decoder Store
 storeDecoder =
-    Decode.map4 Store
+    Decode.map6 Store
         (Decode.field "id" Decode.string)
         (Decode.field "name" Decode.string)
+        (Decode.field "address" Decode.string)
         (Decode.field "lat" Decode.float)
         (Decode.field "lon" Decode.float)
+        -- Optional: a recorder from before planned times sends none.
+        (Decode.oneOf [ Decode.field "arrive" (Decode.nullable Decode.int), Decode.succeed Nothing ])
 
 
 visitDecoder : Decoder Visit
@@ -854,8 +862,62 @@ viewStatsTab model =
         , cell "Weather" [ viewWeather model ]
         , cell "Sky" [ viewSky response ]
         , cell "Sun" [ viewSun response ]
+        , Html.section [ Attr.class "stats-cell stats-cell-plan" ]
+            [ Html.h2 [] [ Html.text "Plan" ]
+            , viewPlan (Maybe.map .stores response |> Maybe.withDefault [])
+            ]
         ]
     ]
+
+
+{-| The route plan as a schedule, like the simulator's printout
+(Simulator.elm, viewPrintSchedule): number, code name, address and
+expected arrival, in New York time. The first row and the first on each
+later day show the date as well.
+-}
+viewPlan : List Store -> Html Msg
+viewPlan stores =
+    if List.isEmpty stores then
+        Html.p [] [ Html.text "No route plan loaded." ]
+
+    else
+        let
+            dayOf ms =
+                NewYorkTime.format ms |> String.split "," |> List.head
+
+            row i ( previous, store ) =
+                Html.tr []
+                    [ Html.td [ Attr.class "plan-num" ] [ Html.text (String.fromInt (i + 1)) ]
+                    , Html.td [] [ Html.text store.name ]
+                    , Html.td [] [ Html.text store.address ]
+                    , Html.td [ Attr.class "plan-time" ]
+                        [ Html.text
+                            (case store.arrive of
+                                Just arrive ->
+                                    if Maybe.andThen .arrive previous |> Maybe.andThen dayOf |> (==) (dayOf arrive) then
+                                        NewYorkTime.clock arrive
+
+                                    else
+                                        NewYorkTime.format arrive
+
+                                Nothing ->
+                                    "—"
+                            )
+                        ]
+                    ]
+        in
+        Html.table [ Attr.class "plan-schedule" ]
+            [ Html.thead []
+                [ Html.tr []
+                    [ Html.th [ Attr.class "plan-num" ] [ Html.text "#" ]
+                    , Html.th [] [ Html.text "Code name" ]
+                    , Html.th [] [ Html.text "Address" ]
+                    , Html.th [] [ Html.text "Expected arrival" ]
+                    ]
+                ]
+            , Html.tbody []
+                (List.indexedMap row (List.map2 Tuple.pair (Nothing :: List.map Just stores) stores))
+            ]
 
 
 {-| "54°F, clear, feels like 47°F. Wind 9 mph from the NW, gusts 12 mph."

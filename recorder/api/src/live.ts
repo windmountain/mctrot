@@ -46,9 +46,14 @@ export const LiveResponse = z
           address: z.string(),
           lat: z.number(),
           lon: z.number(),
+          arrive: z.number().int().nullable().describe("Planned arrival, ms since epoch; null in a hand-written plan"),
+          depart: z.number().int().nullable().describe("Planned departure, ms since epoch; null in a hand-written plan"),
         }),
       )
-      .describe("The route plan's stores"),
+      .describe("The route plan's stores, in the planned order"),
+    plannedTrack: z
+      .array(z.tuple([z.number(), z.number()]))
+      .describe("The planned walking route as [lat, lon] points, from the route plan's GPX"),
     track: z
       .array(z.array(z.tuple([z.number(), z.number()])))
       .describe(
@@ -175,7 +180,16 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
         (ts) => positionFromDb(db, ts),
       )
     : [];
-  const stores = plan.stores.map(({ id, name, address, lat, lon }) => ({ id, name, address, lat, lon }));
+  const time = (iso: string | null) => (iso === null ? null : Date.parse(iso));
+  const stores = plan.stores.map(({ id, name, address, lat, lon, arrive, depart }) => ({
+    id,
+    name,
+    address,
+    lat,
+    lon,
+    arrive: time(arrive),
+    depart: time(depart),
+  }));
   const path = attempt
     ? track(db, attempt.startedAt, attempt.endedAt ?? Number.MAX_SAFE_INTEGER)
     : track(db, now - NO_ATTEMPT_WINDOW_MS, Number.MAX_SAFE_INTEGER);
@@ -184,6 +198,7 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
     position: position ?? null,
     attempt,
     stores,
+    plannedTrack: plan.track,
     track: path,
     visits,
     posts: recentPosts(db, mediaUrl, 50, now),

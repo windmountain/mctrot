@@ -110,6 +110,32 @@
           },
           "lon": {
             "type": "number"
+          },
+          "arrive": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Planned arrival, ms since epoch; null in a hand-written plan"
+          },
+          "depart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Planned departure, ms since epoch; null in a hand-written plan"
           }
         },
         "required": [
@@ -117,11 +143,31 @@
           "name",
           "address",
           "lat",
-          "lon"
+          "lon",
+          "arrive",
+          "depart"
         ],
         "additionalProperties": false
       },
-      "description": "The route plan's stores"
+      "description": "The route plan's stores, in the planned order"
+    },
+    "plannedTrack": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "number"
+          }
+        ],
+        "items": false,
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "description": "The planned walking route as [lat, lon] points, from the route plan's GPX"
     },
     "track": {
       "type": "array",
@@ -764,6 +810,7 @@
     "position",
     "attempt",
     "stores",
+    "plannedTrack",
     "track",
     "visits",
     "posts",
