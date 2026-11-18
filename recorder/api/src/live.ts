@@ -57,7 +57,7 @@ export const LiveResponse = z
     track: z
       .array(z.array(z.tuple([z.number(), z.number()])))
       .describe(
-        "The path walked as [lat, lon] lines, simplified, split where GPS was lost: this attempt's, or the last day's before any attempt",
+        "The path walked as [lat, lon] lines, simplified, split where GPS was lost: every point recorded (while attempts are set aside)",
       ),
     visits: z
       .array(
@@ -78,7 +78,7 @@ export const LiveResponse = z
           }),
         ]),
       )
-      .describe("This attempt's Visit taps in time order, each matched to a store by GPS"),
+      .describe("Check-ins in time order, each matched to a store by GPS (all of them while attempts are set aside)"),
     posts: z
       .array(
         z.object({
@@ -168,17 +168,23 @@ export const LiveResponse = z
 
 export type Live = z.infer<typeof LiveResponse>;
 
+// Attempts are set aside for now (2026-11-17): every check-in is matched to
+// a store, and the walked path is every point ever recorded, whether or
+// not an attempt is running. The attempt itself is still reported. Set
+// this to true to limit both to the latest attempt again (and the path to
+// the last day's before any attempt).
+export const USE_ATTEMPTS = false;
+
 export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()): Live {
   const position = db
     .prepare("select ts, lat, lon, accuracy from points order by ts desc limit 1")
     .get() as Live["position"] | undefined;
   const attempt = latestAttempt(db);
-  const visits = attempt
-    ? matchVisits(
-        tapsBetween(db, attempt.startedAt, attempt.endedAt ?? Number.MAX_SAFE_INTEGER),
-        plan.stores,
-        (ts) => positionFromDb(db, ts),
-      )
+  const window = USE_ATTEMPTS
+    ? attempt && { from: attempt.startedAt, to: attempt.endedAt ?? Number.MAX_SAFE_INTEGER }
+    : { from: 0, to: Number.MAX_SAFE_INTEGER };
+  const visits = window
+    ? matchVisits(tapsBetween(db, window.from, window.to), plan.stores, (ts) => positionFromDb(db, ts))
     : [];
   const time = (iso: string | null) => (iso === null ? null : Date.parse(iso));
   const stores = plan.stores.map(({ id, name, address, lat, lon, arrive, depart }) => ({
@@ -190,9 +196,11 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
     arrive: time(arrive),
     depart: time(depart),
   }));
-  const path = attempt
-    ? track(db, attempt.startedAt, attempt.endedAt ?? Number.MAX_SAFE_INTEGER)
-    : track(db, now - NO_ATTEMPT_WINDOW_MS, Number.MAX_SAFE_INTEGER);
+  const path = !USE_ATTEMPTS
+    ? track(db, 0, Number.MAX_SAFE_INTEGER)
+    : attempt
+      ? track(db, attempt.startedAt, attempt.endedAt ?? Number.MAX_SAFE_INTEGER)
+      : track(db, now - NO_ATTEMPT_WINDOW_MS, Number.MAX_SAFE_INTEGER);
   return {
     serverTs: now,
     position: position ?? null,

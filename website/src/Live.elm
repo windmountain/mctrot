@@ -25,18 +25,21 @@ is handled here through two ports and a few lines in live.html:
 
 import Browser
 import Browser.Dom
+import Browser.Events
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Keyed
 import Http
 import Json.Decode as Decode exposing (Decoder)
-import MctrotMapData
+import Dict
+import LiveMapData
 import NewYorkTime
 import Projection
 import Radio
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
+import Svg.Events
 import Task
 import Time
 import Url exposing (Url)
@@ -174,6 +177,9 @@ type alias LiveResponse =
     , position : Maybe Position
     , attempt : Maybe Attempt
     , stores : List Store
+
+    -- The planned walking route, from the route plan's GPX.
+    , plannedTrack : List ( Float, Float )
     , track : List (List ( Float, Float ))
     , visits : List Visit
     , posts : List Post
@@ -275,8 +281,8 @@ type alias Attempt =
     }
 
 
-{-| A store in the route plan, in planned order, with its planned
-arrival (ms since epoch; Nothing in a hand-written plan).
+{-| A store in the route plan, in planned order, with its planned arrival
+and departure (ms since epoch; Nothing in a hand-written plan).
 -}
 type alias Store =
     { id : String
@@ -285,6 +291,7 @@ type alias Store =
     , lat : Float
     , lon : Float
     , arrive : Maybe Int
+    , depart : Maybe Int
     }
 
 
@@ -310,6 +317,8 @@ liveDecoder =
         |> andMap (Decode.field "position" (Decode.nullable positionDecoder))
         |> andMap (Decode.field "attempt" (Decode.nullable attemptDecoder))
         |> andMap (Decode.field "stores" (Decode.list storeDecoder))
+        -- Optional: a recorder from before the planned route sends none.
+        |> andMap (Decode.oneOf [ Decode.field "plannedTrack" (Decode.list latLonDecoder), Decode.succeed [] ])
         |> andMap (Decode.field "track" (Decode.list (Decode.list latLonDecoder)))
         |> andMap (Decode.field "visits" (Decode.list visitDecoder))
         |> andMap (Decode.field "posts" (Decode.list postDecoder))
@@ -437,7 +446,7 @@ attemptDecoder =
 
 storeDecoder : Decoder Store
 storeDecoder =
-    Decode.map6 Store
+    Decode.map7 Store
         (Decode.field "id" Decode.string)
         (Decode.field "name" Decode.string)
         (Decode.field "address" Decode.string)
@@ -445,6 +454,7 @@ storeDecoder =
         (Decode.field "lon" Decode.float)
         -- Optional: a recorder from before planned times sends none.
         (Decode.oneOf [ Decode.field "arrive" (Decode.nullable Decode.int), Decode.succeed Nothing ])
+        (Decode.oneOf [ Decode.field "depart" (Decode.nullable Decode.int), Decode.succeed Nothing ])
 
 
 visitDecoder : Decoder Visit
@@ -492,6 +502,21 @@ type alias Model =
     , now : Maybe Time.Posix
     , radio : Radio.Model
     , route : Route
+    , zoom : Float
+    , drag : Maybe Drag
+    , dragged : Bool
+    , focused : Maybe String
+    }
+
+
+{-| A drag of the map with the mouse: where the pointer was pressed and how
+far the map was scrolled then.
+-}
+type alias Drag =
+    { x : Float
+    , y : Float
+    , scrollX : Float
+    , scrollY : Float
     }
 
 
@@ -517,6 +542,10 @@ init flags =
       , now = Nothing
       , radio = Radio.init flags.radio
       , route = route
+      , zoom = 1
+      , drag = Nothing
+      , dragged = False
+      , focused = Nothing
       }
     , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route) ]
     )
@@ -534,12 +563,70 @@ type Msg
     | RadioMsg Radio.Msg
     | Navigate Route
     | PathChanged String
+    | Zoom Float
+    | ZoomFrom Float Browser.Dom.Viewport
+    | DragStart Drag
+    | DragTo Float Float
+    | DragEnd
+    | Focus String
     | NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        -- The map's + or - (zoom times 2 or 1/2), within its limits. The
+        -- map grows or shrinks around the middle of what's in view, so
+        -- first see what's in view (Browser.Dom measures after the page is
+        -- next drawn, so this must come before the zoom changes it).
+        Zoom by ->
+            ( model
+            , Browser.Dom.getViewportOf mapFrameId
+                |> Task.attempt (Result.map (ZoomFrom by) >> Result.withDefault NoOp)
+            )
+
+        -- Dragging the map with the mouse scrolls it, so what was under
+        -- the pointer stays under it. (Touch scrolls it natively.)
+        DragStart drag ->
+            ( { model | drag = Just drag, dragged = False }, Cmd.none )
+
+        DragTo x y ->
+            case model.drag of
+                Just drag ->
+                    ( { model | dragged = model.dragged || abs (x - drag.x) + abs (y - drag.y) > 4 }
+                    , Browser.Dom.setViewportOf mapFrameId (drag.scrollX - (x - drag.x)) (drag.scrollY - (y - drag.y))
+                        |> Task.attempt (\_ -> NoOp)
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        DragEnd ->
+            ( { model | drag = Nothing }, Cmd.none )
+
+        -- A store's dot clicked: focus it, or unfocus it if it was. (Not
+        -- the end of a drag that happened to finish on a dot.)
+        Focus id ->
+            if model.dragged then
+                ( { model | dragged = False }, Cmd.none )
+
+            else if model.focused == Just id then
+                ( { model | focused = Nothing }, Cmd.none )
+
+            else
+                ( { model | focused = Just id }, Cmd.none )
+
+        ZoomFrom by before ->
+            let
+                zoom =
+                    clamp 1 maxZoom (model.zoom * by)
+            in
+            if zoom == model.zoom then
+                ( model, Cmd.none )
+
+            else
+                ( { model | zoom = zoom }, keepMapCentre before )
+
         -- A tab (or the title) clicked: switch views without reloading,
         -- so the radio keeps playing.
         Navigate route ->
@@ -625,6 +712,14 @@ subscriptions model =
         , -- Overland sends every 30 s, so polling faster shows nothing new.
           Time.every 15000 (\_ -> Poll)
         , Time.every 1000 Tick
+        , if model.drag == Nothing then
+            Sub.none
+
+          else
+            Sub.batch
+                [ Browser.Events.onMouseMove (Decode.map2 DragTo (Decode.field "clientX" Decode.float) (Decode.field "clientY" Decode.float))
+                , Browser.Events.onMouseUp (Decode.succeed DragEnd)
+                ]
         ]
 
 
@@ -756,7 +851,7 @@ viewOverview model =
         , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
         , viewWeather model
         , viewSky response
-        , viewMap response
+        , viewMap Nothing model.focused (serverNow model) response
         , viewSun response
         , viewPosts model
         ]
@@ -768,13 +863,83 @@ viewStatus model =
     Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ] [ Html.text (status model) ]
 
 
-{-| The map, filling the page. (Zooming comes in a later pass.)
+{-| The map, filling the page's height, mapTabStretch times as wide as
+Manhattan's true proportions (see viewMap), less as it's zoomed in (see
+stretchAt), and zoomable: + and - in its
+top-left corner, then scroll to look around.
 -}
 viewMapTab : Model -> List (Html Msg)
 viewMapTab model =
     [ viewStatus model
-    , viewMap (Maybe.map .response model.latest)
+    , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, dragging = model.drag /= Nothing }) model.focused (serverNow model) (Maybe.map .response model.latest)
     ]
+
+
+maxZoom : Float
+maxZoom =
+    16
+
+
+mapFrameId : String
+mapFrameId =
+    "live-map-frame"
+
+
+{-| After a zoom, scroll the map so what was in the middle of the view
+`before` still is. (Browser.Dom measures once the page is drawn at the new
+size.)
+-}
+keepMapCentre : Browser.Dom.Viewport -> Cmd Msg
+keepMapCentre before =
+    Browser.Dom.getViewportOf mapFrameId
+        |> Task.andThen
+            (\after ->
+                let
+                    centre scroll seen sceneBefore sceneAfter =
+                        (scroll + seen / 2) * sceneAfter / sceneBefore - seen / 2
+                in
+                Browser.Dom.setViewportOf mapFrameId
+                    (centre before.viewport.x before.viewport.width before.scene.width after.scene.width)
+                    (centre before.viewport.y before.viewport.height before.scene.height after.scene.height)
+            )
+        |> Task.attempt (\_ -> NoOp)
+
+
+viewZoomButtons : Float -> Html Msg
+viewZoomButtons zoom =
+    Html.div [ Attr.class "live-map-zoom" ]
+        [ Html.button
+            [ Attr.type_ "button"
+            , Events.onClick (Zoom 2)
+            , Attr.disabled (zoom >= maxZoom)
+            , Attr.attribute "aria-label" "Zoom in"
+            ]
+            [ Html.text "+" ]
+        , Html.button
+            [ Attr.type_ "button"
+            , Events.onClick (Zoom 0.5)
+            , Attr.disabled (zoom <= 1)
+            , Attr.attribute "aria-label" "Zoom out"
+            ]
+            [ Html.text "−" ]
+        ]
+
+
+{-| How much wider than true the Map tab's map is when zoomed all the way
+out: picked by eye with a slider.
+-}
+mapTabStretch : Float
+mapTabStretch =
+    3.6
+
+
+{-| The Map tab's stretch at a zoom: mapTabStretch all the way out, easing
+by the same factor each step in, to 1 (true proportions) all the way in, at
+maxZoom. Roughly 3.6, 2.6, 1.9, 1.4, 1.
+-}
+stretchAt : Float -> Float
+stretchAt zoom =
+    mapTabStretch ^ (1 - logBase 2 zoom / logBase 2 maxZoom)
 
 
 {-| The posts, newest first, scrolling down the page.
@@ -857,26 +1022,34 @@ viewStatsTab model =
             Html.section [ Attr.class "stats-cell" ] (Html.h2 [] [ Html.text title ] :: body)
     in
     [ Html.div [ Attr.class "stats-grid" ]
-        [ cell "Attempt" [ Html.p [] [ Html.text (visitsLine model) ] ]
+        [ cell "Visits" [ Html.p [] [ Html.text (visitsLine model) ] ]
         , cell "Position" [ Html.p [] [ Html.text (status model) ] ]
         , cell "Weather" [ viewWeather model ]
         , cell "Sky" [ viewSky response ]
         , cell "Sun" [ viewSun response ]
         , Html.section [ Attr.class "stats-cell stats-cell-plan" ]
             [ Html.h2 [] [ Html.text "Plan" ]
-            , viewPlan (Maybe.map .stores response |> Maybe.withDefault [])
+            , viewPlan
+                (Maybe.map .stores response |> Maybe.withDefault [])
+                (Maybe.map .visits response |> Maybe.withDefault [])
             ]
         ]
     ]
 
 
 {-| The route plan as a schedule, like the simulator's printout
-(Simulator.elm, viewPrintSchedule): number, code name, address and
-expected arrival, in New York time. The first row and the first on each
-later day show the date as well.
+(Simulator.elm, viewPrintSchedule): number, code name, address, expected
+and actual arrival, the difference, and expected departure, in New York
+time. A time on a new day (the first, or after midnight) shows the date
+as well.
+
+Actual arrival is the time of the check-in (Check In on the upload page)
+that the recorder matched to that store by GPS. The difference is
+expected minus actual: positive (green) when ahead of plan, negative
+(red) when behind.
 -}
-viewPlan : List Store -> Html Msg
-viewPlan stores =
+viewPlan : List Store -> List Visit -> Html Msg
+viewPlan stores visits =
     if List.isEmpty stores then
         Html.p [] [ Html.text "No route plan loaded." ]
 
@@ -885,25 +1058,69 @@ viewPlan stores =
             dayOf ms =
                 NewYorkTime.format ms |> String.split "," |> List.head
 
+            -- A time, with its date if it's on a different day from the
+            -- time before it.
+            timeCell before time =
+                Html.td [ Attr.class "plan-time" ]
+                    [ Html.text
+                        (case time of
+                            Just ms ->
+                                if Maybe.andThen dayOf before == dayOf ms then
+                                    NewYorkTime.clock ms
+
+                                else
+                                    NewYorkTime.format ms
+
+                            Nothing ->
+                                "—"
+                        )
+                    ]
+
+            checkedIn store =
+                visits
+                    |> List.filter (\visit -> visit.match == Matched store.id)
+                    |> List.head
+                    |> Maybe.map .tapTs
+
+            difference store =
+                case ( store.arrive, checkedIn store ) of
+                    ( Just expected, Just actual ) ->
+                        let
+                            minutes =
+                                round (toFloat (expected - actual) / 60000)
+
+                            ( sign, class ) =
+                                if minutes > 0 then
+                                    ( "+", "plan-ahead" )
+
+                                else if minutes < 0 then
+                                    ( "−", "plan-behind" )
+
+                                else
+                                    ( "", "" )
+                        in
+                        Html.td [ Attr.class ("plan-time plan-diff " ++ class) ]
+                            [ Html.text
+                                (if minutes == 0 then
+                                    "on time"
+
+                                 else
+                                    sign ++ duration (abs minutes * 60000)
+                                )
+                            ]
+
+                    _ ->
+                        Html.td [ Attr.class "plan-time plan-diff" ] [ Html.text "—" ]
+
             row i ( previous, store ) =
                 Html.tr []
                     [ Html.td [ Attr.class "plan-num" ] [ Html.text (String.fromInt (i + 1)) ]
                     , Html.td [] [ Html.text store.name ]
                     , Html.td [] [ Html.text store.address ]
-                    , Html.td [ Attr.class "plan-time" ]
-                        [ Html.text
-                            (case store.arrive of
-                                Just arrive ->
-                                    if Maybe.andThen .arrive previous |> Maybe.andThen dayOf |> (==) (dayOf arrive) then
-                                        NewYorkTime.clock arrive
-
-                                    else
-                                        NewYorkTime.format arrive
-
-                                Nothing ->
-                                    "—"
-                            )
-                        ]
+                    , timeCell (Maybe.andThen .depart previous) store.arrive
+                    , timeCell store.arrive (checkedIn store)
+                    , difference store
+                    , timeCell store.arrive store.depart
                     ]
         in
         Html.table [ Attr.class "plan-schedule" ]
@@ -913,6 +1130,9 @@ viewPlan stores =
                     , Html.th [] [ Html.text "Code name" ]
                     , Html.th [] [ Html.text "Address" ]
                     , Html.th [] [ Html.text "Expected arrival" ]
+                    , Html.th [] [ Html.text "Actual arrival" ]
+                    , Html.th [] [ Html.text "Difference" ]
+                    , Html.th [] [ Html.text "Expected departure" ]
                     ]
                 ]
             , Html.tbody []
@@ -1089,45 +1309,34 @@ status model =
                 "Connecting…"
 
 
+{-| "Visits 3 / 46 · 1 checking in". Attempts are set aside for now (the
+recorder's USE_ATTEMPTS), so every check-in counts and there's no "on the
+road for".
+-}
 visitsLine : Model -> String
 visitsLine model =
-    case ( Maybe.map .response model.latest, serverNow model ) of
-        ( Just response, Just now ) ->
-            case response.attempt of
-                Nothing ->
-                    "No attempt yet."
+    case Maybe.map .response model.latest of
+        Just response ->
+            let
+                count status_ =
+                    List.length (List.filter (.match >> status_) response.visits)
 
-                Just attempt ->
-                    let
-                        count status_ =
-                            List.length (List.filter (.match >> status_) response.visits)
+                extra label n =
+                    if n > 0 then
+                        " · " ++ String.fromInt n ++ " " ++ label
 
-                        matched =
-                            count isMatched
+                    else
+                        ""
+            in
+            "Visits "
+                ++ String.fromInt (count isMatched)
+                ++ " / "
+                ++ String.fromInt (List.length response.stores)
+                ++ extra "checking in" (count ((==) Pending))
+                ++ extra "unmatched" (count ((==) Unmatched))
+                ++ "."
 
-                        extra label n =
-                            if n > 0 then
-                                " · " ++ String.fromInt n ++ " " ++ label
-
-                            else
-                                ""
-
-                        visits =
-                            "Visits "
-                                ++ String.fromInt matched
-                                ++ " / "
-                                ++ String.fromInt (List.length response.stores)
-                                ++ extra "checking in" (count ((==) Pending))
-                                ++ extra "unmatched" (count ((==) Unmatched))
-                    in
-                    case attempt.endedAt of
-                        Nothing ->
-                            "On the road for " ++ duration (now - attempt.startedAt) ++ ". " ++ visits ++ "."
-
-                        Just endedAt ->
-                            "Last attempt took " ++ duration (endedAt - attempt.startedAt) ++ ". " ++ visits ++ "."
-
-        _ ->
+        Nothing ->
             ""
 
 
@@ -1172,8 +1381,36 @@ duration ms =
         String.fromInt (seconds // 86400) ++ " days"
 
 
-viewMap : Maybe LiveResponse -> Html Msg
-viewMap response =
+{-| The map, stretched to fill its box like the simulator's "Stretch" map:
+LiveMapData.stretchViewBox (just the McDonald's and the streets between
+them) pulled to the box's width and height, with Manhattan spilling into
+the padding around it (see .live-map-frame in live.html).
+
+With a `shape`, the box is the frame's full height and `stretch` times as
+wide as Manhattan's true proportions would make it (1 is undistorted), but
+never wider than the frame; then all of that times `zoom`, with the frame
+scrolling to show the rest, + and - buttons, and dragging with the mouse
+(a hand cursor, closed while `dragging`). Without one, it fills the frame.
+
+Zooming only spreads places apart: lines, dots and flags stay their size.
+
+Only places stretch. Lines keep their widths (non-scaling strokes), the
+dots and the last position are the ends of zero-length strokes, which keep
+their shape, and the flags are small pictures of their own, pinned by
+percentage. All sizes are in live.html, in screen pixels.
+
+Bottom to top: Manhattan (light grey), every street between McDonald's
+(thin white), the start and finish flags, the planned route and the stores
+(thick white and white dots, with every black outline drawn first so the
+route and the dots join into one shape), the path walked (red, over the
+white dots), a small dot of colour inside each white one (yellow; red once
+visited; dark yellow while closed), and the last position (a small red
+square). Over everything, each dot can be clicked to focus its store (one
+at a time; click again to unfocus), which shows a little box beside it with
+its name and when it next opens or closes (see viewFocus).
+-}
+viewMap : Maybe { stretch : Float, zoom : Float, dragging : Bool } -> Maybe String -> Maybe Int -> Maybe LiveResponse -> Html Msg
+viewMap shape focused now response =
     let
         position =
             Maybe.andThen .position response
@@ -1197,25 +1434,101 @@ viewMap response =
                                 Nothing
                     )
 
-        ( done, todo ) =
-            List.partition (\s -> List.member s.id visited) stores
+        -- When I first checked in at a store, if I have.
+        firstVisit id =
+            Maybe.map .visits response
+                |> Maybe.withDefault []
+                |> List.filter (\v -> v.match == Matched id)
+                |> List.map .tapTs
+                |> List.minimum
+
+        pipClass store =
+            if List.member store.id visited then
+                "live-pip live-pip-visited"
+
+            else if now |> Maybe.map (\ms -> not (isOpen ms store)) |> Maybe.withDefault False then
+                "live-pip live-pip-closed"
+
+            else
+                "live-pip"
 
         track =
             Maybe.map .track response |> Maybe.withDefault []
+
+        planned =
+            Maybe.map .plannedTrack response |> Maybe.withDefault []
+
+        plannedLine class =
+            if List.isEmpty planned then
+                []
+
+            else
+                [ viewLine class planned ]
+
+        layer =
+            Svg.svg
+                [ SvgAttr.viewBox LiveMapData.stretchViewBox
+                , SvgAttr.preserveAspectRatio "none"
+                , SvgAttr.class "live-map-layer"
+                ]
     in
     Html.div [ Attr.class "live-map" ]
-        [ Svg.svg
-            [ SvgAttr.viewBox MctrotMapData.mapViewBox
-            , SvgAttr.class "live-map-svg"
+        [ shape |> Maybe.map (.zoom >> viewZoomButtons) |> Maybe.withDefault (Html.text "")
+        , Html.div
+            [ Attr.class "live-map-frame"
+            , Attr.id mapFrameId
+            , Attr.classList
+                [ ( "live-map-draggable", shape /= Nothing )
+                , ( "live-map-dragging", Maybe.map .dragging shape == Just True )
+                ]
+            , case shape of
+                Just _ ->
+                    Events.preventDefaultOn "mousedown" (Decode.map (\drag -> ( DragStart drag, True )) dragStart)
+
+                Nothing ->
+                    Attr.class ""
             , Attr.attribute "role" "img"
-            , Attr.attribute "aria-label" "Map of Manhattan with every store, the ones visited, the path I've walked and my last position"
+            , Attr.attribute "aria-label" "Map of Manhattan, stretched to fill the page: the streets between McDonald's, the planned route from start flag to finish flag, the path I've walked, every McDonald's (visited, not yet, or closed now) and my last position"
             ]
-            (Svg.path [ SvgAttr.class "borough", SvgAttr.d MctrotMapData.boroughPath ] []
-                :: List.map viewTrack track
-                ++ List.map (viewStore "live-store" "120") todo
-                ++ List.map (viewStore "live-store live-store-visited" "200") done
-                ++ (placed |> Maybe.map (\xy -> [ viewMe xy ]) |> Maybe.withDefault [])
-            )
+            [ Html.div
+                (Attr.class "live-map-box"
+                    :: (case ( shape, stretchBox ) of
+                            ( Just { stretch, zoom }, [ _, _, width, height ] ) ->
+                                [ Attr.style "aspect-ratio" (String.fromFloat (width * stretch) ++ " / " ++ String.fromFloat height)
+                                , Attr.style "height" (String.fromFloat (zoom * 100) ++ "%")
+                                , Attr.style "max-width" (String.fromFloat (zoom * 100) ++ "%")
+                                , Attr.style "margin" "0 auto"
+                                ]
+
+                            _ ->
+                                []
+                       )
+                )
+                [ layer
+                    [ Svg.path [ SvgAttr.class "live-borough", SvgAttr.d LiveMapData.boroughPath ] []
+                    , Svg.path [ SvgAttr.class "live-network", SvgAttr.d LiveMapData.networkPath ] []
+                    ]
+                , Html.div [ Attr.class "live-map-layer" ]
+                    ((List.head planned |> Maybe.andThen (nearestStore stores) |> Maybe.map (\start -> [ viewFlag Start start ]) |> Maybe.withDefault [])
+                        ++ (List.head (List.reverse planned) |> Maybe.andThen (nearestStore stores) |> Maybe.map (\end -> [ viewFlag Finish end ]) |> Maybe.withDefault [])
+                    )
+                , layer
+                    (plannedLine "live-planned-casing"
+                        ++ List.map (viewStore "live-store-casing") stores
+                        ++ plannedLine "live-planned"
+                        ++ List.map (viewStore "live-store") stores
+                        ++ List.map viewTrack track
+                        ++ List.map (\store -> viewStore (pipClass store) store) stores
+                        ++ (placed |> Maybe.map viewMe |> Maybe.withDefault [])
+                        ++ List.map viewStoreHit stores
+                    )
+                , Html.div [ Attr.class "live-map-layer" ]
+                    (stores
+                        |> List.filter (\store -> Just store.id == focused)
+                        |> List.map (\store -> viewFocus now (firstVisit store.id) store)
+                    )
+                ]
+            ]
         , if placed /= Nothing && not (onMap placed) then
             Html.p [ Attr.class "live-note" ] [ Html.text "The last position is off this map." ]
 
@@ -1224,12 +1537,90 @@ viewMap response =
         ]
 
 
+{-| The store whose dot a flag goes over: the one nearest an end of the
+planned route, which starts and finishes on the sidewalk a little off the
+store's own point. As [lat, lon], like the route.
+-}
+nearestStore : List Store -> ( Float, Float ) -> Maybe ( Float, Float )
+nearestStore stores ( lat, lon ) =
+    stores
+        |> List.sortBy (\store -> (store.lat - lat) ^ 2 + ((store.lon - lon) * cos (degrees lat)) ^ 2)
+        |> List.head
+        |> Maybe.map (\store -> ( store.lat, store.lon ))
+
+
+{-| A press of the main mouse button on the map: where, and how far the
+map (the event's currentTarget) is scrolled.
+-}
+dragStart : Decoder Drag
+dragStart =
+    Decode.field "button" Decode.int
+        |> Decode.andThen
+            (\button ->
+                if button == 0 then
+                    Decode.map4 Drag
+                        (Decode.field "clientX" Decode.float)
+                        (Decode.field "clientY" Decode.float)
+                        (Decode.at [ "currentTarget", "scrollLeft" ] Decode.float)
+                        (Decode.at [ "currentTarget", "scrollTop" ] Decode.float)
+
+                else
+                    Decode.fail "not the main button"
+            )
+
+
+{-| Where a point in map coordinates sits in the stretched map's box, as
+CSS percentages from its left and top.
+-}
+boxPercent : ( Float, Float ) -> Maybe ( String, String )
+boxPercent ( x, y ) =
+    case stretchBox of
+        [ minX, minY, width, height ] ->
+            Just
+                ( String.fromFloat ((x - minX) / width * 100) ++ "%"
+                , String.fromFloat ((y - minY) / height * 100) ++ "%"
+                )
+
+        _ ->
+            Nothing
+
+
+stretchBox : List Float
+stretchBox =
+    LiveMapData.stretchViewBox |> String.words |> List.filterMap String.toFloat
+
+
+{-| Whether a McDonald's is open at this moment, from its weekly hours
+(LiveMapData.openWindows). A store without hours (a hand-written plan's)
+counts as open.
+-}
+isOpen : Int -> Store -> Bool
+isOpen ms store =
+    case Dict.get store.id LiveMapData.openWindows of
+        Just windows ->
+            let
+                minute =
+                    NewYorkTime.minuteOfWeek ms
+            in
+            List.any (\( from, to ) -> minute >= from && minute < to) windows
+
+        Nothing ->
+            True
+
+
 {-| One stretch of the path walked (the server splits it where GPS was lost).
 -}
 viewTrack : List ( Float, Float ) -> Svg Msg
 viewTrack segment =
+    viewLine "live-track" segment
+
+
+{-| A line through [lat, lon] points, in map coordinates.
+-}
+viewLine : String -> List ( Float, Float ) -> Svg Msg
+viewLine class segment =
     Svg.polyline
-        [ SvgAttr.class "live-track"
+        [ SvgAttr.class class
         , SvgAttr.points
             (segment
                 |> List.map
@@ -1246,45 +1637,378 @@ viewTrack segment =
         []
 
 
-viewStore : String -> String -> Store -> Svg Msg
-viewStore class radius store =
+{-| A flag at the start (green) or the end (checkered) of the course, at
+the store where the planned route starts or finishes (see nearestStore): a waving flag centred just
+above the store's dot (flagBesideX, flagBesideY). It's drawn as if
+held by a leaning pole, which isn't drawn. It's a small picture of its own, pinned by percentage to its
+place on the stretched map (see viewMap), so it never stretches. Its
+drawing is in flag units, flagUnitsPerPixel to a screen pixel. It's drawn
+under the route and the dots.
+
+The (unseen) pole stands on the point and leans left (its top is flagPoleFoot left
+of its foot), so it slopes down from left to right. The flag hangs upright
+from the top, its left edge along the pole (see flagPoint). The checks are
+drawn one by one, shaped like the cloth, so they wave and lean with it.
+-}
+viewFlag : Flag -> ( Float, Float ) -> Html Msg
+viewFlag flag ( lat, lon ) =
+    let
+        ( name, cloth ) =
+            case flag of
+                Start ->
+                    ( "Start", "live-flag-cloth live-flag-start" )
+
+                Finish ->
+                    ( "Finish", "live-flag-cloth live-flag-finish" )
+
+        whole =
+            flagShape ( 0, 1200 ) ( 0, 750 )
+
+        -- The picture's frame, in flag units around the pole's foot (0, 0),
+        -- with room for the outline.
+        ( left, top ) =
+            ( -400, -2260 )
+
+        ( width, height ) =
+            ( 1360, 2320 )
+
+        px units =
+            String.fromFloat (units / flagUnitsPerPixel) ++ "px"
+    in
+    case boxPercent (Projection.toMap { lat = lat, lon = lon }) of
+        Just ( pinLeft, pinTop ) ->
+            Html.div
+                [ Attr.class "live-flag-pin"
+                , Attr.style "left" pinLeft
+                , Attr.style "top" pinTop
+                ]
+                [ Svg.svg
+                    [ SvgAttr.class "live-flag"
+                    , SvgAttr.viewBox (String.join " " (List.map String.fromFloat [ left, top, width, height ]))
+                    , Attr.style "left" (px (left + flagBesideX))
+                    , Attr.style "top" (px (top + flagBesideY))
+                    , Attr.style "width" (px width)
+                    , Attr.style "height" (px height)
+                    ]
+                    [ Svg.title [] [ Svg.text name ]
+                    , Svg.g [ SvgAttr.transform ("translate(" ++ String.fromFloat -flagPoleFoot ++ ",0)") ]
+                        ([ Svg.polygon [ SvgAttr.class cloth, SvgAttr.points whole ] [] ]
+                            ++ (if flag == Finish then
+                                    flagChecks
+
+                                else
+                                    []
+                               )
+                            ++ [ Svg.polygon [ SvgAttr.class "live-flag-outline", SvgAttr.points whole ] [] ]
+                        )
+                    ]
+                ]
+
+        Nothing ->
+            Html.text ""
+
+
+{-| How far (in flag units) the flag is moved from where the unseen pole
+would hold it, to sit centred just above its dot instead: the cloth's
+middle (600 along and 375 down, see flagPoint) over the dot's centre, and its lowest point (the wave's trough, 75
+below the cloth's bottom, which is flagPoleHeight - 750 above the foot)
+12px above the dot's centre, so about 4px clear of the 16px dot.
+-}
+flagBesideX : Float
+flagBesideX =
+    flagPoleFoot - 600 - flagPoleFoot * 375 / flagPoleHeight
+
+
+flagBesideY : Float
+flagBesideY =
+    (flagPoleHeight - 750 - 75) - 12 * flagUnitsPerPixel
+
+
+{-| The flag's size on screen: how many of its units make a pixel. (At 62,
+it's as big as it was when the map wasn't stretched, on desktop.)
+-}
+flagUnitsPerPixel : Float
+flagUnitsPerPixel =
+    62
+
+
+type Flag
+    = Start
+    | Finish
+
+
+flagPoleHeight : Float
+flagPoleHeight =
+    2100
+
+
+{-| How far right of the pole's top its foot is: about 8 degrees of lean.
+In the flag's own coordinates the top is at x = 0, so viewFlag moves the
+whole flag this far left to stand the foot on the point.
+-}
+flagPoleFoot : Float
+flagPoleFoot =
+    300
+
+
+{-| Where a point of the cloth goes, `u` along it (0 at the pole, 1200 at
+the far edge) and `v` down it (0 at the top, 750 at the bottom). The wave
+(flagWave) lifts or drops the whole height of the cloth alike at each `u`,
+and the cloth leans with the pole: every point is further right the lower
+it is, so both side edges slope like the pole.
+-}
+flagPoint : Float -> Float -> ( Float, Float )
+flagPoint u v =
+    ( u + flagPoleFoot * v / flagPoleHeight
+    , -flagPoleHeight + v + flagWave u
+    )
+
+
+{-| An outline of the part of the cloth from `u0` to `u1` along it and `v0`
+to `v1` down it, as polygon points: its top and bottom edges traced every
+50 along, so they curve with the wave.
+-}
+flagShape : ( Float, Float ) -> ( Float, Float ) -> String
+flagShape ( u0, u1 ) ( v0, v1 ) =
+    let
+        steps =
+            round ((u1 - u0) / 50)
+
+        us =
+            List.map (\i -> u0 + (u1 - u0) * toFloat i / toFloat steps) (List.range 0 steps)
+
+        point v u =
+            let
+                ( px, py ) =
+                    flagPoint u v
+            in
+            String.fromFloat (toFloat (round (px * 10)) / 10) ++ "," ++ String.fromFloat (toFloat (round (py * 10)) / 10)
+    in
+    String.join " " (List.map (point v0) us ++ List.map (point v1) (List.reverse us))
+
+
+{-| How far the wave moves the cloth up (negative) or down at `u` along it:
+up 75 at u = 300, down 75 at u = 900.
+-}
+flagWave : Float -> Float
+flagWave u =
+    if u <= 600 then
+        let
+            t =
+                u / 600
+        in
+        -300 * t * (1 - t)
+
+    else
+        let
+            t =
+                (u - 600) / 600
+        in
+        300 * t * (1 - t)
+
+
+{-| The finish flag's black checks, 4 by 3 on the cloth (white under them),
+black in the corner by the top of the pole.
+-}
+flagChecks : List (Svg Msg)
+flagChecks =
+    List.range 0 3
+        |> List.concatMap
+            (\col ->
+                List.range 0 2
+                    |> List.filter (\row -> modBy 2 (col + row) == 0)
+                    |> List.map
+                        (\row ->
+                            Svg.polygon
+                                [ SvgAttr.class "live-flag-check"
+                                , SvgAttr.points
+                                    (flagShape
+                                        ( toFloat col * 300, toFloat (col + 1) * 300 )
+                                        ( toFloat row * 250, toFloat (row + 1) * 250 )
+                                    )
+                                ]
+                                []
+                        )
+            )
+
+
+{-| A store's dot: the round end of a zero-length stroke, so it stays
+round on the stretched map. Its size is its stroke width (live.html).
+-}
+viewStore : String -> Store -> Svg Msg
+viewStore class store =
     let
         ( x, y ) =
             Projection.toMap { lat = store.lat, lon = store.lon }
     in
-    Svg.circle
+    Svg.path
         [ SvgAttr.class class
-        , SvgAttr.cx (String.fromFloat x)
-        , SvgAttr.cy (String.fromFloat y)
-        , SvgAttr.r radius
+        , SvgAttr.d (dotPath ( x, y ))
         ]
         [ Svg.title [] [ Svg.text store.name ] ]
 
 
-viewMe : ( Float, Float ) -> Svg Msg
-viewMe ( x, y ) =
-    Svg.circle
-        [ SvgAttr.class "live-me"
-        , SvgAttr.cx (String.fromFloat x)
-        , SvgAttr.cy (String.fromFloat y)
-        , SvgAttr.r "350"
+{-| What's clicked to focus a store: a bigger, invisible dot over its dot.
+-}
+viewStoreHit : Store -> Svg Msg
+viewStoreHit store =
+    Svg.path
+        [ SvgAttr.class "live-store-hit"
+        , SvgAttr.d (dotPath (Projection.toMap { lat = store.lat, lon = store.lon }))
+        , Svg.Events.onClick (Focus store.id)
         ]
-        []
+        [ Svg.title [] [ Svg.text store.name ] ]
+
+
+{-| The focused store's box, beside its dot (right of it, or left near the
+map's right edge): its name, and when I visited it (see visitNote) or, if I
+haven't yet, when it next opens or closes (see hoursNote).
+-}
+viewFocus : Maybe Int -> Maybe Int -> Store -> Html Msg
+viewFocus now visitedAt store =
+    let
+        note =
+            case ( visitedAt, now ) of
+                ( Just ts, _ ) ->
+                    Just (visitNote now ts)
+
+                ( Nothing, Just ms ) ->
+                    hoursNote ms store
+
+                ( Nothing, Nothing ) ->
+                    Nothing
+    in
+    case boxPercent (Projection.toMap { lat = store.lat, lon = store.lon }) of
+        Just ( left, top ) ->
+            Html.div
+                [ Attr.classList
+                    [ ( "live-focus", True )
+                    , ( "live-focus-left", (String.toFloat (String.dropRight 1 left) |> Maybe.withDefault 0) > 70 )
+                    ]
+                , Attr.style "left" left
+                , Attr.style "top" top
+                ]
+                [ Html.strong [] [ Html.text store.name ]
+                , case note of
+                    Just text ->
+                        Html.span [] [ Html.text text ]
+
+                    Nothing ->
+                        Html.text ""
+                ]
+
+        Nothing ->
+            Html.text ""
+
+
+{-| "Visited 5:34 AM", or with the date when that's more than 18 hours ago
+(or the clock's not known yet): "Visited November 21, 5:34 AM EST".
+-}
+visitNote : Maybe Int -> Int -> String
+visitNote now ts =
+    case now of
+        Just ms ->
+            if ms - ts <= 18 * 3600000 then
+                "Visited " ++ NewYorkTime.clock ts
+
+            else
+                "Visited " ++ NewYorkTime.format ts
+
+        Nothing ->
+            "Visited " ++ NewYorkTime.format ts
+
+
+{-| When a store next closes, if it's open ("Open until 11:00 PM"), or next
+opens, if it's closed ("Opens 5:00 AM"), from its weekly hours
+(LiveMapData.openWindows). The day is added when that's more than 18 hours
+off ("Opens Monday 6:00 AM"). Nothing for a store without hours.
+-}
+hoursNote : Int -> Store -> Maybe String
+hoursNote ms store =
+    let
+        week =
+            7 * 1440
+
+        minute =
+            NewYorkTime.minuteOfWeek ms
+
+        at minutesAhead =
+            let
+                moment =
+                    ms + minutesAhead * 60000
+            in
+            if minutesAhead > 18 * 60 then
+                NewYorkTime.weekday moment ++ " " ++ NewYorkTime.clock moment
+
+            else
+                NewYorkTime.clock moment
+    in
+    Dict.get store.id LiveMapData.openWindows
+        |> Maybe.andThen
+            (\windows ->
+                if windows == [ ( 0, week ) ] then
+                    Just "Open 24 hours"
+
+                else
+                    case List.filter (\( from, to ) -> minute >= from && minute < to) windows of
+                        ( _, to ) :: _ ->
+                            let
+                                -- Open past Sunday midnight: the week's first window carries on.
+                                closes =
+                                    if to == week then
+                                        case List.filter (\( from, _ ) -> from == 0) windows of
+                                            ( _, mondayTo ) :: _ ->
+                                                week + mondayTo
+
+                                            [] ->
+                                                to
+
+                                    else
+                                        to
+                            in
+                            Just ("Open until " ++ at (closes - minute))
+
+                        [] ->
+                            let
+                                opens =
+                                    case List.filter (\( from, _ ) -> from > minute) windows |> List.map Tuple.first |> List.minimum of
+                                        Just from ->
+                                            Just from
+
+                                        Nothing ->
+                                            windows |> List.map (Tuple.first >> (+) week) |> List.minimum
+                            in
+                            opens |> Maybe.map (\from -> "Opens " ++ at (from - minute))
+            )
+
+
+{-| A zero-length line at a point, whose stroke's end caps make a dot. (A
+hair's length, not none: some browsers skip a stroke of no length.)
+-}
+dotPath : ( Float, Float ) -> String
+dotPath ( x, y ) =
+    "M" ++ String.fromFloat x ++ "," ++ String.fromFloat y ++ " h0.01"
+
+
+{-| The last position: a small red square with a white edge, the square
+ends of zero-length strokes (see dotPath), so it stays square however the
+map stretches.
+-}
+viewMe : ( Float, Float ) -> List (Svg Msg)
+viewMe xy =
+    [ Svg.path [ SvgAttr.class "live-me-edge", SvgAttr.d (dotPath xy) ] []
+    , Svg.path [ SvgAttr.class "live-me", SvgAttr.d (dotPath xy) ] []
+    ]
 
 
 onMap : Maybe ( Float, Float ) -> Bool
 onMap placed =
-    case ( placed, viewBoxNumbers ) of
+    case ( placed, stretchBox ) of
         ( Just ( x, y ), [ minX, minY, width, height ] ) ->
             x >= minX && x <= minX + width && y >= minY && y <= minY + height
 
         _ ->
             True
-
-
-viewBoxNumbers : List Float
-viewBoxNumbers =
-    MctrotMapData.mapViewBox |> String.words |> List.filterMap String.toFloat
 
 
 viewPosts : Model -> Html Msg

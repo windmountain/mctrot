@@ -228,6 +228,12 @@ open "website/build/live.html"                        # or any static server, th
 
 ## Attempts and visits (step 6)
 
+> **Attempts are set aside for now** (`USE_ATTEMPTS = false` in
+> `api/src/live.ts`): `/live` matches every check-in to a store and draws
+> every recorded GPS point as the walked path, attempt or not. Starting and
+> stopping attempts still works and `/live` still reports the latest; set
+> `USE_ATTEMPTS` back to true to limit check-ins and the path to it.
+
 An attempt is a start and a stop time; `/live` shows the running attempt
 (or the last one), and only Visit taps inside it count. A **Visit tap** is
 only a time: the API matches it to the nearest unclaimed store within

@@ -66,6 +66,18 @@ suite =
             \_ ->
                 ( NewYorkTime.clock (utc 2026 11 21 11 50), NewYorkTime.clock (utc 2026 11 21 17 0) )
                     |> Expect.equal ( "6:50 AM", "12:00 PM" )
+        , test "minute of the week: Monday 00:00 is 0; the walk's start is Saturday 5:05 AM" <|
+            \_ ->
+                ( NewYorkTime.minuteOfWeek (utc 2026 11 16 5 0), NewYorkTime.minuteOfWeek (utc 2026 11 21 10 5) )
+                    |> Expect.equal ( 0, 5 * 1440 + 5 * 60 + 5 )
+        , test "minute of the week: Sunday 11:59 PM is the last" <|
+            \_ ->
+                NewYorkTime.minuteOfWeek (utc 2026 11 23 4 59)
+                    |> Expect.equal 10079
+        , test "weekday: the walk is on a Saturday; just past midnight UTC is still Friday in New York" <|
+            \_ ->
+                ( NewYorkTime.weekday (utc 2026 11 21 10 5), NewYorkTime.weekday (utc 2026 11 21 3 0) )
+                    |> Expect.equal ( "Saturday", "Friday" )
         , test "2027: March 14 and November 7" <|
             \_ ->
                 ( NewYorkTime.isDaylight (utc 2027 3 14 7 0), NewYorkTime.isDaylight (utc 2027 11 7 6 0) )

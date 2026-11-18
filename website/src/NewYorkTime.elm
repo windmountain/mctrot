@@ -1,4 +1,4 @@
-module NewYorkTime exposing (clock, format, isDaylight)
+module NewYorkTime exposing (clock, format, isDaylight, minuteOfWeek, weekday)
 
 {-| Times as New York tells them, for every visitor wherever they are:
 "November 21, 5:34 AM EST".
@@ -61,6 +61,49 @@ clock ms =
            )
 
 
+{-| Minutes since Monday 00:00 in New York (0 to 10079), the week opening
+hours are kept in (LiveMapData.openWindows).
+-}
+minuteOfWeek : Int -> Int
+minuteOfWeek ms =
+    let
+        t =
+            local ms
+
+        -- 1970-01-01 was a Thursday: Monday-based weekday 3.
+        dayOfWeek =
+            modBy 7 (floorDiv t dayMs + 3)
+    in
+    dayOfWeek * 1440 + modBy dayMs t // 60000
+
+
+{-| The day of the week in New York: "Saturday".
+-}
+weekday : Int -> String
+weekday ms =
+    case minuteOfWeek ms // 1440 of
+        0 ->
+            "Monday"
+
+        1 ->
+            "Tuesday"
+
+        2 ->
+            "Wednesday"
+
+        3 ->
+            "Thursday"
+
+        4 ->
+            "Friday"
+
+        5 ->
+            "Saturday"
+
+        _ ->
+            "Sunday"
+
+
 zoneName : Int -> String
 zoneName ms =
     if isDaylight ms then
@@ -112,10 +155,10 @@ nthSunday n year month =
             daysFromCivil year month 1
 
         -- 1970-01-01 was a Thursday: weekday 4, counting Sunday as 0.
-        weekday =
+        firstWeekday =
             modBy 7 (first + 4)
     in
-    first + modBy 7 (7 - weekday) + 7 * (n - 1)
+    first + modBy 7 (7 - firstWeekday) + 7 * (n - 1)
 
 
 {-| Days since 1970-01-01 of a date in the proleptic Gregorian calendar

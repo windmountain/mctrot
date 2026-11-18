@@ -2,3 +2,5 @@ node_modules/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+# Made from ../route-plan.gpx for running locally: nix run .#route-plan -- route-plan.gpx
+route-plan.json

@@ -188,7 +188,7 @@
           "maxItems": 2
         }
       },
-      "description": "The path walked as [lat, lon] lines, simplified, split where GPS was lost: this attempt's, or the last day's before any attempt"
+      "description": "The path walked as [lat, lon] lines, simplified, split where GPS was lost: every point recorded (while attempts are set aside)"
     },
     "visits": {
       "type": "array",
@@ -267,7 +267,7 @@
           }
         ]
       },
-      "description": "This attempt's Visit taps in time order, each matched to a store by GPS"
+      "description": "Check-ins in time order, each matched to a store by GPS (all of them while attempts are set aside)"
     },
     "posts": {
       "type": "array",

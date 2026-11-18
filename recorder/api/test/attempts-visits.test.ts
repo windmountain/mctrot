@@ -64,18 +64,13 @@ test("/live: a tap at store A during an attempt counts as a visit to A", async (
   assert.ok(body.visits[0].distanceM < 5);
 });
 
-test("/live: taps outside the attempt don't count", async () => {
+// Attempts are set aside (USE_ATTEMPTS in src/live.ts): every check-in counts.
+test("/live: a check-in counts with no attempt, and from before one", async () => {
   const { app } = await setup();
   await post(app, "/visits", { ts: Date.now() - 3_600_000 }); // an hour before
+  assert.equal((await app.inject({ url: "/live" })).json().visits.length, 1);
   await post(app, "/attempts/start");
   const body = (await app.inject({ url: "/live" })).json();
-  assert.deepEqual(body.visits, []);
-});
-
-test("/live: no attempt yet means no visits", async () => {
-  const { app } = await setup();
-  await post(app, "/visits");
-  const body = (await app.inject({ url: "/live" })).json();
-  assert.equal(body.attempt, null);
-  assert.deepEqual(body.visits, []);
+  assert.equal(body.visits.length, 1);
+  assert.equal(body.attempt.endedAt, null, "the attempt is still reported");
 });

@@ -30,22 +30,30 @@ test("a long gap splits the path; a lone fix draws nothing", () => {
   assert.deepEqual(out[0]![0], [40.73, -73.99]);
 });
 
-test("/live's track: the last day before any attempt, then the attempt's, without inaccurate fixes", async () => {
+test("/live's track: every walk ever recorded, split at gaps, without inaccurate fixes", async () => {
   const { app } = await setup();
   const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+  const days = 3 * 86_400_000;
   const locations = [
-    feature(iso(3 * 86_400_000), -73.99, 40.70), // days ago: not shown
-    feature(iso(120_000), -73.99, 40.73),
+    feature(iso(days + 60_000), -73.99, 40.70), // a walk days ago
+    feature(iso(days), -73.99, 40.71),
+    feature(iso(120_000), -73.99, 40.73), // and one just now
     feature(iso(90_000), -73.97, 40.75, { horizontal_accuracy: 200 }), // indoors: dropped
     feature(iso(60_000), -73.99, 40.74),
   ];
   await app.inject({ method: "POST", url: "/ingest", headers: auth, payload: { locations } });
-  assert.deepEqual((await app.inject({ url: "/live" })).json().track, [
+  const expected = [
+    [
+      [40.7, -73.99],
+      [40.71, -73.99],
+    ],
     [
       [40.73, -73.99],
       [40.74, -73.99],
     ],
-  ]);
+  ];
+  assert.deepEqual((await app.inject({ url: "/live" })).json().track, expected);
+  // Attempts are set aside: starting one doesn't change the path.
   await app.inject({ method: "POST", url: "/attempts/start", headers: auth });
-  assert.deepEqual((await app.inject({ url: "/live" })).json().track, [], "nothing walked yet this attempt");
+  assert.deepEqual((await app.inject({ url: "/live" })).json().track, expected);
 });

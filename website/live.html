@@ -14,7 +14,6 @@
 
   <!-- Absolute paths: this page is also served at /live/map and the rest. -->
   <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/css/mctrot-map.css">
   <style>
     /* The shell, the same on every view (src/Live.elm): header with the
        title and the radio, the view switcher, the view, a footer. */
@@ -46,7 +45,15 @@
     .tab-map { display: flex; flex-direction: column; padding: 8px 16px; }
     .tab-map .live-status { text-align: center; margin: 0 0 4px; min-height: 0; }
     .tab-map .live-map { flex: 1; min-height: 0; }
-    .tab-map .live-map-svg { width: 100%; height: 100%; max-width: none; }
+    .tab-map .live-map { position: relative; }
+    .tab-map .live-map-frame { height: 100%; max-width: none; overflow: auto; overscroll-behavior: contain; }
+    .live-map-draggable { cursor: grab; user-select: none; -webkit-user-select: none; }
+    .live-map-dragging { cursor: grabbing; }
+    /* Top right, clear of the map's scrollbar. */
+    .live-map-zoom { position: absolute; top: 8px; right: 24px; z-index: 1; display: flex; flex-direction: column; gap: 4px; }
+    .live-map-zoom button { width: 32px; height: 32px; padding: 0; border: 2px solid #000; border-radius: 0; background: #fff; color: #000;
+      font: 700 20px/1 system-ui, sans-serif; cursor: pointer; }
+    .live-map-zoom button:disabled { color: #aaa; border-color: #aaa; cursor: default; }
 
     /* Blog */
     .tab-blog .live-posts { margin: 1rem auto 2rem; padding: 0 16px; }
@@ -76,6 +83,9 @@
     .plan-schedule tbody tr:nth-child(even) { background: #eee; }
     .plan-num { text-align: right; width: 2em; }
     .plan-time { font-variant-numeric: tabular-nums; }
+    .plan-diff { white-space: nowrap; }
+    .plan-ahead { color: #1a7f37; font-weight: bold; }
+    .plan-behind { color: #b42318; font-weight: bold; }
 
     /* The overview (plain /live) */
     .live { max-width: var(--measure); margin: 0 auto; padding: 1rem 16px 2rem; }
@@ -115,12 +125,40 @@
     .live-sun th, .live-sun td { text-align: left; padding: 0.15rem 0.75rem 0.15rem 0; font-variant-numeric: tabular-nums; }
     .live-sun thead th { font-weight: normal; opacity: 0.7; }
     .live-sun tbody th { font-weight: normal; }
-    .live-map-svg { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto; }
-    .live-store { fill: #FF0000; }
-    .live-store-visited { fill: #FFD100; }
-    /* The path walked: under the stores, so they stay visible on it. */
-    .live-track { fill: none; stroke: #FFD100; stroke-opacity: 0.85; stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-me { fill: #fff; stroke: #FFD100; stroke-width: 3px; vector-effect: non-scaling-stroke; }
+    /* The stretched map (viewMap in Live.elm): the frame's padding leaves room for Manhattan to spill past the
+       McDonald's and for the start flag above the northernmost one; past the padding it's cut off. */
+    .live-map-frame { box-sizing: border-box; height: 560px; max-width: 360px; margin: 0 auto; padding: 40px 12px 12px; overflow: hidden; }
+    .live-map-box { position: relative; height: 100%; }
+    .live-map-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    div.live-map-layer { pointer-events: none; }
+    /* The map (src/Live.elm, viewMap), bottom to top. */
+    /* Sizes are screen pixels however the map stretches: lines don't scale, and the dots and the last position
+       are the end caps of zero-length strokes (dotPath in Live.elm). */
+    .live-borough { fill: #d9d9d9; }
+    .live-network { fill: none; stroke: #fff; stroke-width: 0.5px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .live-planned-casing { fill: none; stroke: #000; stroke-width: 6px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .live-planned { fill: none; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .live-track { fill: none; stroke: #DA291C; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    /* A black dot 1px wider all round, drawn under the planned route, then a white dot over it, then the colour. */
+    .live-store-casing { fill: none; stroke: #000; stroke-width: 16px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .live-store { fill: none; stroke: #fff; stroke-width: 14px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .live-pip { fill: none; stroke: #FFD100; stroke-width: 8px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .live-pip-visited { stroke: #DA291C; }
+    .live-pip-closed { stroke: #9C7C00; }
+    .live-store-hit { fill: none; stroke: transparent; stroke-width: 24px; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }
+    /* A focused store's box, beside its dot (viewFocus in Live.elm). */
+    .live-focus { position: absolute; transform: translate(14px, -50%); display: flex; flex-direction: column; padding: 4px 8px; background: #fff;
+      border: 2px solid #000; font-size: 13px; line-height: 1.3; white-space: nowrap; pointer-events: none; }
+    .live-focus-left { transform: translate(calc(-100% - 14px), -50%); }
+    .live-me-edge { fill: none; stroke: #fff; stroke-width: 7px; stroke-linecap: square; vector-effect: non-scaling-stroke; }
+    .live-me { fill: none; stroke: #DA291C; stroke-width: 4px; stroke-linecap: square; vector-effect: non-scaling-stroke; }
+    /* The flags: pinned pictures (viewFlag), drawn in their own units. */
+    .live-flag-pin { position: absolute; }
+    .live-flag { position: absolute; overflow: visible; }
+    .live-flag-outline { fill: none; stroke: #000; stroke-width: 70px; stroke-linejoin: round; }
+    .live-flag-start { fill: #1E9E3E; }
+    .live-flag-finish { fill: #fff; }
+    .live-flag-check { fill: #000; }
     .live-note { text-align: center; }
     .live-posts { list-style: none; padding: 0; margin: 1.5rem auto 0; max-width: 28rem; }
     .live-post { border-top: 1px solid var(--rule); padding: 0.6rem 0; }
