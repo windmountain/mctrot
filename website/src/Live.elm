@@ -38,6 +38,7 @@ import LiveMapData
 import NewYorkTime
 import Projection
 import Radio
+import SnapToStreets
 import SolarTime
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
@@ -508,6 +509,7 @@ type alias Model =
     , drag : Maybe Drag
     , dragged : Bool
     , focused : Maybe String
+    , walked : List (List ( Float, Float ))
     }
 
 
@@ -548,6 +550,7 @@ init flags =
       , drag = Nothing
       , dragged = False
       , focused = Nothing
+      , walked = []
       }
     , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route) ]
     )
@@ -664,10 +667,39 @@ update msg model =
             ( { model | failing = True }, Cmd.none )
 
         Received response at ->
-            ( { model | latest = Just (Fetched response at), failing = False, now = Just at }, Cmd.none )
+            ( { model
+                | latest = Just (Fetched response at)
+                , failing = False
+                , now = Just at
+                , walked =
+                    -- Snapping takes a moment: only when the path's changed.
+                    if Maybe.map (.response >> .track) model.latest == Just response.track then
+                        model.walked
+
+                    else
+                        walkedAlongStreets response.track
+              }
+            , Cmd.none
+            )
 
         Tick now ->
             ( { model | now = Just now }, Cmd.none )
+
+
+{-| The path walked, in map coordinates, redrawn along the streets (see
+SnapToStreets), stretch by stretch (the server splits it where GPS was
+lost).
+-}
+walkedAlongStreets : List (List ( Float, Float )) -> List (List ( Float, Float ))
+walkedAlongStreets =
+    List.map (List.map (\( lat, lon ) -> Projection.toMap { lat = lat, lon = lon }) >> SnapToStreets.snap streets)
+
+
+{-| The streets between McDonald's, as a network to snap the path walked to.
+-}
+streets : SnapToStreets.Network
+streets =
+    SnapToStreets.fromPath LiveMapData.networkPath
 
 
 fetch : String -> Cmd Msg
@@ -807,7 +839,7 @@ viewOverview model =
         , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
         , viewWeather model
         , viewSky response
-        , viewMap Nothing model.focused (serverNow model) response
+        , viewMap Nothing model.focused model.walked (serverNow model) response
         , viewSun response
         , viewPosts model
         ]
@@ -827,7 +859,7 @@ top-left corner, then scroll to look around.
 viewMapTab : Model -> List (Html Msg)
 viewMapTab model =
     [ viewStatus model
-    , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, dragging = model.drag /= Nothing }) model.focused (serverNow model) (Maybe.map .response model.latest)
+    , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, dragging = model.drag /= Nothing }) model.focused model.walked (serverNow model) (Maybe.map .response model.latest)
     ]
 
 
@@ -1391,14 +1423,15 @@ Bottom to top: Manhattan (light grey), every street between McDonald's
 (thin white), the start and finish flags, the planned route and the stores
 (thick white and white dots, with every black outline drawn first so the
 route and the dots join into one shape), the path walked (red, over the
-white dots), a small dot of colour inside each white one (yellow; red once
+white dots of the stores visited but under the rest, `walked`: redrawn
+along the streets), a small dot of colour inside each white one (yellow; red once
 visited; dark yellow while closed), and the last position (a small red
 square). Over everything, each dot can be clicked to focus its store (one
 at a time; click again to unfocus), which shows a little box beside it with
 its name and when it next opens or closes (see viewFocus).
 -}
-viewMap : Maybe { stretch : Float, zoom : Float, dragging : Bool } -> Maybe String -> Maybe Int -> Maybe LiveResponse -> Html Msg
-viewMap shape focused now response =
+viewMap : Maybe { stretch : Float, zoom : Float, dragging : Bool } -> Maybe String -> List (List ( Float, Float )) -> Maybe Int -> Maybe LiveResponse -> Html Msg
+viewMap shape focused walked now response =
     let
         position =
             Maybe.andThen .position response
@@ -1439,9 +1472,6 @@ viewMap shape focused now response =
 
             else
                 "live-pip"
-
-        track =
-            Maybe.map .track response |> Maybe.withDefault []
 
         planned =
             Maybe.map .plannedTrack response |> Maybe.withDefault []
@@ -1504,8 +1534,12 @@ viewMap shape focused now response =
                     (plannedLine "live-planned-casing"
                         ++ List.map (viewStore "live-store-casing") stores
                         ++ plannedLine "live-planned"
-                        ++ List.map (viewStore "live-store") stores
-                        ++ List.map viewTrack track
+                        -- A visited store's white dot goes under the path
+                        -- walked, which ran through it; one not visited yet
+                        -- goes over, so a path passing by doesn't cross it.
+                        ++ List.map (viewStore "live-store") (List.filter (\store -> List.member store.id visited) stores)
+                        ++ List.map viewTrack walked
+                        ++ List.map (viewStore "live-store") (List.filter (\store -> not (List.member store.id visited)) stores)
                         ++ List.map (\store -> viewStore (pipClass store) store) stores
                         ++ (placed |> Maybe.map viewMe |> Maybe.withDefault [])
                         ++ List.map viewStoreHit stores
@@ -1596,11 +1630,20 @@ isOpen ms store =
             True
 
 
-{-| One stretch of the path walked (the server splits it where GPS was lost).
+{-| One stretch of the path walked, along the streets (see
+walkedAlongStreets), already in map coordinates.
 -}
 viewTrack : List ( Float, Float ) -> Svg Msg
 viewTrack segment =
-    viewLine "live-track" segment
+    Svg.polyline
+        [ SvgAttr.class "live-track"
+        , SvgAttr.points
+            (segment
+                |> List.map (\( x, y ) -> String.fromFloat (toFloat (round (x * 10)) / 10) ++ "," ++ String.fromFloat (toFloat (round (y * 10)) / 10))
+                |> String.join " "
+            )
+        ]
+        []
 
 
 {-| A line through [lat, lon] points, in map coordinates.
