@@ -10,16 +10,17 @@
 #
 # Every listener hears the same moment: started mid-show (a restart, a
 # deploy, a new program), the show picks up at now − startsAt, by cueing
-# the file in. Before the show, and after it, a silent holding loop plays
-# with the program's "before" and "after" titles ("On air at 5:00 AM",
-# "Off air"). Without a program, or without its file, it holds too.
+# the file in. Before the show, and after it, a holding loop plays (ten
+# seconds of synthesized lounge music, station/holding.py, on repeat) with
+# the program's "before" and "after" titles ("On air at 5:00 AM", "Off
+# air"). Without a program, or without its file, it holds too.
 #
 # Artist and title follow the program, by the clock, and go to Icecast
 # with the stream (radio apps show them). The API reads the same
 # program.json for /live's now playing. Each change is logged ("on air:
 # ..."), which is the on-air log: journalctl -u mctrot-radio.
 #
-# host/radio.nix fills in @station@, @silence@ and @port@ and runs this
+# host/radio.nix fills in @station@, @holding@ and @port@ and runs this
 # as mctrot-radio. The Icecast source password arrives as a systemd
 # credential, never in the Nix store.
 
@@ -31,7 +32,7 @@ credentials = environment.get("CREDENTIALS_DIRECTORY")
 password = string.trim(file.contents("#{credentials}/icecast-source"))
 
 station = "@station@"
-silence = "@silence@"
+holding = "@holding@"
 
 def read_program() =
   try
@@ -74,9 +75,9 @@ if on_air_now then
 end
 
 # The show file, cued in to now if it's already on. Without one, the
-# silence stands in (and the switch below never picks it).
-show = single(id="show", if has_show then "annotate:liq_cue_in=#{cue}:#{show_path}" else silence end)
-hold = single(id="hold", silence)
+# holding loop stands in (and the switch below never picks it).
+show = single(id="show", if has_show then "annotate:liq_cue_in=#{cue}:#{show_path}" else holding end)
+hold = single(id="hold", holding)
 
 def on_air() =
   has_show and time() >= program.startsAt and time() < program.endsAt

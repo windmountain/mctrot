@@ -15,13 +15,14 @@ let
 
   station = "/var/lib/mctrot/station";
 
-  # The holding loop, made at build time: ten seconds of silence.
-  silence = pkgs.runCommand "mctrot-silence.wav" { nativeBuildInputs = [ pkgs.ffmpeg-headless ]; } ''
-    ffmpeg -hide_banner -loglevel error -f lavfi -i "anullsrc=r=44100:cl=stereo" -t 10 $out
+  # The holding loop, synthesized at build time: ten seconds of lounge
+  # music that loops without a seam (station/holding.py).
+  holding = pkgs.runCommand "mctrot-holding.wav" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+    python3 ${../station/holding.py} $out
   '';
 
   script = pkgs.replaceVars ../station/program.liq {
-    inherit station silence;
+    inherit station holding;
     port = toString port;
   };
 

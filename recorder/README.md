@@ -418,7 +418,8 @@ clock says it is; the API reads it on the next `/live`. No deploy needed.
 Liquidsoap and the API both treat a program whose show file isn't there
 as off air.
 
-- **Before the show:** a silent holding loop, titled with the program's
+- **Before the show:** a holding loop (ten seconds of synthesized lounge
+  music, `station/holding.py`, made when the box is built), titled with the program's
   "On air at 5:00 AM"; **after it:** the same, titled "Off air".
 - **A restart** (crash, deploy, new program) cues the file in to now: a
   gap of a second or two, never a drift. `systemctl restart mctrot-radio`
