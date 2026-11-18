@@ -12,7 +12,7 @@ all of them; website/_redirects):
   - /live/map, /live/blog, /live/timeline, /live/stats: one view each,
     taking over the page
 
-All five share the title, the radio, the tab switcher and the footer.
+All five share the title, the radio and the tab switcher.
 Switching tabs doesn't reload the page, so the radio keeps playing.
 
 Elm runs in its own element (Browser.element), not over the whole page
@@ -37,6 +37,7 @@ import LiveMapData
 import NewYorkTime
 import Projection
 import Radio
+import SolarTime
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Svg.Events
@@ -750,7 +751,6 @@ view model =
                 StatsTab ->
                     viewStatsTab model
             )
-        , viewFooter
         ]
 
 
@@ -822,20 +822,6 @@ plainClick msg =
         (Decode.field "shiftKey" Decode.bool)
         (Decode.field "altKey" Decode.bool)
         |> Decode.andThen identity
-
-
-viewFooter : Html Msg
-viewFooter =
-    Html.footer [ Attr.class "app-footer" ]
-        [ Html.a [ Attr.href "/" ] [ Html.text "mctrot.nyc" ]
-        , Html.span [ Attr.class "app-footer-radio" ]
-            (Html.text "Radio: "
-                :: (Radio.links
-                        |> List.map (\( label, url ) -> Html.a [ Attr.href url ] [ Html.text label ])
-                        |> List.intersperse (Html.text " · ")
-                   )
-            )
-        ]
 
 
 {-| Plain /live: everything on one page, as it was before the tabs.
@@ -1024,9 +1010,12 @@ viewStatsTab model =
     [ Html.div [ Attr.class "stats-grid" ]
         [ cell "Visits" [ Html.p [] [ Html.text (visitsLine model) ] ]
         , cell "Position" [ Html.p [] [ Html.text (status model) ] ]
-        , cell "Weather" [ viewWeather model ]
-        , cell "Sky" [ viewSky response ]
-        , cell "Sun" [ viewSun response ]
+        , Html.section [ Attr.class "stats-cell stats-cell-conditions" ]
+            [ Html.h2 [] [ Html.text "Conditions" ]
+            , viewWeatherAfter (solarTime model) model
+            , viewSky response
+            , viewSun response
+            ]
         , Html.section [ Attr.class "stats-cell stats-cell-plan" ]
             [ Html.h2 [] [ Html.text "Plan" ]
             , viewPlan
@@ -1144,6 +1133,26 @@ viewPlan stores visits =
 -}
 viewWeather : Model -> Html Msg
 viewWeather model =
+    viewWeatherAfter Nothing model
+
+
+{-| The time of day by the sun now ("Civil twilight", "2 hours before solar
+noon"; see SolarTime), from today's sun times.
+-}
+solarTime : Model -> Maybe String
+solarTime model =
+    Maybe.map2 (\now { response } -> SolarTime.describe now response.sun) (serverNow model) model.latest
+
+
+{-| The weather sentence, after `lead` if there is one ("Civil twilight.
+44°F, clear, …"). Just the lead before any weather's been fetched.
+-}
+viewWeatherAfter : Maybe String -> Model -> Html Msg
+viewWeatherAfter lead model =
+    let
+        leading =
+            lead |> Maybe.map (\text -> text ++ ". ") |> Maybe.withDefault ""
+    in
     case ( Maybe.andThen (.response >> .weather) model.latest, serverNow model ) of
         ( Just w, Just now ) ->
             let
@@ -1174,13 +1183,18 @@ viewWeather model =
                             ""
             in
             Html.p [ Attr.class "live-weather" ]
-                [ Html.text (capitalize first ++ ". " ++ wind)
+                [ Html.text (leading ++ capitalize first ++ ". " ++ wind)
                 , Html.span [ Attr.class "live-weather-when" ]
                     [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
                 ]
 
         _ ->
-            Html.text ""
+            case lead of
+                Just text ->
+                    Html.p [ Attr.class "live-weather" ] [ Html.text (text ++ ".") ]
+
+                Nothing ->
+                    Html.text ""
 
 
 {-| The sky now, as coloured tiles labelled with where to look: a row on a
