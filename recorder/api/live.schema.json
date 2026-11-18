@@ -803,6 +803,168 @@
       ],
       "additionalProperties": false,
       "description": "The sky's colour overhead and low in four directions, simulated from the sun and the latest weather (src/sky.ts)"
+    },
+    "radio": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "before",
+                "on",
+                "after"
+              ]
+            },
+            "startsAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The show's start, ms since epoch"
+            },
+            "endsAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "The show's end, ms since epoch"
+            },
+            "current": {
+              "type": "object",
+              "properties": {
+                "artist": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Starts, ms since epoch"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Null: on since before anyone knew"
+                },
+                "to": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Ends, ms since epoch"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Null: on from now on"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "track",
+                    "break",
+                    "holding"
+                  ],
+                  "description": "holding: the silent loop before and after the show"
+                }
+              },
+              "required": [
+                "artist",
+                "title",
+                "from",
+                "to",
+                "kind"
+              ],
+              "additionalProperties": false,
+              "description": "What's on now"
+            },
+            "next": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "artist": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Starts, ms since epoch"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Null: on since before anyone knew"
+                    },
+                    "to": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Ends, ms since epoch"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Null: on from now on"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "track",
+                        "break",
+                        "holding"
+                      ],
+                      "description": "holding: the silent loop before and after the show"
+                    }
+                  },
+                  "required": [
+                    "artist",
+                    "title",
+                    "from",
+                    "to",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What's on at current.to; null after the show"
+            }
+          },
+          "required": [
+            "status",
+            "startsAt",
+            "endsAt",
+            "current",
+            "next"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "McTrot radio's now playing, from its program (station/program.json); null without a program"
     }
   },
   "required": [
@@ -816,7 +978,8 @@
     "posts",
     "weather",
     "sun",
-    "sky"
+    "sky",
+    "radio"
   ],
   "additionalProperties": false,
   "title": "McTrot /live response"

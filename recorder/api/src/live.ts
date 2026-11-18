@@ -3,6 +3,7 @@ import { latestAttempt } from "./attempts.ts";
 import type { Db } from "./db.ts";
 import type { RoutePlan } from "./plan.ts";
 import { recentPosts } from "./posts.ts";
+import { nowPlaying, Radio, type RadioProgram } from "./radio.ts";
 import { skyNow } from "./sky.ts";
 import { newYorkDate, sunTimes } from "./sun.ts";
 import { NO_ATTEMPT_WINDOW_MS, track } from "./track.ts";
@@ -163,6 +164,7 @@ export const LiveResponse = z
         ),
       })
       .describe("The sky's colour overhead and low in four directions, simulated from the sun and the latest weather (src/sky.ts)"),
+    radio: Radio,
   })
   .meta({ title: "McTrot /live response" });
 
@@ -175,7 +177,7 @@ export type Live = z.infer<typeof LiveResponse>;
 // the last day's before any attempt).
 export const USE_ATTEMPTS = false;
 
-export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()): Live {
+export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now(), radio: RadioProgram | null = null): Live {
   const position = db
     .prepare("select ts, lat, lon, accuracy from points order by ts desc limit 1")
     .get() as Live["position"] | undefined;
@@ -216,6 +218,7 @@ export function live(db: Db, plan: RoutePlan, mediaUrl: string, now = Date.now()
     })(),
     sun: sunTimes(newYorkDate(now), WEATHER_POINT.lat, WEATHER_POINT.lon),
     sky: skyNow(now, WEATHER_POINT.lat, WEATHER_POINT.lon, latestSkyInputs(db)),
+    radio: nowPlaying(radio, now),
   };
 }
 

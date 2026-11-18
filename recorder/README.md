@@ -380,21 +380,59 @@ the light would see it. Worked out at most once a minute. A plausible sky,
 not a photograph: deep twilight comes out darker than it really is, and
 broken cloud is averaged.
 
-## Radio (step 7)
+## Radio (steps 7 and 8)
 
 `https://radio.mctrot.nyc/live.mp3` is a real internet radio station: open
 it in VLC, Apple Music ("Open Stream URL") or any radio app, or press play
-on `/live`. For now it plays a 30-second 440 Hz test tone on loop, titled
-"McTrot - Test tone" (`station/test-loop.liq`); step 8 replaces it with
-the scheduled show.
+on `/live`. It plays the show on the clock, with each track's artist and
+title in the stream and in `/live`'s player (and the phone's lock screen).
+
+### Making and uploading the show
+
+The show comes from a tape and a spreadsheet (`mctrot-5-radio/`, not in
+git): `Tape.wav`, the tracks back to back, and `Program.xlsx`, whose first
+sheet lists the tape's tracks in order and whose second is the program,
+the order to play them in (by `#`; 0 is a Break), with the row starting
+at the trot's start marked by a Start of 0.
+
+```sh
+nix run .#radio-program -- ../mctrot-5-radio/Program.xlsx ../mctrot-5-radio/Tape.wav --date 2026-11-21
+# with a station ID for the Breaks (default: 5 s of silence):
+nix run .#radio-program -- ... --station-id ../mctrot-5-radio/StationID.wav
+```
+
+`tools/radio_program.py` finds each track on the tape (the silence nearest
+where the sheet's durations put its end), plays the program back to back
+from the trot's start, and writes two files next to the spreadsheet:
+`show-<hash>.flac`, the whole program as one file (about 4 GB), and
+`program.json`, what's on when. It prints both tables to check. Upload
+them, the audio first:
+
+```sh
+scp ../mctrot-5-radio/show-*.flac ../mctrot-5-radio/program.json root@recorder.mctrot.nyc:/var/lib/mctrot/station/
+```
+
+They live on the Volume, not in the deploy. A new `program.json` restarts
+Liquidsoap (a path unit watches it), which joins the show wherever the
+clock says it is; the API reads it on the next `/live`. No deploy needed.
+Liquidsoap and the API both treat a program whose show file isn't there
+as off air.
+
+- **Before the show:** a silent holding loop, titled with the program's
+  "On air at 5:00 AM"; **after it:** the same, titled "Off air".
+- **A restart** (crash, deploy, new program) cues the file in to now: a
+  gap of a second or two, never a drift. `systemctl restart mctrot-radio`
+  does it by hand.
+- **The on-air log** is Liquidsoap's: every title change is logged as
+  `[on air] artist - title` (`journalctl -u mctrot-radio | grep "on air"`).
 
 For players that want a playlist link rather than the stream itself,
 `https://radio.mctrot.nyc/live.m3u` and `/live.pls` point at it (browsers
 need the stream). `https://radio.mctrot.nyc/` (and `http://`, which
 redirects) is a small page listing all three.
 
-- **Liquidsoap** (`mctrot-radio`) loops the tone, encodes 128 kbps stereo
-  MP3 and sends it to Icecast. Its first start after a Liquidsoap upgrade
+- **Liquidsoap** (`mctrot-radio`, `station/program.liq`) plays the show,
+  encodes 128 kbps stereo MP3 and sends it to Icecast. Its first start after a Liquidsoap upgrade
   takes about 20 seconds (it type-checks its whole library on one CPU);
   after that a cache in `/var/cache/mctrot-radio` makes restarts quick.
 - **Icecast** (`icecast`) serves listeners, on 127.0.0.1 only. Caddy

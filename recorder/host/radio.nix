@@ -5,20 +5,23 @@
 # Caddy). Both listen only on 127.0.0.1; Caddy passes on the stream and
 # nothing else, so Icecast's admin pages aren't reachable from outside.
 #
-# Step 7: a 30-second test tone on loop (station/test-loop.liq).
+# The show (station/program.liq): one long file and its program.json,
+# made by tools/radio_program.py and uploaded by hand to `station`, not
+# deployed (they're gigabytes, and change without a deploy). A new
+# program.json restarts Liquidsoap, which picks up the show where the
+# clock says it is.
 let
   port = 8000;
 
-  # The tone, made at build time: 440 Hz at −18 dBFS (ffmpeg's default
-  # level, the usual broadcast alignment tone), faded in and out so each
-  # loop starts cleanly.
-  tone = pkgs.runCommand "mctrot-test-tone.wav" { nativeBuildInputs = [ pkgs.ffmpeg-headless ]; } ''
-    ffmpeg -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:sample_rate=44100:duration=30" \
-      -af "afade=t=in:d=0.5,afade=t=out:st=29.5:d=0.5" -ac 2 $out
+  station = "/var/lib/mctrot/station";
+
+  # The holding loop, made at build time: ten seconds of silence.
+  silence = pkgs.runCommand "mctrot-silence.wav" { nativeBuildInputs = [ pkgs.ffmpeg-headless ]; } ''
+    ffmpeg -hide_banner -loglevel error -f lavfi -i "anullsrc=r=44100:cl=stereo" -t 10 $out
   '';
 
-  script = pkgs.replaceVars ../station/test-loop.liq {
-    inherit tone;
+  script = pkgs.replaceVars ../station/program.liq {
+    inherit station silence;
     port = toString port;
   };
 
@@ -162,11 +165,16 @@ in
     };
   };
 
+  # Where the show is uploaded: root's (scp as root), readable by
+  # Liquidsoap and the API.
+  systemd.tmpfiles.rules = [ "d ${station} 0755 root root -" ];
+
   systemd.services.mctrot-radio = {
     description = "McTrot radio: Liquidsoap, streaming to Icecast";
     wantedBy = [ "multi-user.target" ];
     after = [ "icecast.service" ];
     wants = [ "icecast.service" ];
+    unitConfig.RequiresMountsFor = "/var/lib/mctrot";
     # Liquidsoap type-checks its whole library at start (about 12 s on one
     # CPU) unless it can keep the result: a cache cuts restarts to a second
     # or two, which is how long the stream is down after a deploy or crash.
@@ -183,6 +191,26 @@ in
       RestartSec = 2;
       # Ahead of everything else for the CPU: the stream must never stutter.
       Nice = -5;
+    };
+  };
+
+  # A new program.json (the upload's last file) restarts the radio, which
+  # reads it at start. PathChanged fires when the file is closed after
+  # writing, so a half-copied one isn't read.
+  systemd.paths.mctrot-radio-program = {
+    description = "Watch McTrot radio's program.json";
+    wantedBy = [ "multi-user.target" ];
+    pathConfig = {
+      PathChanged = "${station}/program.json";
+      Unit = "mctrot-radio-reload.service";
+    };
+  };
+
+  systemd.services.mctrot-radio-reload = {
+    description = "McTrot radio: restart on a new program";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.systemd}/bin/systemctl restart mctrot-radio.service";
     };
   };
 

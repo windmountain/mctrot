@@ -189,6 +189,9 @@ type alias LiveResponse =
     , weather : Maybe Weather
     , sun : Sun
     , sky : List SkySquare
+
+    -- McTrot radio's now playing; Nothing without a program.
+    , radio : Maybe Radio.OnAir
     }
 
 
@@ -336,6 +339,8 @@ liveDecoder =
                     )
                 )
             )
+        -- Optional: a recorder from before the radio's program sends none.
+        |> andMap (Decode.oneOf [ Decode.field "radio" (Decode.nullable Radio.onAirDecoder), Decode.succeed Nothing ])
 
 
 
@@ -504,6 +509,9 @@ type alias Model =
     , failing : Bool
     , now : Maybe Time.Posix
     , radio : Radio.Model
+
+    -- What the phone's lock screen was last told is on (Radio.announce).
+    , announced : Maybe Radio.NowPlaying
     , route : Route
     , zoom : Float
     , drag : Maybe Drag
@@ -545,6 +553,7 @@ init flags =
       , failing = False
       , now = Nothing
       , radio = Radio.init flags.radio
+      , announced = Nothing
       , route = route
       , zoom = 1
       , drag = Nothing
@@ -681,9 +690,34 @@ update msg model =
               }
             , Cmd.none
             )
+                |> announceRadio
 
         Tick now ->
             ( { model | now = Just now }, Cmd.none )
+                |> announceRadio
+
+
+{-| What's on McTrot radio now, by the server's clock.
+-}
+radioNow : Model -> Maybe Radio.NowPlaying
+radioNow model =
+    Maybe.map2 Radio.nowPlaying (serverNow model) (Maybe.andThen (.response >> .radio) model.latest)
+
+
+{-| Tell the phone's lock screen when what's on changes.
+-}
+announceRadio : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+announceRadio ( model, cmd ) =
+    case radioNow model of
+        Just playing ->
+            if model.announced == Just playing then
+                ( model, cmd )
+
+            else
+                ( { model | announced = Just playing }, Cmd.batch [ cmd, Radio.announce playing ] )
+
+        Nothing ->
+            ( model, cmd )
 
 
 {-| The path walked, in map coordinates, redrawn along the streets (see
@@ -763,7 +797,7 @@ viewHeader model =
             [ Html.h1 [] [ link Overview [] [ Html.text "McTROT 5" ] ]
             , Html.p [ Attr.class "app-subtitle" ] [ Html.text "EATING AT EVERY McDONALD’S IN MANHATTAN ON ONE WALK" ]
             ]
-        , Html.map RadioMsg (Radio.view model.radio)
+        , Html.map RadioMsg (Radio.view (radioNow model) model.radio)
         ]
 
 

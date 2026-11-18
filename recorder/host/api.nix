@@ -96,6 +96,8 @@ in
       # served from media.mctrot.nyc.
       MCTROT_UPLOAD_DIR = "/var/lib/mctrot/uploads";
       MCTROT_MEDIA_URL = "https://media.mctrot.nyc";
+      # The radio's program, for /live's now playing (host/radio.nix).
+      MCTROT_RADIO_PROGRAM = "/var/lib/mctrot/station/program.json";
       # Deleting a post from the upload page deletes its files too.
       MCTROT_MEDIA_DIR = "/var/lib/mctrot/media";
       NODE_ENV = "production";

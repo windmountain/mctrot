@@ -1,4 +1,4 @@
-port module Radio exposing (Flags, Model, Msg, init, links, subscriptions, update, view)
+port module Radio exposing (Flags, Model, Msg, NowPlaying, OnAir, announce, init, links, nowPlaying, onAirDecoder, subscriptions, update, view)
 
 {-| The radio player in /live's top-right corner: play and stop McTrot
 radio (recorder/host/radio.nix), set the volume, and find its links for
@@ -7,6 +7,10 @@ other players.
 Elm can't drive audio itself, so it sends commands out through a port
 (`radioOut`) to a few lines of JavaScript in live.html that own an
 `<audio>` element, and hears back what the audio is doing (`radioIn`).
+
+What's on comes from the recorder (/live's `radio`, from the same program
+Liquidsoap plays: recorder/station/program.liq), shown in the player and
+told to the phone's lock screen (`announce`).
 
 -}
 
@@ -44,6 +48,77 @@ buttons set the volume, and pages can't.
 -}
 type alias Flags =
     { volumeAdjustable : Bool }
+
+
+{-| What's on now, and what's on next and when, as /live has it.
+-}
+type alias OnAir =
+    { current : Slot
+    , next : Maybe Slot
+    }
+
+
+type alias Slot =
+    { artist : String
+    , title : String
+
+    -- When it ends, ms since the epoch; Nothing if it doesn't.
+    , to : Maybe Int
+    }
+
+
+type alias NowPlaying =
+    { artist : String
+    , title : String
+    }
+
+
+onAirDecoder : Decode.Decoder OnAir
+onAirDecoder =
+    let
+        slot =
+            Decode.map3 Slot
+                (Decode.field "artist" Decode.string)
+                (Decode.field "title" Decode.string)
+                (Decode.field "to" (Decode.nullable Decode.int))
+    in
+    Decode.map2 OnAir
+        (Decode.field "current" slot)
+        (Decode.field "next" (Decode.nullable slot))
+
+
+{-| What's on at `now` (the server's clock): the next slot once the current
+one's over, so titles change on time between polls.
+-}
+nowPlaying : Int -> OnAir -> NowPlaying
+nowPlaying now { current, next } =
+    let
+        slot =
+            case ( current.to, next ) of
+                ( Just to, Just after ) ->
+                    if now >= to then
+                        after
+
+                    else
+                        current
+
+                _ ->
+                    current
+    in
+    { artist = slot.artist, title = slot.title }
+
+
+{-| Tell the phone what's on, for its lock screen and Control Centre.
+-}
+announce : NowPlaying -> Cmd msg
+announce { artist, title } =
+    radioOut
+        (Encode.object
+            [ ( "command", Encode.string "nowPlaying" )
+            , ( "artist", Encode.string artist )
+            , ( "title", Encode.string title )
+            ]
+        )
 
 
 type State
@@ -175,25 +250,34 @@ subscriptions _ =
     radioIn FromAudio
 
 
-view : Model -> Html Msg
-view model =
+{-| The player: the title on now, and its artist (or how tuning in's
+going, or what went wrong). Without a program: "Radio", and whether it's on.
+-}
+view : Maybe NowPlaying -> Model -> Html Msg
+view playing model =
     let
         on =
             model.state /= Stopped
 
         status =
-            case model.state of
-                Stopped ->
-                    "Off"
-
-                Connecting ->
+            case ( model.state, playing ) of
+                ( Connecting, _ ) ->
                     "Tuning in…"
 
-                Playing ->
+                ( Failed message, _ ) ->
+                    message
+
+                ( _, Just { artist } ) ->
+                    artist
+
+                ( Stopped, Nothing ) ->
+                    "Off"
+
+                ( Playing, Nothing ) ->
                     "On"
 
-                Failed message ->
-                    message
+        name =
+            Maybe.map .title playing |> Maybe.withDefault "Radio"
     in
     Html.aside [ Attr.class "radio", Attr.attribute "aria-label" "Radio" ]
         [ Html.div [ Attr.class "radio-bar" ]
@@ -223,12 +307,20 @@ view model =
                         "▶"
                     )
                 ]
-            , Html.div [ Attr.class "radio-info" ]
-                [ Html.span [ Attr.class "radio-name" ] [ Html.text "Radio" ]
+            , Html.div
+                [ Attr.class "radio-info"
+                , Attr.attribute "aria-live" "polite"
+                , case playing of
+                    Just { artist, title } ->
+                        Attr.title (title ++ " — " ++ artist)
+
+                    Nothing ->
+                        Attr.classList []
+                ]
+                [ Html.span [ Attr.class "radio-name" ] [ Html.text name ]
                 , Html.span
                     [ Attr.class "radio-status"
-                    , Attr.classList [ ( "radio-problem", isFailed model.state ) ]
-                    , Attr.attribute "aria-live" "polite"
+                    , Attr.classList [ ( "radio-problem", isFailed model.state ), ( "radio-artist", playing /= Nothing && not (isFailed model.state) ) ]
                     ]
                     [ Html.text status ]
                 ]

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { buildApp } from "./app.ts";
 import { openDb } from "./db.ts";
 import { loadPlan } from "./plan.ts";
+import { programReader } from "./radio.ts";
 
 // Configuration comes from the environment, set by the systemd unit in
 // host/api.nix. The defaults are for running on a laptop.
@@ -24,6 +25,9 @@ const postDir = env.MCTROT_POST_DIR ?? new URL("../../post/", import.meta.url).p
 const uploadDir = env.MCTROT_UPLOAD_DIR ?? "uploads";
 const mediaUrl = env.MCTROT_MEDIA_URL ?? `http://localhost:${port}/media`;
 const mediaDir = env.MCTROT_MEDIA_DIR ?? "media";
+// McTrot radio's program.json, uploaded by hand next to its show file
+// (host/radio.nix); unset or missing means off air.
+const radioPath = env.MCTROT_RADIO_PROGRAM || undefined;
 const resetPolicy = env.MCTROT_DB_RESET === "never" ? "never" : "reset";
 
 // Secrets arrive as files via systemd's LoadCredential, so they never sit
@@ -56,6 +60,7 @@ const app = await buildApp({
   uploadDir,
   mediaUrl,
   mediaDir,
+  radioProgram: programReader(radioPath, (message) => console.warn(message)),
   logger: true,
 });
 if (archived) {

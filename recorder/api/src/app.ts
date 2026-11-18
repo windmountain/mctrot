@@ -7,6 +7,7 @@ import { startAttempt, stopAttempt } from "./attempts.ts";
 import { requireToken, same } from "./auth.ts";
 import { type Db, dbStatus } from "./db.ts";
 import { live } from "./live.ts";
+import type { RadioProgram } from "./radio.ts";
 import { deleteCheckin, deletePost, editPost, sentItems } from "./manage.ts";
 import {
   authenticate,
@@ -45,6 +46,8 @@ export type AppDeps = {
   mediaUrl: string;
   // The media folder itself, so a deleted post's files go too.
   mediaDir: string;
+  // McTrot radio's program, for now playing (src/radio.ts); none: off air.
+  radioProgram?: () => RadioProgram | null;
   logger?: boolean;
 };
 
@@ -305,7 +308,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/live", async (_req, reply) => {
     reply.header("access-control-allow-origin", "*");
     reply.header("cache-control", "no-store");
-    return live(db, plan, deps.mediaUrl);
+    return live(db, plan, deps.mediaUrl, Date.now(), deps.radioProgram?.() ?? null);
   });
 
   // The latest stored points, newest first. Token-protected: it's my

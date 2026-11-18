@@ -127,6 +127,8 @@
     .radio-info { display: flex; flex-direction: column; line-height: 1.15; min-width: 4.5rem; max-width: 11rem; }
     .radio-name { font-weight: bold; }
     .radio-status { opacity: 0.8; font-size: 0.9em; overflow-wrap: anywhere; }
+    /* What's on: a line each, cut short (the whole of it is the info's title). */
+    .radio-name, .radio-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .radio-bar .radio-problem { color: #ffb3a7; opacity: 1; }
     .radio-volume { width: 5rem; accent-color: #FFD100; }
     .radio-links-button { background: none; color: #fff; text-decoration: underline; padding: 4px 6px; }
@@ -300,6 +302,10 @@
         audio.load();
       } else if (cmd.command === "volume") {
         audio.volume = cmd.volume;
+      } else if (cmd.command === "nowPlaying") {
+        if ("mediaSession" in navigator && window.MediaMetadata) {
+          navigator.mediaSession.metadata = new MediaMetadata({ title: cmd.title, artist: cmd.artist, album: "McTrot radio" });
+        }
       }
     });
   </script>

@@ -109,6 +109,17 @@
             exec ${lpkgs.python3}/bin/python3 ${./tools/route_plan.py} "$@"
           '');
         };
+
+        # Make the radio's show from the tape and its spreadsheet: the
+        # whole program as one file, and program.json (what's on when).
+        # Upload both to the box after (it prints how).
+        # Usage: nix run .#radio-program -- Program.xlsx Tape.wav --date 2026-11-21 [--station-id ID.wav]
+        radio-program = {
+          type = "app";
+          program = toString (lpkgs.writeShellScript "recorder-radio-program" ''
+            PATH=${lpkgs.ffmpeg-headless}/bin:$PATH exec ${lpkgs.python3}/bin/python3 ${./tools/radio_program.py} "$@"
+          '');
+        };
       };
     in
     {
