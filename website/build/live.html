@@ -123,12 +123,18 @@
     .radio { position: relative; z-index: 2; font-size: 0.85em; max-width: calc(100vw - 32px); }
     .radio-bar { display: flex; align-items: center; gap: 8px; background: #111; color: #fff; border-radius: 999px; padding: 4px 6px 4px 4px; }
     .radio button { font: inherit; border: 0; cursor: pointer; }
-    .radio-play { width: 2rem; height: 2rem; border-radius: 50%; background: #FFD100; color: #111; font-size: 0.85rem; line-height: 1; }
+    .radio-play { flex: none; width: 2rem; height: 2rem; border-radius: 50%; background: #FFD100; color: #111; font-size: 0.85rem; line-height: 1; }
     .radio-info { display: flex; flex-direction: column; line-height: 1.15; min-width: 4.5rem; max-width: 11rem; }
     .radio-name { font-weight: bold; }
     .radio-status { opacity: 0.8; font-size: 0.9em; overflow-wrap: anywhere; }
     /* What's on: a line each, cut short (the whole of it is the info's title). */
-    .radio-name, .radio-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .radio-name, .radio-artist, .radio-album { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* While it plays: the album, and how far into the track. */
+    .radio-album { opacity: 0.65; font-size: 0.85em; }
+    .radio-progress { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 0.8em; opacity: 0.85; }
+    .radio-progress-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25); overflow: hidden; }
+    .radio-progress-fill { display: block; height: 100%; background: #FFD100; }
+    .radio-times { font-variant-numeric: tabular-nums; white-space: nowrap; }
     .radio-bar .radio-problem { color: #ffb3a7; opacity: 1; }
     .radio-volume { width: 5rem; accent-color: #FFD100; }
     .radio-links-button { background: none; color: #fff; text-decoration: underline; padding: 4px 6px; }
@@ -219,7 +225,7 @@
   </noscript>
 
   <script src="/js/pair-player.js?v=08a817679d"></script>
-  <script src="/js/live.js?v=703530ee66"></script>
+  <script src="/js/live.js?v=5eb12df531"></script>
   <script>
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.
@@ -304,7 +310,7 @@
         audio.volume = cmd.volume;
       } else if (cmd.command === "nowPlaying") {
         if ("mediaSession" in navigator && window.MediaMetadata) {
-          navigator.mediaSession.metadata = new MediaMetadata({ title: cmd.title, artist: cmd.artist, album: "McTrot radio" });
+          navigator.mediaSession.metadata = new MediaMetadata({ title: cmd.title, artist: cmd.artist, album: cmd.album });
         }
       }
     });

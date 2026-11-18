@@ -21,6 +21,8 @@ export const RadioProgram = z.object({
       offset: z.number().describe("Seconds from the show's start"),
       duration: z.number(),
       kind: z.enum(["track", "break"]),
+      album: z.string().nullable().default(null),
+      year: z.string().nullable().default(null),
     }),
   ),
 });
@@ -66,6 +68,8 @@ const ms = (what: string) => z.number().int().describe(`${what}, ms since epoch`
 const Slot = z.object({
   artist: z.string(),
   title: z.string(),
+  album: z.string().nullable(),
+  year: z.string().nullable().describe('The album\'s year: "1995"'),
   from: ms("Starts").nullable().describe("Null: on since before anyone knew"),
   to: ms("Ends").nullable().describe("Null: on from now on"),
   kind: z.enum(["track", "break", "holding"]).describe("holding: the silent loop before and after the show"),
@@ -95,13 +99,16 @@ export function nowPlaying(program: RadioProgram | null, now: number): Radio {
     return {
       artist: e.artist,
       title: e.title,
+      album: e.album,
+      year: e.year,
       from,
       to: next ? startsAt + Math.round(next.offset * 1000) : endsAt,
       kind: e.kind,
     };
   };
-  const before = { ...program.before, from: null, to: startsAt, kind: "holding" as const };
-  const after = { ...program.after, from: endsAt, to: null, kind: "holding" as const };
+  const holding = { album: null, year: null, kind: "holding" as const };
+  const before = { ...program.before, ...holding, from: null, to: startsAt };
+  const after = { ...program.after, ...holding, from: endsAt, to: null };
   const first = program.entries.length ? slot(0) : after;
   if (now < startsAt) return { status: "before", startsAt, endsAt, current: before, next: first };
   if (now >= endsAt || program.entries.length === 0) return { status: "after", startsAt, endsAt, current: after, next: null };

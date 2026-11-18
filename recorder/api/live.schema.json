@@ -838,6 +838,19 @@
                 "title": {
                   "type": "string"
                 },
+                "album": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "year": {
+                  "description": "The album's year: \"1995\"",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "from": {
                   "anyOf": [
                     {
@@ -879,6 +892,8 @@
               "required": [
                 "artist",
                 "title",
+                "album",
+                "year",
                 "from",
                 "to",
                 "kind"
@@ -896,6 +911,19 @@
                     },
                     "title": {
                       "type": "string"
+                    },
+                    "album": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "year": {
+                      "description": "The album's year: \"1995\"",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "from": {
                       "anyOf": [
@@ -938,6 +966,8 @@
                   "required": [
                     "artist",
                     "title",
+                    "album",
+                    "year",
                     "from",
                     "to",
                     "kind"

@@ -58,28 +58,37 @@ type alias OnAir =
     }
 
 
+{-| One thing on the radio: a track, a break, or the holding loop. `from`
+and `to` are ms since the epoch; Nothing when it's been on since before
+the program says, or is on from now on.
+-}
 type alias Slot =
     { artist : String
     , title : String
-
-    -- When it ends, ms since the epoch; Nothing if it doesn't.
+    , album : Maybe String
+    , year : Maybe String
+    , from : Maybe Int
     , to : Maybe Int
     }
 
 
 type alias NowPlaying =
-    { artist : String
-    , title : String
-    }
+    Slot
 
 
 onAirDecoder : Decode.Decoder OnAir
 onAirDecoder =
     let
+        optional name =
+            Decode.oneOf [ Decode.field name (Decode.nullable Decode.string), Decode.succeed Nothing ]
+
         slot =
-            Decode.map3 Slot
+            Decode.map6 Slot
                 (Decode.field "artist" Decode.string)
                 (Decode.field "title" Decode.string)
+                (optional "album")
+                (optional "year")
+                (Decode.field "from" (Decode.nullable Decode.int))
                 (Decode.field "to" (Decode.nullable Decode.int))
     in
     Decode.map2 OnAir
@@ -92,31 +101,28 @@ one's over, so titles change on time between polls.
 -}
 nowPlaying : Int -> OnAir -> NowPlaying
 nowPlaying now { current, next } =
-    let
-        slot =
-            case ( current.to, next ) of
-                ( Just to, Just after ) ->
-                    if now >= to then
-                        after
+    case ( current.to, next ) of
+        ( Just to, Just after ) ->
+            if now >= to then
+                after
 
-                    else
-                        current
+            else
+                current
 
-                _ ->
-                    current
-    in
-    { artist = slot.artist, title = slot.title }
+        _ ->
+            current
 
 
 {-| Tell the phone what's on, for its lock screen and Control Centre.
 -}
 announce : NowPlaying -> Cmd msg
-announce { artist, title } =
+announce { artist, title, album } =
     radioOut
         (Encode.object
             [ ( "command", Encode.string "nowPlaying" )
             , ( "artist", Encode.string artist )
             , ( "title", Encode.string title )
+            , ( "album", Encode.string (Maybe.withDefault "McTrot radio" album) )
             ]
         )
 
@@ -251,10 +257,12 @@ subscriptions _ =
 
 
 {-| The player: the title on now, and its artist (or how tuning in's
-going, or what went wrong). Without a program: "Radio", and whether it's on.
+going, or what went wrong); while it plays, the album and year too, and how
+far into the track it is. Without a program: "Radio", and whether it's on.
+`now` is the server's clock, ms since the epoch.
 -}
-view : Maybe NowPlaying -> Model -> Html Msg
-view playing model =
+view : Maybe Int -> Maybe NowPlaying -> Model -> Html Msg
+view now playing model =
     let
         on =
             model.state /= Stopped
@@ -317,13 +325,21 @@ view playing model =
                     Nothing ->
                         Attr.classList []
                 ]
-                [ Html.span [ Attr.class "radio-name" ] [ Html.text name ]
-                , Html.span
+                ([ Html.span [ Attr.class "radio-name" ] [ Html.text name ]
+                 , Html.span
                     [ Attr.class "radio-status"
                     , Attr.classList [ ( "radio-problem", isFailed model.state ), ( "radio-artist", playing /= Nothing && not (isFailed model.state) ) ]
                     ]
                     [ Html.text status ]
-                ]
+                 ]
+                    ++ (case ( model.state, playing ) of
+                            ( Playing, Just slot ) ->
+                                viewDetails now slot
+
+                            _ ->
+                                []
+                       )
+                )
             , if model.volumeAdjustable then
                 Html.input
                     [ Attr.type_ "range"
@@ -359,6 +375,81 @@ view playing model =
           else
             Html.text ""
         ]
+
+
+{-| While it plays: the album and its year, and the time into the track
+against its length, with a bar.
+-}
+viewDetails : Maybe Int -> NowPlaying -> List (Html msg)
+viewDetails now slot =
+    let
+        album =
+            case ( slot.album, slot.year ) of
+                ( Just name, Just year ) ->
+                    Just (name ++ " · " ++ year)
+
+                ( Just name, Nothing ) ->
+                    Just name
+
+                ( Nothing, Just year ) ->
+                    Just year
+
+                ( Nothing, Nothing ) ->
+                    Nothing
+    in
+    (case album of
+        Just text ->
+            [ Html.span [ Attr.class "radio-album" ] [ Html.text text ] ]
+
+        Nothing ->
+            []
+    )
+        ++ (case ( now, slot.from, slot.to ) of
+                ( Just t, Just from, Just to ) ->
+                    let
+                        length =
+                            max 1 (to - from)
+
+                        elapsed =
+                            clamp 0 length (t - from)
+                    in
+                    [ Html.span [ Attr.class "radio-progress" ]
+                        [ Html.span
+                            [ Attr.class "radio-progress-bar"
+                            , Attr.attribute "aria-hidden" "true"
+                            ]
+                            [ Html.span
+                                [ Attr.class "radio-progress-fill"
+                                , Attr.style "width" (String.fromFloat (toFloat elapsed / toFloat length * 100) ++ "%")
+                                ]
+                                []
+                            ]
+                        , Html.span [ Attr.class "radio-times" ]
+                            [ Html.text (duration elapsed ++ " / " ++ duration length) ]
+                        ]
+                    ]
+
+                _ ->
+                    []
+           )
+
+
+{-| ms as "4:08" (or "1:02:03").
+-}
+duration : Int -> String
+duration ms =
+    let
+        seconds =
+            ms // 1000
+
+        pad n =
+            String.padLeft 2 '0' (String.fromInt n)
+    in
+    if seconds >= 3600 then
+        String.fromInt (seconds // 3600) ++ ":" ++ pad (modBy 3600 seconds // 60) ++ ":" ++ pad (modBy 60 seconds)
+
+    else
+        String.fromInt (seconds // 60) ++ ":" ++ pad (modBy 60 seconds)
 
 
 {-| McTrot radio's addresses, for VLC, Apple Music and radio apps.

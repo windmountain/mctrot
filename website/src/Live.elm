@@ -797,7 +797,7 @@ viewHeader model =
             [ Html.h1 [] [ link Overview [] [ Html.text "McTROT 5" ] ]
             , Html.p [ Attr.class "app-subtitle" ] [ Html.text "EATING AT EVERY McDONALD’S IN MANHATTAN ON ONE WALK" ]
             ]
-        , Html.map RadioMsg (Radio.view (radioNow model) model.radio)
+        , Html.map RadioMsg (Radio.view (serverNow model) (radioNow model) model.radio)
         ]
 
 

@@ -7,7 +7,8 @@ Program.xlsx has two sheets:
 
 1. The tracks on Tape.wav, in the order they're on it: '#', 'Song',
    'Artist', 'Duration' (minutes and seconds, as Excel's hours and
-   minutes: 04:07 is 4 min 7 s).
+   minutes: 04:07 is 4 min 7 s), and if there, 'Album' and 'Album Date'
+   (for /live's player).
 2. The program: the order to play them in, by '#' (0 is a Break), with a
    'Start (Trot-relative)' column whose 0 row starts at the trot's start,
    and that start's clock time in the column after it.
@@ -144,6 +145,12 @@ def sheet_duration(value):
     return clock_seconds(value) / 60
 
 
+def album_year(value):
+    """'1995-06-01' (or '1959-00-00', a year alone) as '1995'; None if not a date."""
+    match = re.match(r"\s*(\d{4})", value or "")
+    return match.group(1) if match and match.group(1) != "0000" else None
+
+
 def is_zero(value):
     return value is not None and re.fullmatch(r"PT0H0M0(\.0*)?S|0(\.0*)?", value.strip()) is not None
 
@@ -231,6 +238,8 @@ def main():
                 "title": mended(row.get("Song")),
                 "artist": artists(row.get("Artist")),
                 "duration": sheet_duration(row["Duration"]),
+                "album": mended(row.get("Album")) or None,
+                "year": album_year(row.get("Album Date")),
             }
         )
     if [t["n"] for t in tracks] != list(range(1, len(tracks) + 1)):
@@ -272,7 +281,7 @@ def main():
     for row in rows:
         n = int(float(row["#"]))
         if n == 0:
-            pieces.append({"kind": "break", "artist": artists(row.get("Artist")) or "McTrot radio", "title": mended(row.get("Song")) or "Break", "from": None, "frames": break_frames})
+            pieces.append({"kind": "break", "artist": artists(row.get("Artist")) or "McTrot radio", "title": mended(row.get("Song")) or "Break", "album": None, "year": None, "from": None, "frames": break_frames})
             continue
         if n not in by_number:
             fail(f"sheet '{program_name}': '#' {n} isn't on the tape")
@@ -280,7 +289,7 @@ def main():
         if mended(row.get("Song")) != t["title"]:
             print(f"warning: program row #{n} says '{mended(row.get('Song'))}', the tape's #{n} is '{t['title']}'", file=sys.stderr)
         first, last = round(t["start"] * RATE), round(t["end"] * RATE)
-        pieces.append({"kind": "track", "artist": t["artist"], "title": t["title"], "from": first, "frames": last - first, "n": n})
+        pieces.append({"kind": "track", "artist": t["artist"], "title": t["title"], "album": t["album"], "year": t["year"], "from": first, "frames": last - first, "n": n})
 
     # Offsets in frames from the show's start; the anchor row is at the trot.
     offsets, total = [], 0
@@ -347,6 +356,8 @@ def main():
                 "duration": p["frames"] / RATE,
                 "artist": p["artist"],
                 "title": p["title"],
+                "album": p["album"],
+                "year": p["year"],
                 "kind": p["kind"],
                 "at": at(offset).isoformat(timespec="seconds"),
             }
