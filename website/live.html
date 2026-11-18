@@ -45,7 +45,8 @@
     .tab-map { display: flex; flex-direction: column; padding: 8px 16px; }
     .tab-map .live-status { text-align: center; margin: 0 0 4px; min-height: 0; }
     .tab-map .live-map { flex: 1; min-height: 0; }
-    .tab-map .live-map { position: relative; }
+    /* Pinching or double-tapping the map mustn't zoom the page (a finger still scrolls it): the map has its own zoom. */
+    .tab-map .live-map { position: relative; touch-action: pan-x pan-y; }
     .tab-map .live-map-frame { height: 100%; max-width: none; overflow: auto; overscroll-behavior: contain; }
     .live-map-draggable { cursor: grab; user-select: none; -webkit-user-select: none; }
     .live-map-dragging { cursor: grabbing; }
