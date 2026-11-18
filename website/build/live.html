@@ -63,26 +63,38 @@
     .tab-blog .live-posts { margin: 1rem auto 2rem; padding: 0 16px; }
 
     /* Timeline: oldest to newest, left to right */
-    .tab-timeline { display: flex; }
-    .timeline { flex: 1; list-style: none; margin: 0; padding: 12px 16px; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; }
-    .timeline-item { flex: 0 0 min(18rem, 80vw); overflow-y: auto; border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; scroll-snap-align: start; }
-    .timeline-when { margin: 0 0 6px; font-size: 0.85em; opacity: 0.7; }
-    .timeline-checkin { margin: 0; font-weight: bold; }
-    .timeline .live-post-photo img, .timeline .live-post-video { max-height: 50vh; }
+    /* Timeline: the burndown chart (src/Burndown.elm), filling the screen. A summary and key on top, then a grid
+       of the numbers down the left, and the time ruler over the plot. */
+    .tab-timeline { display: flex; padding: 12px 16px 16px; }
+    .burndown { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); column-gap: 8px; }
+    .burndown-summary { grid-column: 1 / -1; margin: 0 0 8px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
+    .burndown-key { display: flex; gap: 16px; font-size: 0.85em; }
+    .burndown-key span::before { content: ""; display: inline-block; width: 18px; height: 0; margin-right: 6px; vertical-align: middle; border-top: 3px solid; }
+    .burndown-key-plan::before { border-color: #999 !important; }
+    .burndown-key-actual::before { border-color: #DA291C !important; }
+    .burndown-ruler { display: block; overflow: visible; }
+    .burndown-axis { stroke: #888; }
+    .burndown-axis-label { fill: var(--ink-1); font-size: 11px; }
+    .burndown-levels { position: relative; min-width: 1.5em; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .burndown-level { position: absolute; right: 0; transform: translateY(-50%); line-height: 1; }
+    .burndown-plot { position: relative; box-shadow: inset 0 0 0 1px #ccc; }
+    .burndown-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .burndown-grid { stroke: #eee; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+    .burndown-plan { fill: none; stroke: #999; stroke-width: 2px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+    .burndown-actual { fill: none; stroke: #DA291C; stroke-width: 3px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+    .burndown-now { stroke: #000; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 
     /* Stats: a grid filling the screen */
     .tab-stats { overflow: auto; }
-    /* Phones: the cells one under another, as tall as they need, the page scrolling. Middle widths: Visits and
-       Position side by side, Conditions and the Plan full width. Wide: Visits, Position and Conditions across the
-       top, as tall as they need, and the Plan filling the rest of the screen, scrolling within. */
+    /* Phones: the cells one under another, as tall as they need, the page scrolling. Wider: Status and Conditions
+       side by side, as tall as they need, and the Plan full width under them; on a wide screen it fills the rest of
+       the screen, scrolling within. */
     .stats-grid { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
     @media (min-width: 34rem) {
-      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .stats-cell-conditions, .stats-cell-plan { grid-column: 1 / -1; }
+      .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
     }
     @media (min-width: 60rem) {
-      .stats-grid { height: 100%; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2.5fr); grid-template-rows: auto minmax(0, 1fr); }
-      .stats-cell-conditions { grid-column: auto; }
+      .stats-grid { height: 100%; grid-template-rows: auto minmax(0, 1fr); }
     }
     /* Rules drawn by each cell, so a part-filled last row stays white. */
     .stats-cell { padding: 12px 16px; overflow: auto; box-shadow: 1px 0 0 var(--rule), 0 1px 0 var(--rule); }
@@ -91,12 +103,6 @@
     .stats-cell .live-weather, .stats-cell .live-sky { margin: 0 0 12px; }
     .stats-cell .live-sky ul { max-width: 24rem; }
     .stats-cell .live-sun { margin: 0; }
-    /* Wider screens: the sun's table beside the weather and sky. */
-    @media (min-width: 34rem) {
-      .stats-cell-conditions { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; align-content: start; }
-      .stats-cell-conditions h2 { grid-column: 1 / -1; }
-      .stats-cell-conditions .live-sun { grid-column: 2; grid-row: 2 / span 2; }
-    }
     /* The plan: a full-width row of the grid, scrolling inside. Styled like
        the simulator's printed schedule (.print-schedule, css/style.css). */
     .stats-cell-plan { grid-column: 1 / -1; }
@@ -104,7 +110,6 @@
     .plan-schedule th { text-align: left; border-bottom: 1px solid var(--ink-1); position: sticky; top: -12px; background: #fff; }
     .plan-schedule th, .plan-schedule td { padding: 2px 10px 2px 0; }
     .plan-schedule tbody tr:nth-child(even) { background: #eee; }
-    .plan-num { text-align: right; width: 2em; }
     .plan-time { font-variant-numeric: tabular-nums; }
     .plan-diff { white-space: nowrap; }
     .plan-ahead { color: #1a7f37; font-weight: bold; }
@@ -212,7 +217,7 @@
   </noscript>
 
   <script src="/js/pair-player.js?v=08a817679d"></script>
-  <script src="/js/live.js?v=3418018889"></script>
+  <script src="/js/live.js?v=38969bcc83"></script>
   <script>
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.

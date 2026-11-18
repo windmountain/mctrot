@@ -26,6 +26,7 @@ is handled here through two ports and a few lines in live.html:
 import Browser
 import Browser.Dom
 import Browser.Events
+import Burndown
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -632,14 +633,7 @@ update msg model =
         -- so the radio keeps playing.
         Navigate route ->
             ( { model | route = route }
-            , Cmd.batch
-                [ navigate { path = pathOf route, title = titleOf route }
-                , if route == TimelineTab then
-                    scrollTimelineToNow
-
-                  else
-                    Cmd.none
-                ]
+            , navigate { path = pathOf route, title = titleOf route }
             )
 
         -- Back or Forward.
@@ -649,14 +643,7 @@ update msg model =
                     routeFromPath path
             in
             ( { model | route = route }
-            , Cmd.batch
-                [ setTitle (titleOf route)
-                , if route == TimelineTab then
-                    scrollTimelineToNow
-
-                  else
-                    Cmd.none
-                ]
+            , setTitle (titleOf route)
             )
 
         NoOp ->
@@ -677,27 +664,10 @@ update msg model =
             ( { model | failing = True }, Cmd.none )
 
         Received response at ->
-            ( { model | latest = Just (Fetched response at), failing = False, now = Just at }
-              -- The first data on the timeline: start at the newest end.
-            , if model.route == TimelineTab && model.latest == Nothing then
-                scrollTimelineToNow
-
-              else
-                Cmd.none
-            )
+            ( { model | latest = Just (Fetched response at), failing = False, now = Just at }, Cmd.none )
 
         Tick now ->
             ( { model | now = Just now }, Cmd.none )
-
-
-{-| The timeline runs oldest to newest, left to right: open it at the
-newest end.
--}
-scrollTimelineToNow : Cmd Msg
-scrollTimelineToNow =
-    Browser.Dom.getViewportOf "timeline"
-        |> Task.andThen (\v -> Browser.Dom.setViewportOf "timeline" v.scene.width 0)
-        |> Task.attempt (\_ -> NoOp)
 
 
 fetch : String -> Cmd Msg
@@ -935,61 +905,39 @@ viewBlogTab model =
     [ viewPosts model ]
 
 
-{-| Posts and check-ins in time order, oldest to newest, scrolling
-sideways.
+{-| A burndown chart of the McDonald's still to visit, plan against
+actual, under a time ruler (see Burndown).
 -}
 viewTimelineTab : Model -> List (Html Msg)
 viewTimelineTab model =
     case ( Maybe.map .response model.latest, serverNow model ) of
         ( Just response, Just now ) ->
             let
-                storeName id =
-                    List.filter (\store -> store.id == id) response.stores
-                        |> List.head
-                        |> Maybe.map .name
-                        |> Maybe.withDefault "a McDonald’s"
+                stores =
+                    response.stores
 
-                checkIn visit =
-                    let
-                        what =
-                            case visit.match of
-                                Matched id ->
-                                    "Checked in at " ++ storeName id
-
-                                Pending ->
-                                    "Checked in (finding which McDonald’s…)"
-
-                                Unmatched ->
-                                    "Checked in (no McDonald’s nearby)"
-                    in
-                    ( visit.tapTs
-                    , "visit-" ++ String.fromInt visit.tapTs
-                    , Html.p [ Attr.class "timeline-checkin" ] [ Html.text ("📍 " ++ what) ]
-                    )
-
-                items =
-                    (List.map (\post -> ( post.ts, post.id, viewPostContent post.content )) response.posts
-                        ++ List.map checkIn response.visits
-                    )
-                        |> List.sortBy (\( ts, _, _ ) -> ts)
-            in
-            if List.isEmpty items then
-                [ Html.p [ Attr.class "tab-empty" ] [ Html.text "Nothing yet." ] ]
-
-            else
-                [ Html.Keyed.ol [ Attr.id "timeline", Attr.class "timeline" ]
-                    (List.map
-                        (\( ts, key, content ) ->
-                            ( key
-                            , Html.li [ Attr.class "timeline-item" ]
-                                [ Html.p [ Attr.class "timeline-when" ] [ Html.text (when now ts) ]
-                                , content
-                                ]
+                firstVisits =
+                    stores
+                        |> List.filterMap
+                            (\store ->
+                                response.visits
+                                    |> List.filter (\v -> v.match == Matched store.id)
+                                    |> List.map .tapTs
+                                    |> List.minimum
                             )
-                        )
-                        items
-                    )
-                ]
+            in
+            [ Burndown.view
+                { plan = List.filterMap .arrive stores
+                , planEnd =
+                    List.filterMap .depart stores
+                        ++ List.filterMap .arrive stores
+                        |> List.maximum
+                        |> Maybe.withDefault 0
+                , visits = firstVisits
+                , total = List.length stores
+                , now = now
+                }
+            ]
 
         _ ->
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
@@ -1008,13 +956,11 @@ viewStatsTab model =
             Html.section [ Attr.class "stats-cell" ] (Html.h2 [] [ Html.text title ] :: body)
     in
     [ Html.div [ Attr.class "stats-grid" ]
-        [ cell "Visits" [ Html.p [] [ Html.text (visitsLine model) ] ]
-        , cell "Position" [ Html.p [] [ Html.text (status model) ] ]
+        [ cell "Status" [ Html.p [] [ Html.text (statusLine model) ] ]
         , Html.section [ Attr.class "stats-cell stats-cell-conditions" ]
             [ Html.h2 [] [ Html.text "Conditions" ]
-            , viewWeatherAfter (solarTime model) model
+            , viewWeatherAfter (solarTime model) False model
             , viewSky response
-            , viewSun response
             ]
         , Html.section [ Attr.class "stats-cell stats-cell-plan" ]
             [ Html.h2 [] [ Html.text "Plan" ]
@@ -1027,7 +973,7 @@ viewStatsTab model =
 
 
 {-| The route plan as a schedule, like the simulator's printout
-(Simulator.elm, viewPrintSchedule): number, code name, address, expected
+(Simulator.elm, viewPrintSchedule): nickname, address, expected
 and actual arrival, the difference, and expected departure, in New York
 time. A time on a new day (the first, or after midnight) shows the date
 as well.
@@ -1058,7 +1004,7 @@ viewPlan stores visits =
                                     NewYorkTime.clock ms
 
                                 else
-                                    NewYorkTime.format ms
+                                    NewYorkTime.formatShort ms
 
                             Nothing ->
                                 "—"
@@ -1101,10 +1047,9 @@ viewPlan stores visits =
                     _ ->
                         Html.td [ Attr.class "plan-time plan-diff" ] [ Html.text "—" ]
 
-            row i ( previous, store ) =
+            row ( previous, store ) =
                 Html.tr []
-                    [ Html.td [ Attr.class "plan-num" ] [ Html.text (String.fromInt (i + 1)) ]
-                    , Html.td [] [ Html.text store.name ]
+                    [ Html.td [] [ Html.text store.name ]
                     , Html.td [] [ Html.text store.address ]
                     , timeCell (Maybe.andThen .depart previous) store.arrive
                     , timeCell store.arrive (checkedIn store)
@@ -1115,8 +1060,7 @@ viewPlan stores visits =
         Html.table [ Attr.class "plan-schedule" ]
             [ Html.thead []
                 [ Html.tr []
-                    [ Html.th [ Attr.class "plan-num" ] [ Html.text "#" ]
-                    , Html.th [] [ Html.text "Code name" ]
+                    [ Html.th [] [ Html.text "Nickname" ]
                     , Html.th [] [ Html.text "Address" ]
                     , Html.th [] [ Html.text "Expected arrival" ]
                     , Html.th [] [ Html.text "Actual arrival" ]
@@ -1125,7 +1069,7 @@ viewPlan stores visits =
                     ]
                 ]
             , Html.tbody []
-                (List.indexedMap row (List.map2 Tuple.pair (Nothing :: List.map Just stores) stores))
+                (List.map row (List.map2 Tuple.pair (Nothing :: List.map Just stores) stores))
             ]
 
 
@@ -1133,7 +1077,7 @@ viewPlan stores visits =
 -}
 viewWeather : Model -> Html Msg
 viewWeather model =
-    viewWeatherAfter Nothing model
+    viewWeatherAfter Nothing True model
 
 
 {-| The time of day by the sun now ("Civil twilight", "2 hours before solar
@@ -1145,10 +1089,12 @@ solarTime model =
 
 
 {-| The weather sentence, after `lead` if there is one ("Civil twilight.
-44°F, clear, …"). Just the lead before any weather's been fetched.
+44°F, clear, …"), and where and when it was observed ("Central Manhattan,
+10 min ago") if `withSource`. Just the lead before any weather's been
+fetched.
 -}
-viewWeatherAfter : Maybe String -> Model -> Html Msg
-viewWeatherAfter lead model =
+viewWeatherAfter : Maybe String -> Bool -> Model -> Html Msg
+viewWeatherAfter lead withSource model =
     let
         leading =
             lead |> Maybe.map (\text -> text ++ ". ") |> Maybe.withDefault ""
@@ -1184,8 +1130,12 @@ viewWeatherAfter lead model =
             in
             Html.p [ Attr.class "live-weather" ]
                 [ Html.text (leading ++ capitalize first ++ ". " ++ wind)
-                , Html.span [ Attr.class "live-weather-when" ]
-                    [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
+                , if withSource then
+                    Html.span [ Attr.class "live-weather-when" ]
+                        [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
+
+                  else
+                    Html.text ""
                 ]
 
         _ ->
@@ -1321,6 +1271,30 @@ status model =
 
             else
                 "Connecting…"
+
+
+{-| Stats' status: "5 of 46 restaurants visited. Last position November
+21, 5:34 AM EST." (each restaurant counted once, however many check-ins
+it's had), or how the connection's going before there's anything.
+-}
+statusLine : Model -> String
+statusLine model =
+    case Maybe.map .response model.latest of
+        Just response ->
+            let
+                visited =
+                    response.stores
+                        |> List.filter (\store -> List.any (\v -> v.match == Matched store.id) response.visits)
+                        |> List.length
+            in
+            String.fromInt visited
+                ++ " of "
+                ++ String.fromInt (List.length response.stores)
+                ++ " restaurants visited. "
+                ++ status model
+
+        Nothing ->
+            status model
 
 
 {-| "Visits 3 / 46 · 1 checking in". Attempts are set aside for now (the

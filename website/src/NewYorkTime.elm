@@ -1,4 +1,4 @@
-module NewYorkTime exposing (clock, format, isDaylight, minuteOfWeek, weekday)
+module NewYorkTime exposing (clock, format, formatShort, isDaylight, minuteOfWeek, weekday)
 
 {-| Times as New York tells them, for every visitor wherever they are:
 "November 21, 5:34 AM EST".
@@ -30,6 +30,17 @@ format ms =
             civilFromDays (floorDiv (local ms) dayMs)
     in
     monthName month ++ " " ++ String.fromInt day ++ ", " ++ clock ms ++ " " ++ zoneName ms
+
+
+{-| The same, with a short month and no comma: "Nov 21 5:34 AM EST".
+-}
+formatShort : Int -> String
+formatShort ms =
+    let
+        { month, day } =
+            civilFromDays (floorDiv (local ms) dayMs)
+    in
+    String.left 3 (monthName month) ++ " " ++ String.fromInt day ++ " " ++ clock ms ++ " " ++ zoneName ms
 
 
 {-| Just the time of day in New York: "5:34 AM".

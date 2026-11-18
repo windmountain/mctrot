@@ -62,6 +62,10 @@ suite =
             \_ ->
                 ( NewYorkTime.format (utc 2026 11 1 5 59), NewYorkTime.format (utc 2026 11 1 6 0) )
                     |> Expect.equal ( "November 1, 1:59 AM EDT", "November 1, 1:00 AM EST" )
+        , test "formatShort: a short month, no comma; the date is New York's, not UTC's" <|
+            \_ ->
+                ( NewYorkTime.formatShort (utc 2026 11 17 2 15), NewYorkTime.formatShort (utc 2026 9 21 10 5) )
+                    |> Expect.equal ( "Nov 16 9:15 PM EST", "Sep 21 6:05 AM EDT" )
         , test "clock: just the time, no date or zone" <|
             \_ ->
                 ( NewYorkTime.clock (utc 2026 11 21 11 50), NewYorkTime.clock (utc 2026 11 21 17 0) )
