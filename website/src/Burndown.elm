@@ -1,8 +1,10 @@
-module Burndown exposing (Input, steps, view, window)
+module Burndown exposing (Input, Marks, steps, view, window)
 
 {-| /live's timeline: a burndown chart of the McDonald's still to visit,
 plan against actual, under a time ruler like the simulator's
-(Simulator.elm, viewTimeAxis).
+(Simulator.elm, viewTimeAxis). Over the chart, sharing its space, marks
+(/live's posts) at their time across and a height of their own (latitude),
+read off a second axis down the right.
 
 Down the side, the McDonald's left (all of them at the top, none at the
 bottom); across, New York time from the plan's first arrival to its last
@@ -92,8 +94,20 @@ scale =
     1000
 
 
-view : Input -> Html msg
-view input =
+{-| Marks over the chart: each at a time (across) and `y`, 0 (top) to 1
+(bottom), drawn by a function given both as fractions of the chart; those
+outside the chart's span are left off. `axis`: the right axis's labels, at
+their `y`; `key`: what the marks are, for the key (none without marks).
+-}
+type alias Marks msg =
+    { items : List { at : Int, y : Float, draw : { x : Float, y : Float } -> Html msg }
+    , axis : List ( Float, String )
+    , key : String
+    }
+
+
+view : Marks msg -> Input -> Html msg
+view marks input =
     case window input of
         Nothing ->
             Html.p [ Attr.class "tab-empty" ] [ Html.text "No route plan loaded." ]
@@ -152,6 +166,9 @@ view input =
 
                 hours =
                     hourTicks start end
+
+                shown =
+                    List.filter (\mark -> mark.at >= start && mark.at <= end) marks.items
             in
             Html.div [ Attr.class "burndown" ]
                 [ Html.p [ Attr.class "burndown-summary" ]
@@ -170,12 +187,20 @@ view input =
                             String.fromInt (input.total - List.length input.visits) ++ " to go. Starts " ++ NewYorkTime.format start ++ "."
                         )
                     , Html.span [ Attr.class "burndown-key" ]
-                        [ Html.span [ Attr.class "burndown-key-plan" ] [ Html.text "Plan" ]
-                        , Html.span [ Attr.class "burndown-key-actual" ] [ Html.text "Actual" ]
-                        ]
+                        ([ Html.span [ Attr.class "burndown-key-plan" ] [ Html.text "Plan" ]
+                         , Html.span [ Attr.class "burndown-key-actual" ] [ Html.text "Actual" ]
+                         ]
+                            ++ (if List.isEmpty shown then
+                                    []
+
+                                else
+                                    [ Html.span [ Attr.class "burndown-key-marks" ] [ Html.text marks.key ] ]
+                               )
+                        )
                     ]
                 , Html.div [] []
                 , viewRuler start end
+                , Html.div [] []
                 , Html.div [ Attr.class "burndown-levels" ]
                     (List.map
                         (\left ->
@@ -186,7 +211,23 @@ view input =
                         levels
                     )
                 , Html.div [ Attr.class "burndown-plot" ]
-                    [ Svg.svg
+                    [ Html.div [ Attr.class "burndown-marks" ]
+                        (List.map
+                            (\mark ->
+                                let
+                                    across =
+                                        toFloat (mark.at - start) / span
+                                in
+                                Html.div
+                                    [ Attr.class "burndown-mark"
+                                    , Attr.style "left" (String.fromFloat (across * 100) ++ "%")
+                                    , Attr.style "top" (String.fromFloat (mark.y * 100) ++ "%")
+                                    ]
+                                    [ mark.draw { x = across, y = mark.y } ]
+                            )
+                            shown
+                        )
+                    , Svg.svg
                         [ SvgAttr.viewBox ("0 0 " ++ String.fromFloat scale ++ " " ++ String.fromFloat scale)
                         , SvgAttr.preserveAspectRatio "none"
                         , Attr.attribute "role" "img"
@@ -217,6 +258,17 @@ view input =
                                )
                         )
                     ]
+                , Html.div [ Attr.class "burndown-marks-axis" ]
+                    (if List.isEmpty shown then
+                        []
+
+                     else
+                        List.map
+                            (\( at, label ) ->
+                                Html.span [ Attr.class "burndown-marks-level", Attr.style "top" (String.fromFloat (at * 100) ++ "%") ] [ Html.text label ]
+                            )
+                            marks.axis
+                    )
                 ]
 
 

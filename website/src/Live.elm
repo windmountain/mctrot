@@ -242,6 +242,9 @@ type alias Post =
     { id : String
     , ts : Int
     , content : PostContent
+
+    -- Where I was, as (lat, lon), from the GPS track; Nothing when unknown.
+    , at : Maybe ( Float, Float )
     }
 
 
@@ -393,10 +396,15 @@ latLonDecoder =
 
 postDecoder : Decoder Post
 postDecoder =
-    Decode.map3 Post
+    Decode.map4 Post
         (Decode.field "id" Decode.string)
         (Decode.field "ts" Decode.int)
         (Decode.field "type" Decode.string |> Decode.andThen postContentDecoder)
+        (Decode.oneOf
+            [ Decode.field "at" (Decode.nullable (Decode.map2 Tuple.pair (Decode.field "lat" Decode.float) (Decode.field "lon" Decode.float)))
+            , Decode.succeed Nothing
+            ]
+        )
 
 
 postContentDecoder : String -> Decoder PostContent
@@ -516,7 +524,7 @@ type alias Model =
     , zoom : Float
     , drag : Maybe Drag
     , dragged : Bool
-    , focused : Maybe String
+    , focused : Maybe Focused
     , walked : List (List ( Float, Float ))
     }
 
@@ -582,8 +590,19 @@ type Msg
     | DragStart Drag
     | DragTo Float Float
     | DragEnd
-    | Focus String
+    | Focus Focused
     | NoOp
+
+
+{-| What's open in a little box: on the map, a McDonald's (by id) or the
+posts made at one spot (by the newest's id; see postSpots); on the
+timeline, the posts made at one moment (by the newest's id; see
+postMoments).
+-}
+type Focused
+    = FocusedStore String
+    | FocusedPosts String
+    | FocusedMoment String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -618,17 +637,17 @@ update msg model =
         DragEnd ->
             ( { model | drag = Nothing }, Cmd.none )
 
-        -- A store's dot clicked: focus it, or unfocus it if it was. (Not
-        -- the end of a drag that happened to finish on a dot.)
-        Focus id ->
+        -- A store's dot or a post's pin clicked: focus it, or unfocus it
+        -- if it was. (Not the end of a drag that happened to finish on one.)
+        Focus target ->
             if model.dragged then
                 ( { model | dragged = False }, Cmd.none )
 
-            else if model.focused == Just id then
+            else if model.focused == Just target then
                 ( { model | focused = Nothing }, Cmd.none )
 
             else
-                ( { model | focused = Just id }, Cmd.none )
+                ( { model | focused = Just target }, Cmd.none )
 
         ZoomFrom by before ->
             let
@@ -639,7 +658,17 @@ update msg model =
                 ( model, Cmd.none )
 
             else
-                ( { model | zoom = zoom }, keepMapCentre before )
+                ( { model | zoom = zoom }
+                , case model.focused of
+                    Just (FocusedStore _) ->
+                        centreOnFocused before
+
+                    Just (FocusedPosts _) ->
+                        centreOnFocused before
+
+                    _ ->
+                        keepMapCentre before
+                )
 
         -- A tab (or the title) clicked: switch views without reloading,
         -- so the radio keeps playing.
@@ -913,6 +942,11 @@ size.)
 -}
 keepMapCentre : Browser.Dom.Viewport -> Cmd Msg
 keepMapCentre before =
+    keepMapCentreTask before |> Task.attempt (\_ -> NoOp)
+
+
+keepMapCentreTask : Browser.Dom.Viewport -> Task.Task Browser.Dom.Error ()
+keepMapCentreTask before =
     Browser.Dom.getViewportOf mapFrameId
         |> Task.andThen
             (\after ->
@@ -924,7 +958,33 @@ keepMapCentre before =
                     (centre before.viewport.x before.viewport.width before.scene.width after.scene.width)
                     (centre before.viewport.y before.viewport.height before.scene.height after.scene.height)
             )
+
+
+{-| After a zoom with a dot selected on the map (a McDonald's or a post's),
+scroll so that dot's in the middle of the view; if it can't be found, keep
+the middle as it was (keepMapCentre).
+-}
+centreOnFocused : Browser.Dom.Viewport -> Cmd Msg
+centreOnFocused before =
+    Task.map3
+        (\frame dot after ->
+            { x = after.viewport.x + (dot.element.x + dot.element.width / 2 - frame.element.x) - after.viewport.width / 2
+            , y = after.viewport.y + (dot.element.y + dot.element.height / 2 - frame.element.y) - after.viewport.height / 2
+            }
+        )
+        (Browser.Dom.getElement mapFrameId)
+        (Browser.Dom.getElement focusedDotId)
+        (Browser.Dom.getViewportOf mapFrameId)
+        |> Task.andThen (\{ x, y } -> Browser.Dom.setViewportOf mapFrameId x y)
+        |> Task.onError (\_ -> keepMapCentreTask before)
         |> Task.attempt (\_ -> NoOp)
+
+
+{-| The id of the selected dot on the map, for centreOnFocused.
+-}
+focusedDotId : String
+focusedDotId =
+    "live-map-focused-dot"
 
 
 viewZoomButtons : Float -> Html Msg
@@ -982,6 +1042,9 @@ viewTimelineTab model =
                 stores =
                     response.stores
 
+                latitudes =
+                    latitudeScale
+
                 firstVisits =
                     stores
                         |> List.filterMap
@@ -993,6 +1056,47 @@ viewTimelineTab model =
                             )
             in
             [ Burndown.view
+                { items =
+                    postMoments (onWalkDay stores) response.posts
+                        |> List.filterMap
+                            (\posts ->
+                                case posts of
+                                    newest :: _ ->
+                                        Maybe.map
+                                            (\( lat, _ ) ->
+                                                { at = onWalkDay stores newest.ts
+                                                , y = latitudes.y lat
+                                                , draw =
+                                                    \at ->
+                                                        let
+                                                            target =
+                                                                FocusedMoment (momentId posts)
+                                                        in
+                                                        Html.div []
+                                                            [ postDot model.focused target posts []
+                                                            , if model.focused == Just target then
+                                                                postsBox (Just now)
+                                                                    target
+                                                                    posts
+                                                                    [ ( "live-focus-left", at.x > 0.55 )
+                                                                    , ( "live-focus-below", at.y < 0.35 )
+                                                                    , ( "live-focus-above", at.y > 0.65 )
+                                                                    ]
+                                                                    []
+
+                                                              else
+                                                                Html.text ""
+                                                            ]
+                                                }
+                                            )
+                                            newest.at
+
+                                    [] ->
+                                        Nothing
+                            )
+                , axis = latitudes.axis
+                , key = "Posts, by latitude"
+                }
                 { plan = List.filterMap .arrive stores
                 , planEnd =
                     List.filterMap .depart stores
@@ -1464,7 +1568,7 @@ square). Over everything, each dot can be clicked to focus its store (one
 at a time; click again to unfocus), which shows a little box beside it with
 its name and when it next opens or closes (see viewFocus).
 -}
-viewMap : Maybe { stretch : Float, zoom : Float, dragging : Bool } -> Maybe String -> List (List ( Float, Float )) -> Maybe Int -> Maybe LiveResponse -> Html Msg
+viewMap : Maybe { stretch : Float, zoom : Float, dragging : Bool } -> Maybe Focused -> List (List ( Float, Float )) -> Maybe Int -> Maybe LiveResponse -> Html Msg
 viewMap shape focused walked now response =
     let
         position =
@@ -1475,6 +1579,9 @@ viewMap shape focused walked now response =
 
         stores =
             Maybe.map .stores response |> Maybe.withDefault []
+
+        spots =
+            Maybe.map .posts response |> Maybe.withDefault [] |> postSpots
 
         visited =
             Maybe.map .visits response
@@ -1576,12 +1683,19 @@ viewMap shape focused walked now response =
                         ++ List.map (viewStore "live-store") (List.filter (\store -> not (List.member store.id visited)) stores)
                         ++ List.map (\store -> viewStore (pipClass store) store) stores
                         ++ (placed |> Maybe.map viewMe |> Maybe.withDefault [])
-                        ++ List.map viewStoreHit stores
+                        ++ List.map (\store -> viewStoreHit (focused == Just (FocusedStore store.id)) store) stores
                     )
                 , Html.div [ Attr.class "live-map-layer" ]
-                    (stores
-                        |> List.filter (\store -> Just store.id == focused)
+                    (List.map (viewPostPin focused) spots)
+                , Html.div [ Attr.class "live-map-layer" ]
+                    ((stores
+                        |> List.filter (\store -> Just (FocusedStore store.id) == focused)
                         |> List.map (\store -> viewFocus now (firstVisit store.id) store)
+                     )
+                        ++ (spots
+                                |> List.filter (\spot -> Just (FocusedPosts (spotId spot)) == focused)
+                                |> List.map (viewPostsFocus now)
+                           )
                     )
                 ]
             ]
@@ -1915,14 +2029,326 @@ viewStore class store =
 
 {-| What's clicked to focus a store: a bigger, invisible dot over its dot.
 -}
-viewStoreHit : Store -> Svg Msg
-viewStoreHit store =
+viewStoreHit : Bool -> Store -> Svg Msg
+viewStoreHit selected store =
     Svg.path
         [ SvgAttr.class "live-store-hit"
+        , if selected then
+            SvgAttr.id focusedDotId
+
+          else
+            SvgAttr.class "live-store-hit"
         , SvgAttr.d (dotPath (Projection.toMap { lat = store.lat, lon = store.lon }))
-        , Svg.Events.onClick (Focus store.id)
+        , Svg.Events.onClick (Focus (FocusedStore store.id))
         ]
         [ Svg.title [] [ Svg.text store.name ] ]
+
+
+{-| Posts made at one spot, newest first, and where (map coordinates): the
+newest's place.
+-}
+type alias Spot =
+    { at : ( Float, Float )
+    , posts : List Post
+    }
+
+
+spotId : Spot -> String
+spotId spot =
+    List.head spot.posts |> Maybe.map .id |> Maybe.withDefault ""
+
+
+{-| Posts within this many feet of each other share a pin: about a
+block, so a McDonald's gets one pin, not a pile.
+-}
+spotRadius : Float
+spotRadius =
+    250
+
+
+{-| The posts with a place, gathered into spots: each joins the first
+spot (newest first) within spotRadius of it, or starts its own.
+-}
+postSpots : List Post -> List Spot
+postSpots posts =
+    posts
+        |> List.filterMap (\post -> Maybe.map (\( lat, lon ) -> ( Projection.toMap { lat = lat, lon = lon }, post )) post.at)
+        |> List.foldl
+            (\( at, post ) spots ->
+                joinFirstNear at post spots
+                    |> Maybe.withDefault (spots ++ [ { at = at, posts = [ post ] } ])
+            )
+            []
+
+
+{-| The spots with `post` added to the first within spotRadius of `at`;
+Nothing if none is.
+-}
+joinFirstNear : ( Float, Float ) -> Post -> List Spot -> Maybe (List Spot)
+joinFirstNear ( x, y ) post spots =
+    case spots of
+        [] ->
+            Nothing
+
+        spot :: rest ->
+            let
+                ( sx, sy ) =
+                    spot.at
+            in
+            if (sx - x) ^ 2 + (sy - y) ^ 2 <= spotRadius ^ 2 then
+                Just ({ spot | posts = spot.posts ++ [ post ] } :: rest)
+
+            else
+                Maybe.map ((::) spot) (joinFirstNear ( x, y ) post rest)
+
+
+{-| A spot's pin on the map (see postDot), on its place.
+-}
+viewPostPin : Maybe Focused -> Spot -> Html Msg
+viewPostPin focused spot =
+    case boxPercent spot.at of
+        Just ( left, top ) ->
+            postDot focused
+                (FocusedPosts (spotId spot))
+                spot.posts
+                ([ Attr.style "left" left, Attr.style "top" top ]
+                    ++ (if focused == Just (FocusedPosts (spotId spot)) then
+                            [ Attr.id focusedDotId ]
+
+                        else
+                            []
+                       )
+                )
+
+        Nothing ->
+            Html.text ""
+
+
+{-| A spot's posts in a box beside its pin on the map (see postsBox): right
+of it, or left near the map's right edge; down from it near the top, up
+from it near the bottom.
+-}
+viewPostsFocus : Maybe Int -> Spot -> Html Msg
+viewPostsFocus now spot =
+    case boxPercent spot.at of
+        Just ( left, top ) ->
+            let
+                percent text =
+                    String.toFloat (String.dropRight 1 text) |> Maybe.withDefault 0
+            in
+            postsBox now
+                (FocusedPosts (spotId spot))
+                spot.posts
+                [ ( "live-focus-left", percent left > 55 )
+                , ( "live-focus-below", percent top < 30 )
+                , ( "live-focus-above", percent top > 70 )
+                ]
+                [ Attr.style "left" left, Attr.style "top" top ]
+
+        Nothing ->
+            Html.text ""
+
+
+{-| Posts' dot, on the map or the timeline: small and red (the newest
+post's kind, or how many posts, in its tooltip). `attributes` place it.
+Clicked, it opens `target`, the posts' box (see postsBox).
+-}
+postDot : Maybe Focused -> Focused -> List Post -> List (Html.Attribute Msg) -> Html Msg
+postDot focused target posts attributes =
+    case posts of
+        newest :: _ ->
+            let
+                count =
+                    List.length posts
+
+                label =
+                    if count == 1 then
+                        "A " ++ postKind newest.content
+
+                    else
+                        String.fromInt count ++ " posts"
+            in
+            Html.button
+                ([ Attr.classList
+                    [ ( "live-post-pin", True )
+                    , ( "live-post-pin-open", focused == Just target )
+                    ]
+                 , Attr.type_ "button"
+                 , Attr.attribute "aria-label" label
+                 , Attr.title label
+                 , Events.onClick (Focus target)
+                 ]
+                    ++ attributes
+                )
+                []
+
+        [] ->
+            Html.text ""
+
+
+postKind : PostContent -> String
+postKind content =
+    case content of
+        Text _ ->
+            "note"
+
+        Photo _ _ ->
+            "photo"
+
+        Video _ _ ->
+            "video"
+
+        Voice _ ->
+            "voice note"
+
+        Pair _ ->
+            "DoubleTake"
+
+
+{-| Posts, newest first, in a box beside their dot: each as the feed shows
+it, and when. Scrolls when there are many; × closes it (on a phone it's a
+sheet over the dot, so the dot can't). Presses inside don't drag the map,
+so video controls work. `classes` and `attributes` place it.
+-}
+postsBox : Maybe Int -> Focused -> List Post -> List ( String, Bool ) -> List (Html.Attribute Msg) -> Html Msg
+postsBox now target posts classes attributes =
+    Html.div
+        ([ Attr.classList (( "live-focus", True ) :: ( "live-focus-posts", True ) :: classes)
+         , Events.stopPropagationOn "mousedown" (Decode.succeed ( NoOp, True ))
+         ]
+            ++ attributes
+        )
+        (Html.button
+            [ Attr.class "live-focus-close"
+            , Attr.type_ "button"
+            , Attr.attribute "aria-label" "Close"
+            , Events.onClick (Focus target)
+            ]
+            [ Html.text "×" ]
+            :: List.map
+                (\post ->
+                    Html.div [ Attr.class "live-focus-post" ]
+                        [ viewPostContent (inBox post.content)
+                        , case now of
+                            Just ms ->
+                                Html.span [ Attr.class "live-focus-when" ] [ Html.text (when ms post.ts) ]
+
+                            Nothing ->
+                                Html.text ""
+                        ]
+                )
+                posts
+        )
+
+
+{-| The posts with a place, gathered into moments for the timeline, by
+`timeOf` (see onWalkDay): each joins the newest moment (newest first) if
+within momentMinutes and momentDegrees (of latitude) of its newest post,
+or starts its own.
+-}
+postMoments : (Int -> Int) -> List Post -> List (List Post)
+postMoments timeOf posts =
+    let
+        latitude post =
+            Maybe.map Tuple.first post.at |> Maybe.withDefault 0
+    in
+    posts
+        |> List.filter (\post -> post.at /= Nothing)
+        |> List.sortBy (.ts >> timeOf >> negate)
+        |> List.foldl
+            (\post moments ->
+                case moments of
+                    (newest :: rest) :: others ->
+                        if timeOf newest.ts - timeOf post.ts <= momentMinutes * 60000 && abs (latitude newest - latitude post) <= momentDegrees then
+                            (newest :: rest ++ [ post ]) :: others
+
+                        else
+                            [ post ] :: moments
+
+                    _ ->
+                        [ post ] :: moments
+            )
+            []
+        |> List.reverse
+
+
+{-| Posts this close in time share a dot on the timeline: about a dot's
+width on a phone, over a day's walk.
+-}
+momentMinutes : Int
+momentMinutes =
+    10
+
+
+{-| And this close in latitude: about a dot's height (some 700 ft).
+-}
+momentDegrees : Float
+momentDegrees =
+    0.002
+
+
+{-| The timeline's latitude axis (for posts; see Burndown.Marks): Manhattan
+from the Battery (40.70°) to Inwood's northern tip (40.88°), north at the
+top. `y` places a latitude, 0 (top) to 1 (bottom), held to the axis (a post
+off the island sits at its edge); `axis` labels every 0.05°: "40.75°".
+-}
+latitudeScale : { y : Float -> Float, axis : List ( Float, String ) }
+latitudeScale =
+    let
+        south =
+            40.7
+
+        north =
+            40.88
+
+        y lat =
+            clamp 0 1 ((north - lat) / (north - south))
+
+        label hundredths =
+            String.fromInt (hundredths // 100) ++ "." ++ String.padLeft 2 '0' (String.fromInt (modBy 100 hundredths)) ++ "°"
+    in
+    { y = y
+    , axis =
+        List.range (ceiling (south * 20 - 1.0e-6)) (floor (north * 20 + 1.0e-6))
+            |> List.map (\twentieths -> ( y (toFloat twentieths / 20), label (twentieths * 5) ))
+    }
+
+
+{-| A time moved to the same time of day (New York's) on the walk's day,
+the day of the plan's first arrival: so on the timeline every post shows
+at the time of day it was made, whatever the date. Unchanged without a
+plan.
+-}
+onWalkDay : List Store -> Int -> Int
+onWalkDay stores ts =
+    let
+        timeOfDay t =
+            modBy 1440 (NewYorkTime.minuteOfWeek t) * 60000 + modBy 60000 t
+    in
+    case List.filterMap .arrive stores |> List.minimum of
+        Just start ->
+            start - timeOfDay start + timeOfDay ts
+
+        Nothing ->
+            ts
+
+
+momentId : List Post -> String
+momentId posts =
+    List.head posts |> Maybe.map .id |> Maybe.withDefault ""
+
+
+{-| A post as it fits a map box: a DoubleTake as its one cut video (the
+side-by-side player needs the page's width).
+-}
+inBox : PostContent -> PostContent
+inBox content =
+    case content of
+        Pair { cut } ->
+            Video cut.url cut.posterUrl
+
+        other ->
+            other
 
 
 {-| The focused store's box, beside its dot (right of it, or left near the
