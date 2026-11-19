@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildApp } from "../src/app.ts";
 import { openDb } from "../src/db.ts";
+import type { Mail } from "../src/guests/mail.ts";
 import type { RoutePlan } from "../src/plan.ts";
 
 export const TOKEN = "test-token";
@@ -21,8 +22,15 @@ export const PLAN: RoutePlan = {
 // setup({}) runs without an ingest token configured.
 export const ORIGIN = "https://api.example.test";
 
-export async function setup({ ingestToken }: { ingestToken?: string } = { ingestToken: TOKEN }) {
+export const SITE = "https://site.example.test";
+
+// setup({ ingestToken: TOKEN, guests: true }) turns guest accounts on;
+// their emails land in `mail` instead of being sent.
+export async function setup(
+  { ingestToken, guests = false }: { ingestToken?: string; guests?: boolean } = { ingestToken: TOKEN },
+) {
   const { db } = openDb(":memory:");
+  const mail: Mail[] = [];
   const mediaDir = mkdtempSync(join(tmpdir(), "mctrot-media-"));
   const app = await buildApp({
     db,
@@ -38,8 +46,9 @@ export async function setup({ ingestToken }: { ingestToken?: string } = { ingest
     uploadDir: mkdtempSync(join(tmpdir(), "mctrot-uploads-")),
     mediaUrl: "https://media.example.test",
     mediaDir,
+    guests: guests ? { siteOrigin: SITE, mailer: async (m) => void mail.push(m) } : undefined,
   });
-  return { db, app, mediaDir };
+  return { db, app, mediaDir, mail };
 }
 
 // A location as Overland sends it.

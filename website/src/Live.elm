@@ -34,6 +34,7 @@ import Html.Keyed
 import Http
 import Json.Decode as Decode exposing (Decoder)
 import Dict
+import Guests
 import LiveMapData
 import NewYorkTime
 import Projection
@@ -168,6 +169,9 @@ type alias Flags =
 
     -- location.pathname: which view to start on
     , path : String
+
+    -- location.origin, e.g. "https://mctrot.nyc": where signing in returns to
+    , origin : String
     }
 
 
@@ -526,6 +530,10 @@ type alias Model =
     , dragged : Bool
     , focused : Maybe Focused
     , walked : List (List ( Float, Float ))
+
+    -- Guests' likes and comments under posts (src/Guests.elm).
+    , guests : Guests.Model
+    , origin : String
     }
 
 
@@ -555,8 +563,13 @@ init flags =
     let
         route =
             routeFromPath flags.path
+
+        ( guests, guestsCmd ) =
+            Guests.init flags.api
     in
     ( { api = flags.api
+      , guests = guests
+      , origin = flags.origin
       , latest = Nothing
       , failing = False
       , now = Nothing
@@ -569,7 +582,7 @@ init flags =
       , focused = Nothing
       , walked = []
       }
-    , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route) ]
+    , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route), Cmd.map GuestsMsg guestsCmd ]
     )
 
 
@@ -591,6 +604,7 @@ type Msg
     | DragTo Float Float
     | DragEnd
     | Focus Focused
+    | GuestsMsg Guests.Msg
     | NoOp
 
 
@@ -695,7 +709,11 @@ update msg model =
                 |> Tuple.mapBoth (\radio -> { model | radio = radio }) (Cmd.map RadioMsg)
 
         Poll ->
-            ( model, fetch model.api )
+            ( model, Cmd.batch [ fetch model.api, Cmd.map GuestsMsg (Guests.poll model.guests) ] )
+
+        GuestsMsg guestsMsg ->
+            Guests.update guestsMsg model.guests
+                |> Tuple.mapBoth (\guests -> { model | guests = guests }) (Cmd.map GuestsMsg)
 
         Got (Ok response) ->
             ( model, Task.perform (Received response) Time.now )
@@ -2519,6 +2537,7 @@ viewPosts model =
                             , Html.li [ Attr.class "live-post" ]
                                 [ viewPostContent post.content
                                 , Html.p [ Attr.class "live-post-when" ] [ Html.text (when now post.ts) ]
+                                , Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.route) post.id model.guests)
                                 ]
                             )
                         )

@@ -21,6 +21,8 @@ import { lastPoints, OverlandBatch, storePoints } from "./points.ts";
 import { postStatuses } from "./jobs.ts";
 import { MAX_TEXT, recordTextPost } from "./posts.ts";
 import { endSession, hasSession, requireWriter, startSession } from "./session.ts";
+import type { Mailer } from "./guests/mail.ts";
+import { registerGuests } from "./guests/routes.ts";
 import { registerUploads } from "./uploads.ts";
 import { recordTap } from "./visits.ts";
 
@@ -48,6 +50,9 @@ export type AppDeps = {
   mediaDir: string;
   // McTrot radio's program, for now playing (src/radio.ts); none: off air.
   radioProgram?: () => RadioProgram | null;
+  // Guest accounts (src/guests/): set to turn them on. siteOrigin is the
+  // public site whose /live calls them (https://mctrot.nyc).
+  guests?: { siteOrigin: string; mailer: Mailer };
   logger?: boolean;
 };
 
@@ -81,6 +86,8 @@ const tusBrowser = new URL("../node_modules/tus-js-client/dist/tus.min.js", impo
 const POST_FILES: Record<string, { file: string | URL; type: string }> = {
   "/post": { file: "index.html", type: "text/html; charset=utf-8" },
   "/post/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
+  // Guests' comments to approve (src/guests/).
+  "/post/comments.js": { file: "comments.js", type: "text/javascript; charset=utf-8" },
   "/post/manifest.webmanifest": { file: "manifest.webmanifest", type: "application/manifest+json" },
   "/post/webauthn.js": { file: webauthnBrowser, type: "text/javascript; charset=utf-8" },
   "/post/tus.js": { file: tusBrowser, type: "text/javascript; charset=utf-8" },
@@ -219,6 +226,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerUploads(app, db, deps.uploadDir, writer);
+
+  // Guests who like and comment (src/guests/). Needs the session secret,
+  // which also hashes their sign-in codes.
+  if (deps.guests && deps.sessionSecret !== undefined) {
+    await registerGuests(app, {
+      db,
+      secret: deps.sessionSecret,
+      apiOrigin: deps.origin,
+      siteOrigin: deps.guests.siteOrigin,
+      mailer: deps.guests.mailer,
+      writer,
+    });
+  }
 
   // Where uploaded posts are: "processing" until the worker is done. The
   // upload page polls this for what's in its outbox.

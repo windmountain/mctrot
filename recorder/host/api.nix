@@ -101,6 +101,14 @@ in
       # Deleting a post from the upload page deletes its files too.
       MCTROT_MEDIA_DIR = "/var/lib/mctrot/media";
       NODE_ENV = "production";
+    } // lib.optionalAttrs config.recorder.guests {
+      # Guest accounts (api/src/guests/): /live on the site calls them.
+      MCTROT_GUESTS = "on";
+      MCTROT_SITE_ORIGIN = "https://mctrot.nyc";
+      # Mailgun's EU region; the sending domain's DNS is at Namecheap.
+      MCTROT_MAILGUN_URL = "https://api.eu.mailgun.net";
+      MCTROT_MAILGUN_DOMAIN = "mg.mctrot.nyc";
+      MCTROT_MAIL_FROM = "McTrot <noreply@mg.mctrot.nyc>";
     };
 
     serviceConfig = {
@@ -112,7 +120,8 @@ in
       LoadCredential = [
         "ingest-token:${config.sops.secrets.ingest-token.path}"
         "session-secret:${config.sops.secrets.session-secret.path}"
-      ];
+      ] ++ lib.optional config.recorder.guests
+        "mailgun-api-key:${config.sops.secrets.mailgun-api-key.path}";
       Restart = "always";
       RestartSec = 2;
 

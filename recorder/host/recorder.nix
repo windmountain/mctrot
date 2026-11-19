@@ -57,6 +57,16 @@ in
         setting the database aside.
       '';
     };
+    guests = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Guest accounts: people sign in with an emailed code to like and
+        comment on posts (api/src/guests/). Sends email through Mailgun,
+        so it needs the mailgun-api-key secret. Off: the routes don't
+        exist and nothing else changes.
+      '';
+    };
     dataServices = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];

@@ -23,6 +23,12 @@
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO7Jgkt1Qinux6JxO4eh3pL+E5BRYrUM+XF2uE4h+xPK zach@windmountainsoftware.com"
   ];
 
+  # Logs (with visitors' IP addresses: Caddy, the API, Icecast) are kept
+  # 14 days, as the privacy policy (website/privacy.html) promises.
+  services.journald.extraConfig = ''
+    MaxRetentionSec=14day
+  '';
+
   # Small box: keep old generations around for rollback, but not forever.
   nix.gc = {
     automatic = true;
@@ -35,6 +41,10 @@
   # (no mctrot-wipe or mctrot-dislocate, no database reset on a schema
   # change). See host/recorder.nix.
   recorder.live = false;
+
+  # Guest accounts: likes and comments on /live (api/src/guests/). Needs
+  # the mailgun-api-key secret in secrets/recorder.yaml first.
+  recorder.guests = true;
 
   # The route plan: the simulator's GPX download, saved next to this
   # folder's flake.nix (or a hand-written GPX for a test walk). See

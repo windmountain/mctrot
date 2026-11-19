@@ -114,6 +114,12 @@
         <ul id="outbox"></ul>
       </div>
 
+      <!-- Guests' comments to approve (post/comments.js); hidden when guests are off. -->
+      <div id="comments-card" class="card" hidden>
+        <h2>Comments <span id="comments-count"></span></h2>
+        <ul id="comments"></ul>
+      </div>
+
       <!-- What the server has: delete anything, edit text posts. -->
       <div class="card">
         <h2>Sent</h2>
@@ -132,5 +138,6 @@
   <script src="/post/webauthn.js"></script>
   <script src="/post/tus.js"></script>
   <script src="/post/app.js" type="module"></script>
+  <script src="/post/comments.js" type="module"></script>
 </body>
 </html>
