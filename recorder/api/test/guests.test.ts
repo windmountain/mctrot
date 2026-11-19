@@ -97,6 +97,18 @@ test("sign up with an emailed code, then sign in again later", async () => {
   assert.equal(s.db.prepare("select count(*) from guest_accounts").pluck().get(), 1);
 });
 
+test("signing out from /live, and only from the site", async () => {
+  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const live = await signUp(s);
+  const elsewhere = await s.app.inject({ method: "POST", url: "/guests/signout", headers: { cookie: live, origin: "https://evil.example" } });
+  assert.equal(elsewhere.statusCode, 403);
+  assert.notEqual((await s.app.inject({ url: "/guests/feed", headers: fromSite(live) })).json().me, null);
+  const fromLive = await s.app.inject({ method: "POST", url: "/guests/signout", headers: fromSite(live) });
+  assert.equal(fromLive.statusCode, 200);
+  assert.equal(fromLive.headers["access-control-allow-credentials"], "true");
+  assert.equal((await s.app.inject({ url: "/guests/feed", headers: fromSite(live) })).json().me, null);
+});
+
 test("a wrong code counts; five wrong and it's gone", async () => {
   const s = await setup({ ingestToken: TOKEN, guests: true });
   await s.app.inject({ method: "POST", url: "/account/code", headers: formHeaders, payload: form({ email: "a@b.co" }) });
@@ -158,7 +170,7 @@ test("the profile needs a name and the 16+ box", async () => {
   assert.equal(like.statusCode, 403);
 });
 
-test("likes count; comments wait for approval; only the author sees them pending", async () => {
+test("likes are private; comments wait for approval; only the author sees them pending", async () => {
   const s = await setup({ ingestToken: TOKEN, guests: true });
   await textPost(s.app);
   const fan = await signUp(s, "fan@example.com", "Fan");
@@ -175,13 +187,13 @@ test("likes count; comments wait for approval; only the author sees them pending
   const commentId = c.json().id;
 
   const asFan = (await s.app.inject({ url: "/guests/feed", headers: fromSite(fan) })).json().posts.p1;
-  assert.equal(asFan.likes, 1);
+  assert.equal("likes" in asFan, false);
   assert.equal(asFan.liked, true);
   assert.equal(asFan.comments.length, 0);
   assert.equal(asFan.pending[0].text, "great");
+  // Someone else sees nothing of the fan's like or waiting comment.
   const asOther = (await s.app.inject({ url: "/guests/feed", headers: fromSite(other) })).json().posts.p1;
-  assert.equal(asOther.liked, false);
-  assert.equal(asOther.pending.length, 0);
+  assert.equal(asOther, undefined);
 
   // Moderation from the upload page.
   const writer = await signInWriter(s.app);

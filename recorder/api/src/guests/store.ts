@@ -252,8 +252,8 @@ export type PublicComment = {
   mine: boolean;
 };
 
+// No like counts: a guest sees only their own likes.
 export type PostSocial = {
-  likes: number;
   liked: boolean;
   comments: PublicComment[]; // approved, oldest first
   pending: { id: number; text: string; ts: number }[]; // mine, awaiting approval
@@ -263,13 +263,7 @@ export type PostSocial = {
 export function feed(db: Db, viewer: Account | null): Record<string, PostSocial> {
   const out: Record<string, PostSocial> = {};
   const get = (postId: string) =>
-    (out[postId] ??= { likes: 0, liked: false, comments: [], pending: [] });
-  for (const r of db.prepare("select post_id, count(*) as n from guest_likes group by post_id").all() as {
-    post_id: string;
-    n: number;
-  }[]) {
-    get(r.post_id).likes = r.n;
-  }
+    (out[postId] ??= { liked: false, comments: [], pending: [] });
   if (viewer) {
     for (const postId of db
       .prepare("select post_id from guest_likes where account_id = ?")

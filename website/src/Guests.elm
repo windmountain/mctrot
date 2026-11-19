@@ -1,4 +1,4 @@
-module Guests exposing (Model, Msg, init, poll, update, viewPost)
+module Guests exposing (Model, Msg, init, poll, update, viewAccount, viewPost)
 
 {-| Likes and comments under each post on /live, from guests who signed in
 with an emailed code at api.mctrot.nyc/account (recorder/api/src/guests/).
@@ -13,6 +13,9 @@ or #comment=<post>). live.html hands that fragment over and clears it
 from the address; once the feed says they're signed in, the like is sent
 or the comment box opened, so they don't have to click again.
 
+Guests see only their own likes: there's no count, here or from the
+server.
+
 Every request carries the guest's cookie for api.mctrot.nyc
 (Http.riskyRequest: "with credentials"); the server only allows that
 from the site's own origin.
@@ -20,6 +23,7 @@ from the site's own origin.
 -}
 
 import Browser.Dom
+import Browser.Navigation
 import Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -106,8 +110,7 @@ type alias Me =
 
 
 type alias Social =
-    { likes : Int
-    , liked : Bool
+    { liked : Bool
     , comments : List Comment
     , pending : List Pending
     }
@@ -142,7 +145,7 @@ type alias Ui =
 
 emptySocial : Social
 emptySocial =
-    { likes = 0, liked = False, comments = [], pending = [] }
+    { liked = False, comments = [], pending = [] }
 
 
 emptyUi : Ui
@@ -179,6 +182,9 @@ configOf model =
 type Msg
     = GotFeed (Result Http.Error Feed)
     | ToggleLike String Bool
+    | SignIn String
+    | SignOut
+    | SignedOut (Result Http.Error ())
     | OpenComment String
     | Draft String String
     | SendComment String
@@ -211,23 +217,13 @@ update msg model =
             ( model, Cmd.none )
 
         ( ToggleLike postId liked, On config feed ui ) ->
-            -- Shown at once; the next feed has the real count.
+            -- Shown at once.
             let
                 social =
                     socialOf postId feed
 
                 changed =
-                    { social
-                        | liked = liked
-                        , likes =
-                            social.likes
-                                + (if liked then
-                                    1
-
-                                   else
-                                    -1
-                                  )
-                    }
+                    { social | liked = liked }
             in
             ( On config { feed | posts = Dict.insert postId changed feed.posts } ui
             , send config.api
@@ -236,6 +232,18 @@ update msg model =
                 (Encode.object [ ( "postId", Encode.string postId ), ( "liked", Encode.bool liked ) ])
                 Done
             )
+
+        ( SignIn url, _ ) ->
+            ( model, Browser.Navigation.load url )
+
+        ( SignOut, On config _ _ ) ->
+            ( model, send config.api "POST" "/guests/signout" Encode.null SignedOut )
+
+        ( SignedOut (Ok ()), On config feed _ ) ->
+            ( On config { feed | me = Nothing } emptyUi, fetchFeed config.api )
+
+        ( SignedOut (Err _), _ ) ->
+            ( model, Cmd.none )
 
         ( OpenComment postId, On config feed ui ) ->
             ( On config feed { ui | open = Just postId }, Cmd.none )
@@ -465,8 +473,7 @@ feedDecoder =
 
 socialDecoder : Decoder Social
 socialDecoder =
-    Decode.map4 Social
-        (Decode.field "likes" Decode.int)
+    Decode.map3 Social
         (Decode.field "liked" Decode.bool)
         (Decode.field "comments"
             (Decode.list
@@ -511,35 +518,34 @@ viewPost back postId model =
             in
             Html.div [ Attr.class "guest", Attr.id (guestId postId) ]
                 [ Html.div [ Attr.class "guest-bar" ]
-                    [ if canAct then
-                        Html.button
-                            [ Attr.class "guest-like"
-                            , Attr.classList [ ( "guest-liked", social.liked ) ]
-                            , Attr.attribute "aria-pressed" (boolText social.liked)
-                            , Events.onClick (ToggleLike postId (not social.liked))
-                            ]
-                            [ Html.text (heart social.liked ++ likesText social.likes) ]
+                    -- Signed out (or not finished signing up), both go
+                    -- to sign in first; see resume.
+                    [ Html.button
+                        [ Attr.class "guest-button guest-like"
+                        , Attr.classList [ ( "guest-liked", canAct && social.liked ) ]
+                        , Attr.attribute "aria-label" "Like"
+                        , Attr.attribute "aria-pressed" (boolText (canAct && social.liked))
+                        , Events.onClick
+                            (if canAct then
+                                ToggleLike postId (not social.liked)
 
-                      else
-                        Html.a [ Attr.class "guest-like", Attr.href (signInUrl (LikeAfter postId)), Attr.title "Sign in to like" ]
-                            [ Html.text (heart False ++ likesText social.likes) ]
-                    , if canAct then
-                        if ui.open == Just postId then
-                            Html.text ""
+                             else
+                                SignIn (signInUrl (LikeAfter postId))
+                            )
+                        ]
+                        [ Html.text (heart (canAct && social.liked)) ]
+                    , Html.button
+                        [ Attr.class "guest-button"
+                        , Attr.attribute "aria-expanded" (boolText (canAct && ui.open == Just postId))
+                        , Events.onClick
+                            (if canAct then
+                                OpenComment postId
 
-                        else
-                            Html.button [ Attr.class "guest-link", Events.onClick (OpenComment postId) ] [ Html.text "Comment" ]
-
-                      else
-                        Html.a [ Attr.class "guest-link", Attr.href (signInUrl (CommentAfter postId)) ]
-                            [ Html.text
-                                (if feed.me == Nothing then
-                                    "Sign in to like and comment"
-
-                                 else
-                                    "Finish signing up to comment"
-                                )
-                            ]
+                             else
+                                SignIn (signInUrl (CommentAfter postId))
+                            )
+                        ]
+                        [ Html.text "Comment" ]
                     ]
                 , if List.isEmpty social.comments && List.isEmpty social.pending then
                     Html.text ""
@@ -561,6 +567,36 @@ viewPost back postId model =
                     Nothing ->
                         Html.text ""
                 ]
+
+
+{-| Once, above the posts: who's signed in, and a way out. Nothing when
+signed out.
+-}
+viewAccount : Model -> Html Msg
+viewAccount model =
+    case model of
+        On _ feed _ ->
+            case feed.me of
+                Just me ->
+                    Html.div [ Attr.class "guest guest-account" ]
+                        [ Html.span [ Attr.class "guest-meta" ]
+                            [ Html.text
+                                (case me.displayName of
+                                    Just name ->
+                                        "Signed in as " ++ name
+
+                                    Nothing ->
+                                        "Signed in"
+                                )
+                            ]
+                        , Html.button [ Attr.class "guest-button", Events.onClick SignOut ] [ Html.text "Sign out" ]
+                        ]
+
+                Nothing ->
+                    Html.text ""
+
+        Off _ ->
+            Html.text ""
 
 
 viewComment : Ui -> Comment -> Html Msg
@@ -628,7 +664,7 @@ viewComposer postId draft =
             [ Attr.id (composerId postId)
             , Attr.value draft
             , Attr.maxlength 500
-            , Attr.placeholder "Say something nice"
+            , Attr.placeholder "Leave a note"
             , Attr.attribute "aria-label" "Your comment"
             , Events.onInput (Draft postId)
             ]
@@ -647,15 +683,6 @@ heart liked =
 
     else
         "♡"
-
-
-likesText : Int -> String
-likesText n =
-    if n == 0 then
-        ""
-
-    else
-        " " ++ String.fromInt n
 
 
 boolText : Bool -> String

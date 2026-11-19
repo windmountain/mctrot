@@ -386,6 +386,14 @@ export async function registerGuests(app: FastifyInstance, deps: GuestDeps) {
       return { me: meJson(me), accountUrl: `${apiOrigin}/account`, posts: feed(db, me) };
     });
 
+    // Sign out from /live (the form at /account/signout only takes posts
+    // from api.mctrot.nyc's own pages).
+    scope.post("/guests/signout", async (req, reply) => {
+      if (!jsonOk(req, reply)) return reply;
+      signOut(req, reply);
+      return { signedOut: true };
+    });
+
     // The signed-in guest who may like and comment; otherwise replies.
     const participant = (req: FastifyRequest, reply: FastifyReply): Account | null => {
       if (!jsonOk(req, reply)) return null;

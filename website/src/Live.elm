@@ -37,13 +37,16 @@ import Dict
 import Guests
 import LiveMapData
 import NewYorkTime
+import Process
 import Projection
 import Radio
 import SnapToStreets
+import Simplify
 import SolarTime
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Svg.Events
+import Svg.Lazy
 import Task
 import Time
 import Url exposing (Url)
@@ -529,6 +532,10 @@ type alias Model =
     , announced : Maybe Radio.NowPlaying
     , route : Route
     , zoom : Float
+
+    -- The zoom Manhattan's outline is simplified for (see boroughAt):
+    -- catches up with `zoom` just after the map's been drawn at it.
+    , outlineZoom : Float
     , drag : Maybe Drag
     , dragged : Bool
     , focused : Maybe Focused
@@ -536,8 +543,7 @@ type alias Model =
 
     -- Guests' likes and comments under posts (src/Guests.elm).
     , guests : Guests.Model
-    , origin : String
-    }
+    , origin : String    }
 
 
 {-| A drag of the map with the mouse: where the pointer was pressed and how
@@ -580,6 +586,7 @@ init flags =
       , announced = Nothing
       , route = route
       , zoom = 1
+      , outlineZoom = 1
       , drag = Nothing
       , dragged = False
       , focused = Nothing
@@ -603,6 +610,7 @@ type Msg
     | PathChanged String
     | Zoom Float
     | ZoomFrom Float Browser.Dom.Viewport
+    | OutlineFor Float
     | DragStart Drag
     | DragTo Float Float
     | DragEnd
@@ -676,16 +684,29 @@ update msg model =
 
             else
                 ( { model | zoom = zoom }
-                , case model.focused of
-                    Just (FocusedStore _) ->
-                        centreOnFocused before
+                , Cmd.batch
+                    [ case model.focused of
+                        Just (FocusedStore _) ->
+                            centreOnFocused before
 
-                    Just (FocusedPosts _) ->
-                        centreOnFocused before
+                        Just (FocusedPosts _) ->
+                            centreOnFocused before
 
-                    _ ->
-                        keepMapCentre before
+                        _ ->
+                            keepMapCentre before
+
+                    -- Zoom first; re-simplify the outline once that's on
+                    -- screen (and only for the last of several quick clicks).
+                    , Task.perform (\_ -> OutlineFor zoom) (Process.sleep 150)
+                    ]
                 )
+
+        OutlineFor zoom ->
+            if zoom == model.zoom then
+                ( { model | outlineZoom = zoom }, Cmd.none )
+
+            else
+                ( model, Cmd.none )
 
         -- A tab (or the title) clicked: switch views without reloading,
         -- so the radio keeps playing.
@@ -943,8 +964,31 @@ top-left corner, then scroll to look around.
 viewMapTab : Model -> List (Html Msg)
 viewMapTab model =
     [ viewStatus model
-    , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, dragging = model.drag /= Nothing }) model.focused model.walked (serverNow model) (Maybe.map .response model.latest)
+    , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, outlineZoom = model.outlineZoom, dragging = model.drag /= Nothing }) model.focused model.walked (serverNow model) (Maybe.map .response model.latest)
     ]
+
+
+{-| Manhattan's outline, as simple as this zoom allows: a handful of
+points all the way out (zoom 1, level 100), every point all the way in
+(maxZoom, level 0), evenly between on the same log scale as the zoom
+steps. Ranked once (src/Simplify.elm).
+-}
+boroughAt : Float -> String
+boroughAt zoom =
+    (Simplify.atLevel (100 * (1 - logBase 2 zoom / logBase 2 maxZoom)) boroughRanked).d
+
+
+{-| Lazy, so the path is only rebuilt when the zoom changes, not on every
+redraw (a drag redraws many times a second).
+-}
+viewBorough : Float -> Svg msg
+viewBorough zoom =
+    Svg.path [ SvgAttr.class "live-borough", SvgAttr.d (boroughAt zoom) ] []
+
+
+boroughRanked : Simplify.Ranked
+boroughRanked =
+    Simplify.rank LiveMapData.boroughPath
 
 
 maxZoom : Float
@@ -1578,7 +1622,8 @@ dots and the last position are the ends of zero-length strokes, which keep
 their shape, and the flags are small pictures of their own, pinned by
 percentage. All sizes are in live.html, in screen pixels.
 
-Bottom to top: Manhattan (light grey), every street between McDonald's
+Bottom to top: Manhattan (light grey; simpler the further out, see
+boroughAt), every street between McDonald's
 (thin white), the start and finish flags, the planned route and the stores
 (thick white and white dots, with every black outline drawn first so the
 route and the dots join into one shape), the path walked (red, over the
@@ -1589,7 +1634,7 @@ square). Over everything, each dot can be clicked to focus its store (one
 at a time; click again to unfocus), which shows a little box beside it with
 its name and when it next opens or closes (see viewFocus).
 -}
-viewMap : Maybe { stretch : Float, zoom : Float, dragging : Bool } -> Maybe Focused -> List (List ( Float, Float )) -> Maybe Int -> Maybe LiveResponse -> Html Msg
+viewMap : Maybe { stretch : Float, zoom : Float, outlineZoom : Float, dragging : Bool } -> Maybe Focused -> List (List ( Float, Float )) -> Maybe Int -> Maybe LiveResponse -> Html Msg
 viewMap shape focused walked now response =
     let
         position =
@@ -1685,7 +1730,7 @@ viewMap shape focused walked now response =
                        )
                 )
                 [ layer
-                    [ Svg.path [ SvgAttr.class "live-borough", SvgAttr.d LiveMapData.boroughPath ] []
+                    [ Svg.Lazy.lazy viewBorough (Maybe.map .outlineZoom shape |> Maybe.withDefault 1)
                     , Svg.path [ SvgAttr.class "live-network", SvgAttr.d LiveMapData.networkPath ] []
                     ]
                 , Html.div [ Attr.class "live-map-layer" ]
@@ -2533,7 +2578,9 @@ viewPosts model =
             else
                 -- Keyed by post, so a video that's playing keeps playing
                 -- when a newer post arrives above it.
-                Html.Keyed.ul [ Attr.class "live-posts" ]
+                Html.div []
+                    [ Html.map GuestsMsg (Guests.viewAccount model.guests)
+                    , Html.Keyed.ul [ Attr.class "live-posts" ]
                     (List.map
                         (\post ->
                             ( post.id
@@ -2546,6 +2593,7 @@ viewPosts model =
                         )
                         response.posts
                     )
+                    ]
 
         _ ->
             Html.text ""
