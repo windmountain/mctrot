@@ -7,12 +7,19 @@ Its own module so the feature comes out cleanly: Live.elm only keeps a
 Model, forwards Msgs, and calls viewPost under each post. While the server
 has no guest routes (a 404, or no answer), nothing is shown at all.
 
+A guest who clicks the heart or "Comment" while signed out goes to sign
+in with what they wanted in the return address's fragment (#like=<post>
+or #comment=<post>). live.html hands that fragment over and clears it
+from the address; once the feed says they're signed in, the like is sent
+or the comment box opened, so they don't have to click again.
+
 Every request carries the guest's cookie for api.mctrot.nyc
 (Http.riskyRequest: "with credentials"); the server only allows that
 from the site's own origin.
 
 -}
 
+import Browser.Dom
 import Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -20,6 +27,8 @@ import Html.Events as Events
 import Http
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
+import Process
+import Task exposing (Task)
 import Url
 
 
@@ -33,7 +42,51 @@ type Model
 
 
 type alias Config =
-    { api : String }
+    { api : String
+    , after : Maybe Intent
+    }
+
+
+{-| What a guest clicked before signing in, to do once they're back.
+-}
+type Intent
+    = LikeAfter String
+    | CommentAfter String
+
+
+intentFromHash : String -> Maybe Intent
+intentFromHash hash =
+    let
+        postIdOf prefix =
+            String.dropLeft (String.length prefix) hash
+                |> Url.percentDecode
+                |> Maybe.andThen
+                    (\postId ->
+                        if String.isEmpty postId then
+                            Nothing
+
+                        else
+                            Just postId
+                    )
+    in
+    if String.startsWith "#like=" hash then
+        Maybe.map LikeAfter (postIdOf "#like=")
+
+    else if String.startsWith "#comment=" hash then
+        Maybe.map CommentAfter (postIdOf "#comment=")
+
+    else
+        Nothing
+
+
+hashOf : Intent -> String
+hashOf intent =
+    case intent of
+        LikeAfter postId ->
+            "#like=" ++ Url.percentEncode postId
+
+        CommentAfter postId ->
+            "#comment=" ++ Url.percentEncode postId
 
 
 {-| GET /guests/feed: who's signed in, and every post's likes and
@@ -97,9 +150,11 @@ emptyUi =
     { drafts = Dict.empty, open = Nothing, reporting = Nothing, notes = Dict.empty, reported = [] }
 
 
-init : String -> ( Model, Cmd Msg )
-init api =
-    ( Off { api = api }, fetchFeed api )
+{-| The API's address, and the page's location.hash when it opened.
+-}
+init : String -> String -> ( Model, Cmd Msg )
+init api hash =
+    ( Off { api = api, after = intentFromHash hash }, fetchFeed api )
 
 
 poll : Model -> Cmd Msg
@@ -135,16 +190,17 @@ type Msg
     | CancelReport
     | Reported Int (Result Http.Error ())
     | Done (Result Http.Error ())
+    | Revealed Intent Int (Result Browser.Dom.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
         ( GotFeed (Ok feed), On config _ ui ) ->
-            ( On config feed ui, Cmd.none )
+            resume config feed ui
 
         ( GotFeed (Ok feed), Off config ) ->
-            ( On config feed emptyUi, Cmd.none )
+            resume config feed emptyUi
 
         ( GotFeed (Err (Http.BadStatus 404)), _ ) ->
             -- Guests are off on this server.
@@ -254,8 +310,86 @@ update msg model =
         ( Done _, On config _ _ ) ->
             ( model, fetchFeed config.api )
 
+        ( Revealed intent tries (Err _), _ ) ->
+            -- The post isn't drawn yet (/live's own data may still be on
+            -- its way): look again shortly, for up to ten seconds.
+            if tries < 40 then
+                ( model, Task.attempt (Revealed intent (tries + 1)) (Process.sleep 250 |> Task.andThen (\_ -> reveal intent)) )
+
+            else
+                ( model, Cmd.none )
+
         _ ->
             ( model, Cmd.none )
+
+
+{-| A new feed: if the guest came back from signing in to like or
+comment, do that now (once). Still signed out, or not finished signing
+up, and it's dropped: they can click again.
+-}
+resume : Config -> Feed -> Ui -> ( Model, Cmd Msg )
+resume config feed ui =
+    case ( config.after, Maybe.map .complete feed.me ) of
+        ( Just intent, Just True ) ->
+            let
+                done =
+                    { config | after = Nothing }
+
+                ( model, cmd ) =
+                    case intent of
+                        LikeAfter postId ->
+                            if (socialOf postId feed).liked then
+                                ( On done feed ui, Cmd.none )
+
+                            else
+                                update (ToggleLike postId True) (On done feed ui)
+
+                        CommentAfter postId ->
+                            ( On done feed { ui | open = Just postId }, Cmd.none )
+            in
+            ( model, Cmd.batch [ cmd, Task.attempt (Revealed intent 0) (reveal intent) ] )
+
+        ( Just _, _ ) ->
+            ( On { config | after = Nothing } feed ui, Cmd.none )
+
+        ( Nothing, _ ) ->
+            ( On config feed ui, Cmd.none )
+
+
+{-| Scroll to the post; for a comment, put the cursor in its box.
+-}
+reveal : Intent -> Task Browser.Dom.Error ()
+reveal intent =
+    let
+        postId =
+            case intent of
+                LikeAfter id ->
+                    id
+
+                CommentAfter id ->
+                    id
+    in
+    Browser.Dom.getElement (guestId postId)
+        |> Task.andThen (\{ element } -> Browser.Dom.setViewport 0 (max 0 (element.y - 120)))
+        |> Task.andThen
+            (\_ ->
+                case intent of
+                    CommentAfter _ ->
+                        Browser.Dom.focus (composerId postId)
+
+                    LikeAfter _ ->
+                        Task.succeed ()
+            )
+
+
+guestId : String -> String
+guestId postId =
+    "guest-" ++ postId
+
+
+composerId : String -> String
+composerId postId =
+    "guest-composer-" ++ postId
 
 
 problem : Http.Error -> String
@@ -369,13 +503,13 @@ viewPost back postId model =
                 social =
                     socialOf postId feed
 
-                signInUrl =
-                    feed.accountUrl ++ "?back=" ++ Url.percentEncode back
+                signInUrl intent =
+                    feed.accountUrl ++ "?back=" ++ Url.percentEncode (back ++ hashOf intent)
 
                 canAct =
                     Maybe.map .complete feed.me |> Maybe.withDefault False
             in
-            Html.div [ Attr.class "guest" ]
+            Html.div [ Attr.class "guest", Attr.id (guestId postId) ]
                 [ Html.div [ Attr.class "guest-bar" ]
                     [ if canAct then
                         Html.button
@@ -387,7 +521,7 @@ viewPost back postId model =
                             [ Html.text (heart social.liked ++ likesText social.likes) ]
 
                       else
-                        Html.a [ Attr.class "guest-like", Attr.href signInUrl, Attr.title "Sign in to like" ]
+                        Html.a [ Attr.class "guest-like", Attr.href (signInUrl (LikeAfter postId)), Attr.title "Sign in to like" ]
                             [ Html.text (heart False ++ likesText social.likes) ]
                     , if canAct then
                         if ui.open == Just postId then
@@ -397,7 +531,7 @@ viewPost back postId model =
                             Html.button [ Attr.class "guest-link", Events.onClick (OpenComment postId) ] [ Html.text "Comment" ]
 
                       else
-                        Html.a [ Attr.class "guest-link", Attr.href signInUrl ]
+                        Html.a [ Attr.class "guest-link", Attr.href (signInUrl (CommentAfter postId)) ]
                             [ Html.text
                                 (if feed.me == Nothing then
                                     "Sign in to like and comment"
@@ -491,7 +625,8 @@ viewComposer : String -> String -> Html Msg
 viewComposer postId draft =
     Html.form [ Attr.class "guest-composer", Events.onSubmit (SendComment postId) ]
         [ Html.textarea
-            [ Attr.value draft
+            [ Attr.id (composerId postId)
+            , Attr.value draft
             , Attr.maxlength 500
             , Attr.placeholder "Say something nice"
             , Attr.attribute "aria-label" "Your comment"

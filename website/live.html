@@ -304,10 +304,17 @@
       flags: {
         path: location.pathname,
         origin: location.origin,
+        hash: location.hash,
         api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc",
         radio: { volumeAdjustable: volumeAdjustable }
       }
     });
+
+    // Back from signing in to like or comment (#like=…): Elm has it now,
+    // so take it off the address and a reload doesn't do it again.
+    if (/^#(like|comment)=/.test(location.hash)) {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
 
     // --- The address (src/Live.elm's navigate, setTitle, pathChanged) -----
     // ?api=… stays on the address as views change, for local testing.

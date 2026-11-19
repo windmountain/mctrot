@@ -172,6 +172,9 @@ type alias Flags =
 
     -- location.origin, e.g. "https://mctrot.nyc": where signing in returns to
     , origin : String
+
+    -- location.hash: what to do after signing in (#like=…, Guests.elm)
+    , hash : String
     }
 
 
@@ -565,7 +568,7 @@ init flags =
             routeFromPath flags.path
 
         ( guests, guestsCmd ) =
-            Guests.init flags.api
+            Guests.init flags.api flags.hash
     in
     ( { api = flags.api
       , guests = guests
