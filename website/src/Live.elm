@@ -1093,7 +1093,36 @@ stretchAt zoom =
 -}
 viewBlogTab : Model -> List (Html Msg)
 viewBlogTab model =
-    [ viewPosts model ]
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            (case plannedStart response of
+                Just start ->
+                    if response.attempt == Nothing && now < start then
+                        [ Html.p [ Attr.class "tab-empty" ] [ Html.text ("Starting " ++ NewYorkTime.format start) ] ]
+
+                    else
+                        []
+
+                Nothing ->
+                    []
+            )
+                ++ (if List.isEmpty response.posts then
+                        [ Html.p [ Attr.class "tab-empty" ] [ Html.text "No blog posts yet." ] ]
+
+                    else
+                        [ viewPosts model ]
+                   )
+
+        _ ->
+            [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
+
+
+{-| When the walk is planned to start: the plan's first arrival (Nothing
+in a hand-written plan without times).
+-}
+plannedStart : LiveResponse -> Maybe Int
+plannedStart response =
+    List.filterMap .arrive response.stores |> List.minimum
 
 
 {-| A burndown chart of the McDonald's still to visit, plan against
