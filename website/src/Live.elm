@@ -43,6 +43,7 @@ import Radio
 import SnapToStreets
 import Simplify
 import SolarTime
+import Status
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Svg.Events
@@ -933,24 +934,89 @@ plainClick msg =
         |> Decode.andThen identity
 
 
-{-| Plain /live: everything on one page, as it was before the tabs.
+{-| Plain /live: one paragraph, what McTrot is and where the walk stands
+(src/Status.elm), and nothing below it.
 -}
 viewOverview : Model -> List (Html Msg)
 viewOverview model =
-    let
-        response =
-            Maybe.map .response model.latest
-    in
     [ Html.div [ Attr.class "live" ]
-        [ viewStatus model
-        , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
-        , viewWeather model
-        , viewSky response
-        , viewMap Nothing model.focused model.walked (serverNow model) response
-        , viewSun response
-        , viewPosts model
+        [ Html.p [ Attr.class "live-paragraph" ]
+            [ Html.text
+                (case ( Maybe.map .response model.latest, serverNow model ) of
+                    ( Just response, Just now ) ->
+                        Status.paragraph (statusInput now model response)
+                            ++ (if model.failing then
+                                    " Can’t reach the recorder; retrying."
+
+                                else
+                                    ""
+                               )
+
+                    _ ->
+                        status model
+                )
+            ]
         ]
     ]
+
+
+{-| What the overview's paragraph is made from.
+-}
+statusInput : Int -> Model -> LiveResponse -> Status.Input {}
+statusInput now model response =
+    { now = now
+    , stores = List.length response.stores
+    , start =
+        List.head response.stores
+            |> Maybe.andThen (\first -> Maybe.map (\at -> { at = at, address = first.address }) (plannedStart response))
+    , visits =
+        response.stores
+            |> List.filterMap
+                (\store ->
+                    response.visits
+                        |> List.filter (\v -> v.match == Matched store.id)
+                        |> List.map .tapTs
+                        |> List.minimum
+                        |> Maybe.map (\at -> { planned = store.arrive, at = at })
+                )
+    , weather =
+        response.weather
+            |> Maybe.map
+                (\w ->
+                    { summary = w.summary
+                    , temperatureF = w.temperatureF
+                    , feelsLikeF = w.feelsLikeF
+                    , windMph = w.windMph
+                    , gustMph = w.gustMph
+                    , windFrom = w.windFrom
+                    }
+                )
+    , sun = Just response.sun
+    , latestPost =
+        List.head response.posts
+            |> Maybe.map
+                (\post ->
+                    { at = post.ts
+                    , kind =
+                        case post.content of
+                            Text text ->
+                                Status.TextPost text
+
+                            Photo _ _ ->
+                                Status.PhotoPost
+
+                            Video _ _ ->
+                                Status.VideoPost
+
+                            Pair _ ->
+                                Status.VideoPost
+
+                            Voice _ ->
+                                Status.VoicePost
+                    }
+                )
+    , radio = radioNow model |> Maybe.map (\{ title, artist } -> { title = title, artist = artist })
+    }
 
 
 viewStatus : Model -> Html Msg
