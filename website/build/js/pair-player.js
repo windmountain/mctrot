@@ -5,8 +5,9 @@
 // cameras halfway through, and the pair's order (set on the upload page)
 // picks one.
 //
-// - On a narrow screen (a phone): that one cut, with the browser's own
-//   video controls.
+// - On a narrow screen (a phone), or when the browser says to save data
+//   (Data Saver: navigator.connection.saveData): that one cut, with the
+//   browser's own video controls.
 // - On a wide screen: both clips side by side, first camera on the left,
 //   playing in sync with one set of controls. Browsers have no built-in
 //   way to group two videos under one set of controls (HTML once had
@@ -19,19 +20,19 @@
 // The first clip is the leader: its sound plays and the other follows it.
 
 const WIDE = "(min-width: 48rem)";
+// Two videos download twice as much: not for someone saving data.
+const savingData = () => Boolean(navigator.connection && navigator.connection.saveData);
 const DRIFT_S = 0.12; // resync the follower when it drifts more than this
 
 const css = `
   :host { display: block; }
-  video { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; background: #000; border-radius: 6px; }
+  video { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; background: #000; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-  .pair video { border-radius: 0; height: 100%; }
-  .pair video:first-child { border-radius: 6px 0 0 0; }
-  .pair video:last-child { border-radius: 0 6px 0 0; }
+  .pair video { height: 100%; }
   .wrap:fullscreen { background: #000; display: flex; flex-direction: column; justify-content: center; }
   .wrap:fullscreen video { max-height: calc(100vh - 3rem); }
   .controls { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #111; color: #fff;
-    border-radius: 0 0 6px 6px; font: 0.85rem/1 -apple-system, Helvetica, Arial, sans-serif; }
+    font: 0.85rem/1 -apple-system, Helvetica, Arial, sans-serif; }
   button { font: inherit; color: inherit; background: none; border: 0; padding: 4px 6px; cursor: pointer; min-width: 2rem; }
   button:focus-visible, input:focus-visible { outline: 2px solid #FFD100; outline-offset: 2px; }
   .seek { flex: 1; accent-color: #FFD100; min-width: 4rem; }
@@ -77,7 +78,7 @@ class McTrotPair extends HTMLElement {
       this.pending = false;
       this.stop?.();
       this.stop = null;
-      if (this.wide.matches) this.renderPair();
+      if (this.wide.matches && !savingData()) this.renderPair();
       else this.renderCut();
     });
   }
