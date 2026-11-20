@@ -3,9 +3,9 @@ module Guests exposing (Model, Msg, init, poll, update, viewPost, viewSignOut)
 {-| Likes and comments under each post on /live, from guests who signed in
 with an emailed code at api.mctrot.nyc/account (recorder/api/src/guests/).
 
-Its own module so the feature comes out cleanly: Live.elm only keeps a
-Model, forwards Msgs, and calls viewPost under each post. While the server
-has no guest routes (a 404, or no answer), nothing is shown at all.
+Its own module: Live.elm only keeps a Model, forwards Msgs, and calls
+viewPost under each post. Guest accounts are always on at the recorder;
+until the first feed arrives, nothing is shown under posts.
 
 A guest who clicks the heart or "Add a comment…" while signed out goes to sign
 in with what they wanted in the return address's fragment (#like=<post>
@@ -41,8 +41,11 @@ import Url
 -- MODEL
 
 
+{-| Loading until the first feed arrives; then On, for good (a failed
+poll keeps what's shown).
+-}
 type Model
-    = Off Config
+    = Loading Config
     | On Config Feed Ui
 
 
@@ -161,7 +164,7 @@ emptyUi =
 -}
 init : String -> String -> ( Model, Cmd Msg )
 init api hash =
-    ( Off { api = api, after = intentFromHash hash }, fetchFeed api )
+    ( Loading { api = api, after = intentFromHash hash }, fetchFeed api )
 
 
 poll : Model -> Cmd Msg
@@ -172,7 +175,7 @@ poll model =
 configOf : Model -> Config
 configOf model =
     case model of
-        Off config ->
+        Loading config ->
             config
 
         On config _ _ ->
@@ -211,12 +214,8 @@ update msg model =
         ( GotFeed (Ok feed), On config _ ui ) ->
             resume config feed ui
 
-        ( GotFeed (Ok feed), Off config ) ->
+        ( GotFeed (Ok feed), Loading config ) ->
             resume config feed emptyUi
-
-        ( GotFeed (Err (Http.BadStatus 404)), _ ) ->
-            -- Guests are off on this server.
-            ( Off (configOf model), Cmd.none )
 
         ( GotFeed (Err _), _ ) ->
             -- Keep what's shown; the next poll retries.
@@ -515,7 +514,7 @@ page's address, for after signing in.
 viewPost : String -> String -> Model -> Html Msg
 viewPost back postId model =
     case model of
-        Off _ ->
+        Loading _ ->
             Html.text ""
 
         On _ feed ui ->
@@ -619,7 +618,7 @@ viewSignOut model =
             else
                 Html.button [ Attr.class "guest-signout", Attr.type_ "button", Events.onClick SignOut ] [ Html.text "Sign out" ]
 
-        Off _ ->
+        Loading _ ->
             Html.text ""
 
 
