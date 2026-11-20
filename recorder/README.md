@@ -418,6 +418,11 @@ clock says it is; the API reads it on the next `/live`. No deploy needed.
 Liquidsoap and the API both treat a program whose show file isn't there
 as off air.
 
+- **Every day:** the show airs daily at the program's time of day, not
+  only on its `--date`. Liquidsoap restarts itself a second after each
+  day's show ends (a second or two of silence) to line up the next; the
+  API's now playing says "before" tomorrow's. Days are 24 hours, so a
+  daylight saving change shifts it an hour.
 - **Before the show:** a holding loop (ten seconds of synthesized lounge
   music, `station/holding.py`, made when the box is built), titled with the program's
   "On air at 5:00 AM"; **after it:** the same, titled "Off air".

@@ -8,6 +8,9 @@
 #
 # A new program.json restarts this (host/radio.nix watches it).
 #
+# It airs every day at the program's time of day, not only on its date,
+# and restarts itself after each day's show to line up the next.
+#
 # Every listener hears the same moment: started mid-show (a restart, a
 # deploy, a new program), the show picks up at now − startsAt, by cueing
 # the file in. Before the show, and after it, a holding loop plays (ten
@@ -67,9 +70,18 @@ if program.file != "" and not has_show then
   log.important(label="program", "#{show_path} isn't there (upload it before program.json), so holding.")
 end
 
+# The show airs every day at the program's time, not only on its date:
+# today's, if it's on or still to come, else tomorrow's. (Days are 24
+# hours, so across a daylight saving change it airs an hour off.)
+day = 86400.
 started = time()
-on_air_now = has_show and started >= program.startsAt and started < program.endsAt
-cue = if on_air_now then started - program.startsAt else 0. end
+length = program.endsAt - program.startsAt
+latest = program.startsAt + day * floor((started - program.startsAt) / day)
+starts = if started >= latest + length then latest + day else latest end
+ends = starts + length
+
+on_air_now = has_show and started >= starts and started < ends
+cue = if on_air_now then started - starts else 0. end
 if on_air_now then
   log.important(label="program", "Joining the show #{cue} s in.")
 end
@@ -80,7 +92,16 @@ show = single(id="show", if has_show then "annotate:liq_cue_in=#{cue}:#{show_pat
 hold = single(id="hold", holding)
 
 def on_air() =
-  has_show and time() >= program.startsAt and time() < program.endsAt
+  has_show and time() >= starts and time() < ends
+end
+
+# Once today's show is over, stop: systemd starts this again (a second or
+# two of silence), which lines up tomorrow's.
+if has_show then
+  thread.run(delay=ends - started + 1., fun () -> begin
+    log.important(label="program", "Today's show is over; restarting for tomorrow's.")
+    shutdown()
+  end)
 end
 
 radio = switch(id="radio", track_sensitive=false, [(on_air, show), ({true}, hold)])
@@ -94,12 +115,12 @@ count = list.length(program.entries)
 
 def now_playing() =
   t = time()
-  if t < program.startsAt and has_show then
+  if t < starts and has_show then
     (program.before.artist, program.before.title)
-  elsif t >= program.endsAt or not has_show then
+  elsif t >= ends or not has_show then
     (program.after.artist, program.after.title)
   else
-    offset = t - program.startsAt
+    offset = t - starts
     # The last entry starting at or before now.
     i = list.length(list.filter(fun (e) -> e.offset <= offset, program.entries)) - 1
     e = list.nth(program.entries, max(0, min(i, count - 1)))

@@ -41,12 +41,35 @@ test("an entry starts on its first millisecond", () => {
   assert.equal(nowPlaying(PROGRAM, at(240.499))?.current.title, "Are You Ready To Fly");
 });
 
-test("the last entry's next is off air; after the show there's nothing next", () => {
+test("the last entry's next is off air", () => {
   assert.equal(nowPlaying(PROGRAM, at(597))?.next?.title, "Off air");
+});
+
+const DAY = 86400;
+
+test("after the show: holding until tomorrow's", () => {
   const after = nowPlaying(PROGRAM, at(600));
-  assert.equal(after?.status, "after");
-  assert.deepEqual(after?.current, { artist: "McTrot radio", title: "Off air", album: null, year: null, from: at(600), to: null, kind: "holding" });
-  assert.equal(after?.next, null);
+  assert.equal(after?.status, "before");
+  assert.equal(after?.startsAt, at(DAY));
+  assert.deepEqual(after?.current, { artist: "McTrot radio", title: "On air at 5:00 AM", album: null, year: null, from: null, to: at(DAY), kind: "holding" });
+  assert.equal(after?.next?.title, "Are You Ready To Fly");
+});
+
+test("it airs every day at the same time, before its date and after", () => {
+  for (const days of [-2, -1, 1, 7]) {
+    const radio = nowPlaying(PROGRAM, at(days * DAY + 300));
+    assert.equal(radio?.status, "on", `${days} days`);
+    assert.equal(radio?.startsAt, at(days * DAY));
+    assert.equal(radio?.current.title, "I Feel Love");
+    assert.equal(radio?.current.from, at(days * DAY + 240.5));
+  }
+  assert.equal(nowPlaying(PROGRAM, at(-DAY + 600))?.startsAt, at(0), "yesterday's over: today's next");
+});
+
+test("no entries: off air", () => {
+  const radio = nowPlaying({ ...PROGRAM, entries: [] }, at(300));
+  assert.equal(radio?.status, "after");
+  assert.equal(radio?.next, null);
 });
 
 test("no program: no radio", () => {

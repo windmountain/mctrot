@@ -815,19 +815,20 @@
                 "before",
                 "on",
                 "after"
-              ]
+              ],
+              "description": "after: only with no entries, now the show airs daily"
             },
             "startsAt": {
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991,
-              "description": "The show's start, ms since epoch"
+              "description": "Today's show's start (or tomorrow's, once today's is over), ms since epoch"
             },
             "endsAt": {
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991,
-              "description": "The show's end, ms since epoch"
+              "description": "That show's end, ms since epoch"
             },
             "current": {
               "type": "object",

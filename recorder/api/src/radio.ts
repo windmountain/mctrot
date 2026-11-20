@@ -77,9 +77,9 @@ const Slot = z.object({
 
 export const Radio = z
   .object({
-    status: z.enum(["before", "on", "after"]),
-    startsAt: ms("The show's start"),
-    endsAt: ms("The show's end"),
+    status: z.enum(["before", "on", "after"]).describe("after: only with no entries, now the show airs daily"),
+    startsAt: ms("Today's show's start (or tomorrow's, once today's is over)"),
+    endsAt: ms("That show's end"),
     current: Slot.describe("What's on now"),
     next: Slot.nullable().describe("What's on at current.to; null after the show"),
   })
@@ -88,8 +88,23 @@ export const Radio = z
 
 export type Radio = z.infer<typeof Radio>;
 
-export function nowPlaying(program: RadioProgram | null, now: number): Radio {
-  if (program === null) return null;
+const DAY = 86400;
+
+// The show airs every day at the program's time, not only on its date
+// (station/program.liq does the same): today's, if it's on or still to
+// come, else tomorrow's. Days are 24 hours, so across a daylight saving
+// change it airs an hour off.
+export function daily(program: RadioProgram, now: number): RadioProgram {
+  const length = program.endsAt - program.startsAt;
+  const t = now / 1000;
+  let startsAt = program.startsAt + DAY * Math.floor((t - program.startsAt) / DAY);
+  if (t >= startsAt + length) startsAt += DAY;
+  return { ...program, startsAt, endsAt: startsAt + length };
+}
+
+export function nowPlaying(original: RadioProgram | null, now: number): Radio {
+  if (original === null) return null;
+  const program = daily(original, now);
   const startsAt = Math.round(program.startsAt * 1000);
   const endsAt = Math.round(program.endsAt * 1000);
   const slot = (i: number): z.infer<typeof Slot> => {
