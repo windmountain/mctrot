@@ -384,7 +384,7 @@ Filled versions with a meaningful color are preferred over outlines.
 
 | Use                  | Icon                              | Color                                  |
 |----------------------|-----------------------------------|----------------------------------------|
-| Radio play           | `play--filled`                    | yellow disc, black ▶ (its inner path)  |
+| Radio play           | `play--filled`                    | black disc, yellow ▶ on the yellow stripe (a yellow disc wouldn't show there); yellow disc, black ▶ elsewhere |
 | Radio stop           | `stop--filled`                    | black disc, yellow ■ (inner square added by us) |
 | Like, off / on       | `favorite` / `favorite--filled`   | black outline → red (`--signal`)       |
 | Map zoom             | `add--filled` / `subtract--filled`| black disc, white + / −                |
@@ -394,6 +394,24 @@ Filled versions with a meaningful color are preferred over outlines.
 
 Color meaning: yellow is play or go, red is something that happened
 (liked, visited), black is a plain control.
+
+## As built (branch `live-redesign`, 2026-11-20)
+
+Where the build differs from the above, or settles something it left
+open:
+
+- The play icon on the stripe is a black disc with a yellow ▶ (see
+  Icons).
+- The radio links button shows the `link` icon and the word "Links".
+- The timeline's track runs from the hour the plan starts in to the hour
+  after it ends, so every stop is an hour line. Posts on it are grouped
+  within 10 minutes of each other.
+- Stats' Plan tile, small, lists from the latest McDonald's visited on;
+  maximized, it opens scrolled to the next stop.
+- Posts on the timeline no longer need a place (they used to be placed
+  by latitude).
+- Pinch and double-tap are tested with synthetic touch events only; tune
+  on a phone.
 
 ## Later
 
