@@ -208,25 +208,20 @@
     .radio { position: sticky; bottom: 0; z-index: 5; background: var(--accent); color: var(--ink);
       padding-bottom: env(safe-area-inset-bottom); }
     .radio-bar { display: flex; align-items: stretch; height: var(--stripe-h); }
-    .radio button { position: relative; font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; color: inherit;
-      background: none; border: 0; padding: 0 var(--space-4); cursor: pointer; }
-    .radio button::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--stripe-h) - var(--control-h)); bottom: 0; }
+    .radio button, .radio-home { position: relative; font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; color: inherit;
+      background: none; border: 0; padding: 0 var(--space-4); cursor: pointer; text-decoration: none; }
+    .radio button::before, .radio-home::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--stripe-h) - var(--control-h)); bottom: 0; }
     .radio-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); text-align: left; }
     /* On the yellow stripe, play and stop are black discs with a yellow
        symbol (a yellow disc wouldn't show). */
     .radio .icon .icon-disc { fill: var(--ink); }
     .radio .icon .icon-glyph { fill: var(--accent); }
-    .radio-links-button { display: flex; align-items: center; gap: var(--space-1); }
-    .radio-links-button .icon { width: 16px; height: 16px; }
+    /* Links: to radio.mctrot.nyc, in a new tab. */
+    .radio-home { display: flex; align-items: center; gap: var(--space-1); }
+    .radio-home .icon { width: 16px; height: 16px; }
     .radio-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .radio-volume { align-self: center; width: 5rem; accent-color: var(--ink); }
     .radio button:focus-visible, .radio input:focus-visible, .radio a:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
-    .radio-links { position: absolute; right: var(--space-4); bottom: calc(100% + var(--space-2)); width: min(20rem, calc(100vw - 32px));
-      box-sizing: border-box; margin: 0; background: var(--paper); color: var(--ink); border: var(--strong); padding: var(--space-3); }
-    .radio-links dt { font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; margin-top: var(--space-2); }
-    .radio-links dt:first-child { margin-top: 0; }
-    .radio-links dd { margin: var(--space-1) 0 0; font: var(--t-helper); overflow-wrap: anywhere; }
-    .radio-links a { color: var(--ink); }
     .live-sun { margin: 1rem auto 0; border-collapse: collapse; font-size: 0.9em; }
     .live-sun caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
     .live-sun th, .live-sun td { text-align: left; padding: 0.15rem 0.75rem 0.15rem 0; font-variant-numeric: tabular-nums; }
@@ -356,7 +351,7 @@
   </noscript>
 
   <script src="/js/pair-player.js?v=a92a0ea6eb"></script>
-  <script src="/js/live.js?v=961e1fbe85"></script>
+  <script src="/js/live.js?v=d5f1975645"></script>
   <script>
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.

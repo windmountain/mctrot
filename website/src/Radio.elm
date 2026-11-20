@@ -1,8 +1,9 @@
-port module Radio exposing (Flags, Model, Msg, NowPlaying, OnAir, announce, init, links, nowPlaying, onAirDecoder, subscriptions, update, view)
+port module Radio exposing (Flags, Model, Msg, NowPlaying, OnAir, announce, init, nowPlaying, onAirDecoder, subscriptions, update, view)
 
 {-| The radio player along the bottom of /live's screen: play and stop McTrot
-radio (recorder/host/radio.nix), set the volume, and find its links for
-other players.
+radio (recorder/host/radio.nix), set the volume, and go to the station's
+own page (radio.mctrot.nyc: a full-page player, and the links for other
+players).
 
 Elm can't drive audio itself, so it sends commands out through a port
 (`radioOut`) to a few lines of JavaScript in live.html that own an
@@ -28,20 +29,16 @@ port radioOut : Encode.Value -> Cmd msg
 port radioIn : (Decode.Value -> msg) -> Sub msg
 
 
-{-| The station: the stream the page plays, and playlists pointing at
-it for players that want one.
+{-| The station: the stream the page plays, and its home page.
 -}
 stream : String
 stream =
     "https://radio.mctrot.nyc/live.mp3"
 
 
-links : List ( String, String )
-links =
-    [ ( "Stream (MP3)", stream )
-    , ( "Playlist (M3U)", "https://radio.mctrot.nyc/live.m3u" )
-    , ( "Playlist (PLS)", "https://radio.mctrot.nyc/live.pls" )
-    ]
+home : String
+home =
+    "https://radio.mctrot.nyc/"
 
 
 {-| `volumeAdjustable` is False on iPhones and iPads: there the hardware
@@ -139,7 +136,6 @@ type alias Model =
     { volumeAdjustable : Bool
     , state : State
     , volume : Float
-    , showingLinks : Bool
     }
 
 
@@ -148,7 +144,6 @@ init flags =
     { volumeAdjustable = flags.volumeAdjustable
     , state = Stopped
     , volume = 0.8
-    , showingLinks = False
     }
 
 
@@ -156,7 +151,6 @@ type Msg
     = Play
     | Stop
     | SetVolume Float
-    | ToggleLinks
     | FromAudio Decode.Value
 
 
@@ -171,9 +165,6 @@ update msg model =
 
         SetVolume volume ->
             ( { model | volume = volume }, command "volume" [ ( "volume", Encode.float volume ) ] )
-
-        ToggleLinks ->
-            ( { model | showingLinks = not model.showingLinks }, Cmd.none )
 
         FromAudio value ->
             case Decode.decodeValue audioEvent value of
@@ -259,8 +250,9 @@ subscriptions _ =
 
 {-| The player, as one line along the bottom of the screen (live.html,
 .radio): play or stop at the left, with what's on, or how tuning in's
-going, or what went wrong; the volume where a page can set it; and Links,
-whose panel opens upward. The whole left part is the play/stop button.
+going, or what went wrong; the volume where a page can set it; and Links
+at the right, to radio.mctrot.nyc (its full-page player and the links for
+other players), in a new tab so the walk stays open. The whole left part is the play/stop button.
 `now` is the server's clock, ms since the epoch (unused since the stripe
 lost its progress bar; kept so callers needn't change).
 -}
@@ -270,22 +262,25 @@ view _ playing model =
         on =
             model.state /= Stopped
 
+        station rest =
+            [ Html.text ("Radio · " ++ rest) ]
+
         label =
             case ( model.state, playing ) of
                 ( Connecting, _ ) ->
-                    "Radio · Tuning in…"
+                    station "Tuning in…"
 
                 ( Failed message, _ ) ->
-                    "Radio · " ++ message
+                    station message
 
                 ( Playing, Just { title, artist } ) ->
-                    "Now: " ++ title ++ " — " ++ artist
+                    [ Html.text ("Now: " ++ title ++ " — " ++ artist) ]
 
                 ( Playing, Nothing ) ->
-                    "Radio · On"
+                    station "On"
 
                 ( Stopped, _ ) ->
-                    "Radio · Off"
+                    station "Off"
     in
     Html.aside [ Attr.class "radio", Attr.attribute "aria-label" "Radio" ]
         [ Html.div [ Attr.class "radio-bar" ]
@@ -321,7 +316,7 @@ view _ playing model =
                      else
                         Icon.Play
                     )
-                , Html.span [ Attr.class "radio-label", Attr.attribute "aria-live" "polite" ] [ Html.text label ]
+                , Html.span [ Attr.class "radio-label", Attr.attribute "aria-live" "polite" ] label
                 ]
             , if model.volumeAdjustable then
                 Html.input
@@ -338,41 +333,15 @@ view _ playing model =
 
               else
                 Html.text ""
-            , Html.button
-                [ Attr.class "radio-links-button"
-                , Attr.type_ "button"
-                , Attr.attribute "aria-expanded"
-                    (if model.showingLinks then
-                        "true"
-
-                     else
-                        "false"
-                    )
-                , Events.onClick ToggleLinks
+            , Html.a
+                [ Attr.class "radio-home"
+                , Attr.href home
+                , Attr.target "_blank"
+                , Attr.rel "noopener"
                 ]
-                [ Icon.view Icon.Link, Html.text "Links" ]
+                [ Icon.view Icon.Earth, Html.text "Links" ]
             ]
-        , if model.showingLinks then
-            viewLinks
-
-          else
-            Html.text ""
         ]
-
-
-{-| McTrot radio's addresses, for VLC, Apple Music and radio apps.
--}
-viewLinks : Html Msg
-viewLinks =
-    Html.dl [ Attr.class "radio-links" ]
-        (List.concatMap
-            (\( label, url ) ->
-                [ Html.dt [] [ Html.text label ]
-                , Html.dd [] [ Html.a [ Attr.href url ] [ Html.text url ] ]
-                ]
-            )
-            links
-        )
 
 
 isFailed : State -> Bool

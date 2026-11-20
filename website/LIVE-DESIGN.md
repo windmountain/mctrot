@@ -389,7 +389,7 @@ Filled versions with a meaningful color are preferred over outlines.
 | Like, off / on       | `favorite` / `favorite--filled`   | black outline → red (`--signal`)       |
 | Map zoom             | `add--filled` / `subtract--filled`| black disc, white + / −                |
 | Close a box          | `close--filled`                   | black disc, white ×                    |
-| Radio links          | `link`                            | black outline                          |
+| Radio links          | `earth`                           | black outline                          |
 | Tile maximize/restore| `maximize` / `minimize`           | black outline                          |
 
 Color meaning: yellow is play or go, red is something that happened
@@ -402,7 +402,9 @@ open:
 
 - The play icon on the stripe is a black disc with a yellow ▶ (see
   Icons).
-- The radio links button shows the `link` icon and the word "Links".
+- The radio stripe's Links shows the `launch` icon and goes straight to radio.mctrot.nyc
+  (recorder/radio-site/: a full-page player and the links for other
+  players) in a new tab; there's no links panel.
 - The timeline's track runs from the hour the plan starts in to the hour
   after it ends, so every stop is an hour line. Posts on it are grouped
   within 10 minutes of each other.
