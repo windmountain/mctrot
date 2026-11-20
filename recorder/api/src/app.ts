@@ -50,9 +50,10 @@ export type AppDeps = {
   mediaDir: string;
   // McTrot radio's program, for now playing (src/radio.ts); none: off air.
   radioProgram?: () => RadioProgram | null;
-  // Guest accounts (src/guests/): set to turn them on. siteOrigin is the
-  // public site whose /live calls them (https://mctrot.nyc).
-  guests?: { siteOrigin: string; mailer: Mailer };
+  // Guest accounts (src/guests/), always on. siteOrigin is the public
+  // site whose /live calls them (https://mctrot.nyc); mailer sends their
+  // sign-in codes.
+  guests: { siteOrigin: string; mailer: Mailer };
   logger?: boolean;
 };
 
@@ -109,9 +110,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const session = { origin: deps.origin };
   const passkeys = { origin: deps.origin, rpID: deps.rpID };
   const app = Fastify({ logger: deps.logger ?? false });
-  // Without a session secret, a random one keeps the cookie plugin working,
-  // but sign-in refuses anyway (see /auth/token and /auth/login/verify).
-  await app.register(cookie, { secret: deps.sessionSecret ?? crypto.randomUUID() });
+  // Without a session secret (only ever locally), a random one keeps the
+  // cookie plugin and guest accounts working until a restart; the upload
+  // page's sign-in refuses anyway (see /auth/token and /auth/login/verify).
+  const secret = deps.sessionSecret ?? crypto.randomUUID();
+  await app.register(cookie, { secret });
 
   const writer = (req: Parameters<typeof requireWriter>[2], reply: Parameters<typeof requireWriter>[3]) =>
     requireWriter(ingestToken, session, req, reply);
@@ -232,18 +235,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   registerUploads(app, db, deps.uploadDir, writer);
 
-  // Guests who like and comment (src/guests/). Needs the session secret,
-  // which also hashes their sign-in codes.
-  if (deps.guests && deps.sessionSecret !== undefined) {
-    await registerGuests(app, {
-      db,
-      secret: deps.sessionSecret,
-      apiOrigin: deps.origin,
-      siteOrigin: deps.guests.siteOrigin,
-      mailer: deps.guests.mailer,
-      writer,
-    });
-  }
+  // Guests who like and comment (src/guests/). The session secret also
+  // hashes their sign-in codes.
+  await registerGuests(app, {
+    db,
+    secret,
+    apiOrigin: deps.origin,
+    siteOrigin: deps.guests.siteOrigin,
+    mailer: deps.guests.mailer,
+    writer,
+  });
 
   // Where uploaded posts are: "processing" until the worker is done. The
   // upload page polls this for what's in its outbox.

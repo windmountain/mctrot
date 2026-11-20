@@ -46,23 +46,22 @@ function readSecret(name: string): string | undefined {
 const ingestToken = readSecret("ingest-token") ?? (env.MCTROT_INGEST_TOKEN || undefined);
 const sessionSecret = readSecret("session-secret") ?? (env.MCTROT_SESSION_SECRET || undefined);
 
-// Guest accounts (src/guests/): on with MCTROT_GUESTS=on. Codes go out
-// through Mailgun when its API key is a credential; locally, without one,
-// they're printed to the log instead.
-const guestsOn = env.MCTROT_GUESTS === "on";
+// Guest accounts (src/guests/), always on. Codes go out through Mailgun
+// when its API key is a credential; without one (locally), they're printed
+// to the log instead.
 const siteOrigin = env.MCTROT_SITE_ORIGIN ?? "http://localhost:8000";
 const mailgunKey = readSecret("mailgun-api-key") ?? (env.MCTROT_MAILGUN_API_KEY || undefined);
-const mailer: Mailer | undefined = mailgunKey
+const mailer: Mailer = mailgunKey
   ? mailgun({
       baseUrl: env.MCTROT_MAILGUN_URL ?? "https://api.eu.mailgun.net",
       domain: env.MCTROT_MAILGUN_DOMAIN ?? "mg.mctrot.nyc",
       apiKey: mailgunKey,
       from: env.MCTROT_MAIL_FROM ?? "McTrot <noreply@mg.mctrot.nyc>",
     })
-  : env.NODE_ENV === "production"
-    ? undefined
-    : logMailer((message) => console.log(message));
-if (guestsOn && !mailer) console.warn("MCTROT_GUESTS=on but no mailgun-api-key: guest accounts stay off");
+  : logMailer((message) => console.log(message));
+if (!mailgunKey && env.NODE_ENV === "production") {
+  console.warn("no mailgun-api-key: guests' sign-in codes are only printed to this log, not emailed");
+}
 
 const plan = loadPlan(planPath);
 const { db, archived } = openDb(dbPath, resetPolicy);
@@ -80,7 +79,7 @@ const app = await buildApp({
   mediaUrl,
   mediaDir,
   radioProgram: programReader(radioPath, (message) => console.warn(message)),
-  guests: guestsOn && mailer ? { siteOrigin, mailer } : undefined,
+  guests: { siteOrigin, mailer },
   logger: true,
 });
 if (archived) {

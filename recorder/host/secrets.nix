@@ -14,8 +14,7 @@
     secrets.ingest-token = { };
     # Signs the upload page's session cookie (api/src/session.ts).
     secrets.session-secret = { };
-    # Sends guests' sign-in codes (api/src/guests/mail.ts); only with
-    # recorder.guests on, so the box deploys before the secret exists.
-    secrets.mailgun-api-key = lib.mkIf config.recorder.guests { };
+    # Sends guests' sign-in codes (api/src/guests/mail.ts).
+    secrets.mailgun-api-key = { };
   };
 }

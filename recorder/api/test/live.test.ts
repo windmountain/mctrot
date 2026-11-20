@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { buildApp } from "../src/app.ts";
 import { openDb } from "../src/db.ts";
 import { LiveResponse, liveJsonSchema } from "../src/live.ts";
-import { auth, feature, setup } from "./helpers.ts";
+import { SITE, auth, feature, setup } from "./helpers.ts";
 
 test("GET /live before any points: position is null", async () => {
   const { app } = await setup();
@@ -62,6 +62,7 @@ test("GET /live without a route plan: no stores", async () => {
     uploadDir: (await import("node:os")).tmpdir(),
     mediaUrl: "http://localhost/media",
     mediaDir: (await import("node:os")).tmpdir(),
+    guests: { siteOrigin: SITE, mailer: async () => {} },
   });
   const body = (await app.inject({ url: "/live" })).json();
   assert.deepEqual(body.stores, []);
@@ -95,6 +96,7 @@ test("GET /live has the plan: stores in order with planned times, and the planne
     uploadDir: (await import("node:os")).tmpdir(),
     mediaUrl: "http://localhost/media",
     mediaDir: (await import("node:os")).tmpdir(),
+    guests: { siteOrigin: SITE, mailer: async () => {} },
   });
   const body = (await app.inject({ url: "/live" })).json();
   assert.deepEqual(body.stores.map((s: { name: string }) => s.name), ["SLOPER", "STRADDLER"]);

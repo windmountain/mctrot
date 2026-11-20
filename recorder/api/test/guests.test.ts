@@ -62,14 +62,8 @@ async function signInWriter(app: App): Promise<string> {
   return String(Array.isArray(c) ? c[0] : c).split(";")[0]!;
 }
 
-test("guests are off unless configured", async () => {
-  const { app } = await setup();
-  assert.equal((await app.inject({ url: "/account" })).statusCode, 404);
-  assert.equal((await app.inject({ url: "/guests/feed" })).statusCode, 404);
-});
-
 test("sign up with an emailed code, then sign in again later", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const page = await s.app.inject({ url: "/account" });
   assert.match(page.body, /Email me a code/);
 
@@ -98,7 +92,7 @@ test("sign up with an emailed code, then sign in again later", async () => {
 });
 
 test("signing out from /live, and only from the site", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const live = await signUp(s);
   const elsewhere = await s.app.inject({ method: "POST", url: "/guests/signout", headers: { cookie: live, origin: "https://evil.example" } });
   assert.equal(elsewhere.statusCode, 403);
@@ -110,7 +104,7 @@ test("signing out from /live, and only from the site", async () => {
 });
 
 test("a wrong code counts; five wrong and it's gone", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   await s.app.inject({ method: "POST", url: "/account/code", headers: formHeaders, payload: form({ email: "a@b.co" }) });
   const right = lastCode(s.mail);
   const wrong = right === "000000" ? "111111" : "000000";
@@ -124,7 +118,7 @@ test("a wrong code counts; five wrong and it's gone", async () => {
 });
 
 test("codes can't be asked for again within a minute", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   for (let i = 0; i < 3; i++) {
     await s.app.inject({ method: "POST", url: "/account/code", headers: formHeaders, payload: form({ email: "a@b.co" }) });
   }
@@ -132,7 +126,7 @@ test("codes can't be asked for again within a minute", async () => {
 });
 
 test("forms from another origin are refused", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const res = await s.app.inject({
     method: "POST",
     url: "/account/code",
@@ -144,14 +138,14 @@ test("forms from another origin are refused", async () => {
 });
 
 test("back only ever goes to our own site", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const page = await s.app.inject({ url: "/account?back=https://evil.example/x" });
   assert.doesNotMatch(page.body, /evil/);
   assert.match(page.body, new RegExp(`${SITE}/live`));
 });
 
 test("the profile needs a name and the 16+ box", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   await s.app.inject({ method: "POST", url: "/account/code", headers: formHeaders, payload: form({ email: "a@b.co" }) });
   const v = await s.app.inject({ method: "POST", url: "/account/verify", headers: formHeaders, payload: form({ email: "a@b.co", code: lastCode(s.mail) }) });
   const cookie = cookieFrom(v);
@@ -171,7 +165,7 @@ test("the profile needs a name and the 16+ box", async () => {
 });
 
 test("likes are private; comments wait for approval; only the author sees them pending", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   await textPost(s.app);
   const fan = await signUp(s, "fan@example.com", "Fan");
   const other = await signUp(s, "other@example.com", "Other");
@@ -223,7 +217,7 @@ test("likes are private; comments wait for approval; only the author sees them p
 });
 
 test("likes and comments only on public posts, and need sign-in", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const fan = await signUp(s);
   const missing = await s.app.inject({ method: "POST", url: "/guests/likes", headers: fromSite(fan), payload: { postId: "nope", liked: true } });
   assert.equal(missing.statusCode, 404);
@@ -240,7 +234,7 @@ test("likes and comments only on public posts, and need sign-in", async () => {
 });
 
 test("anyone can report an approved comment; it goes back in the queue", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   await textPost(s.app);
   const fan = await signUp(s);
   const id = (await s.app.inject({ method: "POST", url: "/guests/comments", headers: fromSite(fan), payload: { postId: "p1", text: "hm" } })).json().id;
@@ -262,7 +256,7 @@ test("anyone can report an approved comment; it goes back in the queue", async (
 });
 
 test("download my data, then close the account: everything goes", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   await textPost(s.app);
   const fan = await signUp(s);
   await s.app.inject({ method: "POST", url: "/guests/likes", headers: fromSite(fan), payload: { postId: "p1", liked: true } });
@@ -292,7 +286,7 @@ test("download my data, then close the account: everything goes", async () => {
 });
 
 test("change email with a code sent to the new address", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const fan = await signUp(s);
   await signUp(s, "taken@example.com", "T");
   const taken = await s.app.inject({ method: "POST", url: "/account/email", headers: { ...formHeaders, cookie: fan }, payload: form({ email: "taken@example.com" }) });
@@ -312,7 +306,7 @@ test("change email with a code sent to the new address", async () => {
 });
 
 test("deleting a post deletes its likes and comments", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   await textPost(s.app);
   const fan = await signUp(s);
   await s.app.inject({ method: "POST", url: "/guests/likes", headers: fromSite(fan), payload: { postId: "p1", liked: true } });
@@ -324,7 +318,7 @@ test("deleting a post deletes its likes and comments", async () => {
 });
 
 test("preflight from the site is allowed", async () => {
-  const s = await setup({ ingestToken: TOKEN, guests: true });
+  const s = await setup({ ingestToken: TOKEN });
   const res = await s.app.inject({ method: "OPTIONS", url: "/guests/likes", headers: { origin: SITE, "access-control-request-method": "POST" } });
   assert.equal(res.statusCode, 204);
   assert.equal(res.headers["access-control-allow-origin"], SITE);

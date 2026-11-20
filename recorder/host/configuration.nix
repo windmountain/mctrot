@@ -42,10 +42,6 @@
   # change). See host/recorder.nix.
   recorder.live = false;
 
-  # Guest accounts: likes and comments on /live (api/src/guests/). Needs
-  # the mailgun-api-key secret in secrets/recorder.yaml first.
-  recorder.guests = true;
-
   # The route plan: the simulator's GPX download, saved next to this
   # folder's flake.nix (or a hand-written GPX for a test walk). See
   # host/recorder.nix. Without it, Visit taps have no stores to match.

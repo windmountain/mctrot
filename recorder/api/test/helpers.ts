@@ -24,11 +24,8 @@ export const ORIGIN = "https://api.example.test";
 
 export const SITE = "https://site.example.test";
 
-// setup({ ingestToken: TOKEN, guests: true }) turns guest accounts on;
-// their emails land in `mail` instead of being sent.
-export async function setup(
-  { ingestToken, guests = false }: { ingestToken?: string; guests?: boolean } = { ingestToken: TOKEN },
-) {
+// Guests' emails land in `mail` instead of being sent.
+export async function setup({ ingestToken }: { ingestToken?: string } = { ingestToken: TOKEN }) {
   const { db } = openDb(":memory:");
   const mail: Mail[] = [];
   const mediaDir = mkdtempSync(join(tmpdir(), "mctrot-media-"));
@@ -46,7 +43,7 @@ export async function setup(
     uploadDir: mkdtempSync(join(tmpdir(), "mctrot-uploads-")),
     mediaUrl: "https://media.example.test",
     mediaDir,
-    guests: guests ? { siteOrigin: SITE, mailer: async (m) => void mail.push(m) } : undefined,
+    guests: { siteOrigin: SITE, mailer: async (m) => void mail.push(m) },
   });
   return { db, app, mediaDir, mail };
 }
