@@ -552,6 +552,13 @@ type alias Model =
 
     -- The Stats tile filling the screen, if one is.
     , maximized : Maybe Tile
+
+    -- The timeline: how far it's scrolled (for its day strip), a mouse
+    -- drag of it (where the mouse was pressed, how far it was scrolled),
+    -- and whether it's been scrolled to now since the tab opened.
+    , timelineVisible : Maybe Burndown.Visible
+    , timelineDrag : Maybe ( Float, Float )
+    , timelinePlaced : Bool
     , focused : Maybe Focused
     , walked : List (List ( Float, Float ))
 
@@ -638,6 +645,9 @@ init flags =
       , touchStart = Nothing
       , lastTap = Nothing
       , maximized = Nothing
+      , timelineVisible = Nothing
+      , timelineDrag = Nothing
+      , timelinePlaced = False
       , focused = Nothing
       , walked = []
       }
@@ -670,6 +680,11 @@ type Msg
     | Focus Focused
     | GuestsMsg Guests.Msg
     | Maximize (Maybe Tile)
+    | TimelineScrolled Burndown.Visible
+    | TimelineJump Float
+    | TimelineDragStart Float Float
+    | TimelineDragTo Float
+    | TimelineDragEnd
     | NoOp
 
 
@@ -880,8 +895,15 @@ update msg model =
         -- A tab (or the title) clicked: switch views without reloading,
         -- so the radio keeps playing.
         Navigate route ->
-            ( { model | route = route }
-            , navigate { path = pathOf route, title = titleOf route }
+            ( { model | route = route, timelinePlaced = route == TimelineTab && model.latest /= Nothing }
+            , Cmd.batch
+                [ navigate { path = pathOf route, title = titleOf route }
+                , if route == TimelineTab then
+                    placeTimeline model
+
+                  else
+                    Cmd.none
+                ]
             )
 
         -- Back or Forward.
@@ -890,12 +912,48 @@ update msg model =
                 route =
                     routeFromPath path
             in
-            ( { model | route = route }
-            , setTitle (titleOf route)
+            ( { model | route = route, timelinePlaced = route == TimelineTab && model.latest /= Nothing }
+            , Cmd.batch
+                [ setTitle (titleOf route)
+                , if route == TimelineTab then
+                    placeTimeline model
+
+                  else
+                    Cmd.none
+                ]
             )
 
         NoOp ->
             ( model, Cmd.none )
+
+        TimelineScrolled visible ->
+            ( { model | timelineVisible = Just visible }, Cmd.none )
+
+        -- A tap or drag on the day strip: centre that part of the day (it
+        -- then settles on an hour).
+        TimelineJump fraction ->
+            ( model
+            , Browser.Dom.getViewportOf Burndown.scrollerId
+                |> Task.andThen (\v -> Browser.Dom.setViewportOf Burndown.scrollerId (fraction * v.scene.width - v.viewport.width / 2) 0)
+                |> Task.attempt (\_ -> NoOp)
+            )
+
+        -- Dragging the timeline with the mouse scrolls it (snapping off
+        -- meanwhile); let go and it settles on the nearest hour. (Touch
+        -- scrolls it natively.)
+        TimelineDragStart x left ->
+            ( { model | timelineDrag = Just ( x, left ) }, Cmd.none )
+
+        TimelineDragTo x ->
+            case model.timelineDrag of
+                Just ( from, left ) ->
+                    ( model, Browser.Dom.setViewportOf Burndown.scrollerId (left - (x - from)) 0 |> Task.attempt (\_ -> NoOp) )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        TimelineDragEnd ->
+            ( { model | timelineDrag = Nothing }, Cmd.none )
 
         -- The Plan opens scrolled to the next stop (with one done above
         -- it, for context).
@@ -947,11 +1005,23 @@ update msg model =
               }
             , Cmd.none
             )
+                |> placeTimelineOnce
                 |> announceRadio
 
         Tick now ->
             ( { model | now = Just now }, Cmd.none )
                 |> announceRadio
+
+
+{-| The first data on the Timeline tab: scroll it to now.
+-}
+placeTimelineOnce : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+placeTimelineOnce ( model, cmd ) =
+    if model.route == TimelineTab && not model.timelinePlaced then
+        ( { model | timelinePlaced = True }, Cmd.batch [ cmd, placeTimeline model ] )
+
+    else
+        ( model, cmd )
 
 
 {-| What's on McTrot radio now, by the server's clock.
@@ -1006,6 +1076,15 @@ subscriptions model =
         , -- Overland sends every 30 s, so polling faster shows nothing new.
           Time.every 15000 (\_ -> Poll)
         , Time.every 1000 Tick
+        , case model.timelineDrag of
+            Just _ ->
+                Sub.batch
+                    [ Browser.Events.onMouseMove (Decode.map TimelineDragTo (Decode.field "clientX" Decode.float))
+                    , Browser.Events.onMouseUp (Decode.succeed TimelineDragEnd)
+                    ]
+
+            Nothing ->
+                Sub.none
         , if model.drag == Nothing then
             Sub.none
 
@@ -1424,85 +1503,105 @@ plannedStart response =
 
 
 {-| A burndown chart of the McDonald's still to visit, plan against
-actual, under a time ruler (see Burndown).
+actual, scrolling sideways an hour at a time, with the posts as dots on the
+red line and the whole day small underneath (see Burndown).
 -}
 viewTimelineTab : Model -> List (Html Msg)
 viewTimelineTab model =
     case ( Maybe.map .response model.latest, serverNow model ) of
         ( Just response, Just now ) ->
-            let
-                stores =
-                    response.stores
-
-                latitudes =
-                    latitudeScale
-
-                firstVisits =
-                    stores
-                        |> List.filterMap
-                            (\store ->
-                                response.visits
-                                    |> List.filter (\v -> v.match == Matched store.id)
-                                    |> List.map .tapTs
-                                    |> List.minimum
-                            )
-            in
             [ Burndown.view
+                { scrolled = TimelineScrolled
+                , jump = TimelineJump
+                , dragStart = TimelineDragStart
+                , visible = model.timelineVisible
+                , dragging = model.timelineDrag /= Nothing
+                }
                 { items =
-                    postMoments (onWalkDay stores) response.posts
+                    postMoments (onWalkDay response.stores) response.posts
                         |> List.filterMap
                             (\posts ->
                                 case posts of
                                     newest :: _ ->
-                                        Maybe.map
-                                            (\( lat, _ ) ->
-                                                { at = onWalkDay stores newest.ts
-                                                , y = latitudes.y lat
-                                                , draw =
-                                                    \at ->
-                                                        let
-                                                            target =
-                                                                FocusedMoment (momentId posts)
-                                                        in
-                                                        Html.div []
-                                                            [ postDot model.focused target posts []
-                                                            , if model.focused == Just target then
-                                                                postsBox (Just now)
-                                                                    target
-                                                                    posts
-                                                                    [ ( "live-focus-left", at.x > 0.55 )
-                                                                    , ( "live-focus-below", at.y < 0.35 )
-                                                                    , ( "live-focus-above", at.y > 0.65 )
-                                                                    ]
-                                                                    []
+                                        Just
+                                            { at = onWalkDay response.stores newest.ts
+                                            , draw =
+                                                \at ->
+                                                    let
+                                                        target =
+                                                            FocusedMoment (momentId posts)
+                                                    in
+                                                    Html.div []
+                                                        [ postDot model.focused target posts []
+                                                        , if model.focused == Just target then
+                                                            postsBox (Just now)
+                                                                target
+                                                                posts
+                                                                [ ( "live-focus-left", at.x > 0.55 )
+                                                                , ( "live-focus-below", at.y < 0.35 )
+                                                                , ( "live-focus-above", at.y > 0.65 )
+                                                                ]
+                                                                []
 
-                                                              else
-                                                                Html.text ""
-                                                            ]
-                                                }
-                                            )
-                                            newest.at
+                                                          else
+                                                            Html.text ""
+                                                        ]
+                                            }
 
                                     [] ->
                                         Nothing
                             )
-                , axis = latitudes.axis
-                , key = "Posts, by latitude"
+                , key = "Posts"
                 }
-                { plan = List.filterMap .arrive stores
-                , planEnd =
-                    List.filterMap .depart stores
-                        ++ List.filterMap .arrive stores
-                        |> List.maximum
-                        |> Maybe.withDefault 0
-                , visits = firstVisits
-                , total = List.length stores
-                , now = now
-                }
+                (burndownInput now response)
             ]
 
         _ ->
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
+
+
+burndownInput : Int -> LiveResponse -> Burndown.Input
+burndownInput now response =
+    { plan = List.filterMap .arrive response.stores
+    , planEnd =
+        List.filterMap .depart response.stores
+            ++ List.filterMap .arrive response.stores
+            |> List.maximum
+            |> Maybe.withDefault 0
+    , visits = visitedStores response |> List.map Tuple.second
+    , total = List.length response.stores
+    , now = now
+    }
+
+
+{-| Scroll the timeline so now is a third of the way in from the left (it
+then settles on an hour).
+-}
+placeTimeline : Model -> Cmd Msg
+placeTimeline model =
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            case Burndown.track (burndownInput now response) of
+                Just ( start, end ) ->
+                    let
+                        fraction =
+                            clamp 0 1 (toFloat (now - start) / toFloat (max 1 (end - start)))
+                    in
+                    -- Then report what's on screen, for the day strip (there's
+                    -- no scroll event if it was already there).
+                    Browser.Dom.getViewportOf Burndown.scrollerId
+                        |> Task.andThen (\v -> Browser.Dom.setViewportOf Burndown.scrollerId (fraction * v.scene.width - v.viewport.width / 3) 0)
+                        |> Task.andThen (\_ -> Browser.Dom.getViewportOf Burndown.scrollerId)
+                        |> Task.attempt
+                            (Result.map (\v -> TimelineScrolled { left = v.viewport.x, width = v.viewport.width, scene = v.scene.width })
+                                >> Result.withDefault NoOp
+                            )
+
+                Nothing ->
+                    Cmd.none
+
+        _ ->
+            Cmd.none
 
 
 {-| Stats: tiles filling the screen, like windows (website/LIVE-DESIGN.md).
@@ -2712,25 +2811,19 @@ postsBox now target posts classes attributes =
         )
 
 
-{-| The posts with a place, gathered into moments for the timeline, by
-`timeOf` (see onWalkDay): each joins the newest moment (newest first) if
-within momentMinutes and momentDegrees (of latitude) of its newest post,
-or starts its own.
+{-| The posts gathered into moments for the timeline, by `timeOf` (see
+onWalkDay): each joins the newest moment (newest first) if within
+momentMinutes of its newest post, or starts its own.
 -}
 postMoments : (Int -> Int) -> List Post -> List (List Post)
 postMoments timeOf posts =
-    let
-        latitude post =
-            Maybe.map Tuple.first post.at |> Maybe.withDefault 0
-    in
     posts
-        |> List.filter (\post -> post.at /= Nothing)
         |> List.sortBy (.ts >> timeOf >> negate)
         |> List.foldl
             (\post moments ->
                 case moments of
                     (newest :: rest) :: others ->
-                        if timeOf newest.ts - timeOf post.ts <= momentMinutes * 60000 && abs (latitude newest - latitude post) <= momentDegrees then
+                        if timeOf newest.ts - timeOf post.ts <= momentMinutes * 60000 then
                             (newest :: rest ++ [ post ]) :: others
 
                         else
@@ -2744,45 +2837,11 @@ postMoments timeOf posts =
 
 
 {-| Posts this close in time share a dot on the timeline: about a dot's
-width on a phone, over a day's walk.
+width on a phone at three hours to a screen.
 -}
 momentMinutes : Int
 momentMinutes =
     10
-
-
-{-| And this close in latitude: about a dot's height (some 700 ft).
--}
-momentDegrees : Float
-momentDegrees =
-    0.002
-
-
-{-| The timeline's latitude axis (for posts; see Burndown.Marks): Manhattan
-from the Battery (40.70°) to Inwood's northern tip (40.88°), north at the
-top. `y` places a latitude, 0 (top) to 1 (bottom), held to the axis (a post
-off the island sits at its edge); `axis` labels every 0.05°: "40.75°".
--}
-latitudeScale : { y : Float -> Float, axis : List ( Float, String ) }
-latitudeScale =
-    let
-        south =
-            40.7
-
-        north =
-            40.88
-
-        y lat =
-            clamp 0 1 ((north - lat) / (north - south))
-
-        label hundredths =
-            String.fromInt (hundredths // 100) ++ "." ++ String.padLeft 2 '0' (String.fromInt (modBy 100 hundredths)) ++ "°"
-    in
-    { y = y
-    , axis =
-        List.range (ceiling (south * 20 - 1.0e-6)) (floor (north * 20 + 1.0e-6))
-            |> List.map (\twentieths -> ( y (toFloat twentieths / 20), label (twentieths * 5) ))
-    }
 
 
 {-| A time moved to the same time of day (New York's) on the walk's day,
