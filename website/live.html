@@ -129,42 +129,56 @@
     .burndown-actual { fill: none; stroke: #DA291C; stroke-width: 3px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .burndown-now { stroke: #000; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 
-    /* Stats: a grid filling the screen */
-    .tab-stats { overflow: auto; }
-    /* Phones: the cells one under another, as tall as they need, the page scrolling. Wider: Status and Conditions
-       side by side, as tall as they need, and the Plan full width under them; on a wide screen it fills the rest of
-       the screen, scrolling within. */
-    .stats-grid { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
-    @media (min-width: 34rem) {
-      .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
-    }
-    @media (min-width: 60rem) {
-      .stats-grid { height: 100%; grid-template-rows: auto minmax(0, 1fr); }
-    }
-    /* Rules drawn by each cell, so a part-filled last row stays white. */
-    .stats-cell { padding: 12px 16px; overflow: auto; box-shadow: 1px 0 0 var(--rule), 0 1px 0 var(--rule); }
-    .stats-cell h2 { margin: 0 0 6px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-1); }
-    /* Conditions: the solar time and weather, the sky, the sun's times, one under another. */
-    .stats-cell .live-weather, .stats-cell .live-sky { margin: 0 0 12px; }
-    .stats-cell .live-sky ul { max-width: 24rem; }
-    .stats-cell .live-sun { margin: 0; }
-    /* The plan: a full-width row of the grid, scrolling inside. Styled like
-       the simulator's printed schedule (.print-schedule, css/style.css). */
-    .stats-cell-plan { grid-column: 1 / -1; }
-    .plan-schedule { width: 100%; border-collapse: collapse; font-size: 0.85em; line-height: 1.3; }
-    .plan-schedule th { text-align: left; border-bottom: 1px solid var(--ink-1); position: sticky; top: -12px; background: #fff; }
-    .plan-schedule th, .plan-schedule td { padding: 2px 10px 2px 0; }
-    .plan-schedule tbody tr:nth-child(even) { background: #eee; }
-    .plan-time { font-variant-numeric: tabular-nums; }
-    .plan-diff { white-space: nowrap; }
-    .plan-ahead { color: #1a7f37; font-weight: bold; }
-    .plan-behind { color: #b42318; font-weight: bold; }
+    /* Stats: tiles filling the screen, 2px ink lines between them (the
+       grid's gap over an ink background). Two small tiles side by side,
+       then full-width ones; the Plan takes what's left. A maximized tile
+       takes all of it and scrolls. */
+    .tab-stats { overflow: hidden; }
+    .stats-tiles { box-sizing: border-box; height: 100%; display: grid; gap: 2px; background: var(--ink);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr); }
+    .stats-tile { background: var(--paper); padding: var(--space-3) var(--space-4); min-height: 0; overflow: hidden; cursor: pointer; }
+    .stats-tile-weather, .stats-tile-sun, .stats-tile-plan { grid-column: 1 / -1; }
+    .stats-maximized { grid-template-rows: minmax(0, 1fr); }
+    .stats-maximized .stats-tile { grid-column: 1 / -1; overflow: auto; cursor: auto; }
+    .stats-tile-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 var(--space-2); }
+    .stats-tile-head h2 { margin: 0; }
+    .stats-tile-toggle { display: flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h);
+      margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0; padding: 0; border: 0; background: none; color: var(--ink); cursor: pointer; }
+    .stats-tile-toggle .icon { width: 16px; height: 16px; }
+    .stats-tile p { margin: 0; }
+    .stats-big { margin: var(--space-1) 0 var(--space-1) !important; }
+    .stats-line { font: var(--t-body); color: var(--ink); }
+    /* The sky: tiny swatches, a label beside each. */
+    .stats-sky { list-style: none; padding: 0; margin: var(--space-2) 0 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font: var(--t-helper); color: var(--ink); }
+    .stats-sky li { display: flex; align-items: center; gap: var(--space-1); }
+    .stats-swatch { display: block; width: 12px; height: 12px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+    .stats-maximized .stats-swatch { width: 48px; height: 48px; }
+    .stats-maximized .stats-sky li { flex-direction: column; align-items: flex-start; }
+    /* The sun: sunrise, a bar with the sun on it now, sunset. */
+    .stats-sun { display: flex; align-items: center; gap: var(--space-2); }
+    .stats-sun-track { position: relative; flex: 1; height: 2px; background: var(--ink); }
+    .stats-sun-now { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--ink);
+      transform: translate(-50%, -50%); box-sizing: border-box; }
+    .stats-maximized .stats-line { margin: var(--space-3) 0 0; }
+    .stats-maximized .live-sun { margin: var(--space-3) 0 0; }
+    /* The plan: one line a stop; full screen, the actual time and the
+       address too, two lines a stop, the next one marked. */
+    .plan-list { list-style: none; margin: 0; padding: 0; }
+    .plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 3.5em; gap: 0 var(--space-3); align-items: baseline; padding: 2px 0;
+      font: var(--t-body); font-variant-numeric: tabular-nums; }
+    .plan-list-full .plan-row { grid-template-columns: minmax(0, 1fr) auto auto 3.5em; padding: var(--space-2) 0 var(--space-2) var(--space-4);
+      border-bottom: var(--hairline); position: relative; }
+    .plan-name { font: var(--t-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .plan-address { grid-column: 1 / -1; }
+    .plan-diff { text-align: right; font-weight: 700; }
+    .plan-ahead { color: #1a7f37; }
+    .plan-behind { color: var(--signal); }
+    .plan-done .plan-name { color: var(--ink-muted); }
+    .plan-list-full .plan-next::before { content: "▸"; position: absolute; left: 0; top: var(--space-2); }
 
     /* The overview (plain /live) */
     .live { max-width: var(--measure); margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
     .live-paragraph { margin: 0; font: var(--t-body); color: var(--ink); }
-    .live-status { margin: 0.25rem 0 0; min-height: 1.6em; }
-    .live-visits { margin: 0 0 1rem; min-height: 1.6em; }
     /* The radio (src/Radio.elm): one line pinned to the bottom of the
        screen, above the home indicator. Its buttons' tap areas reach 12px
        above the stripe, to 44px. */
@@ -190,18 +204,6 @@
     .radio-links dt:first-child { margin-top: 0; }
     .radio-links dd { margin: var(--space-1) 0 0; font: var(--t-helper); overflow-wrap: anywhere; }
     .radio-links a { color: var(--ink); }
-    .live-weather { margin: 0 0 1rem; }
-    .live-weather-when { opacity: 0.7; }
-    /* The sky tiles (src/Live.elm, viewSky): a row of five; on the
-       overview on a wide screen, a column pinned to the bottom-left corner. */
-    .live-sky { margin: 0 0 1rem; }
-    .live-sky ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
-    .live-sky li { font-size: 0.75em; line-height: 1.25; text-align: center; }
-    .live-sky-swatch { display: block; aspect-ratio: 1; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); margin-bottom: 0.25rem; }
-    @media (min-width: 64rem) {
-      .page-overview .live-sky { position: fixed; left: 16px; bottom: 16px; width: 3.5rem; margin: 0; z-index: 1; }
-      .page-overview .live-sky ul { grid-template-columns: 1fr; }
-    }
     .live-sun { margin: 1rem auto 0; border-collapse: collapse; font-size: 0.9em; }
     .live-sun caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
     .live-sun th, .live-sun td { text-align: left; padding: 0.15rem 0.75rem 0.15rem 0; font-variant-numeric: tabular-nums; }

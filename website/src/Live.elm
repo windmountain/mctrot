@@ -549,6 +549,9 @@ type alias Model =
     -- scroll; and the last tap, for a double-tap.
     , touchStart : Maybe Tap
     , lastTap : Maybe Tap
+
+    -- The Stats tile filling the screen, if one is.
+    , maximized : Maybe Tile
     , focused : Maybe Focused
     , walked : List (List ( Float, Float ))
 
@@ -634,6 +637,7 @@ init flags =
       , pinch = Nothing
       , touchStart = Nothing
       , lastTap = Nothing
+      , maximized = Nothing
       , focused = Nothing
       , walked = []
       }
@@ -665,7 +669,18 @@ type Msg
     | DragEnd
     | Focus Focused
     | GuestsMsg Guests.Msg
+    | Maximize (Maybe Tile)
     | NoOp
+
+
+{-| The Stats tab's tiles.
+-}
+type Tile
+    = ProgressTile
+    | PaceTile
+    | WeatherTile
+    | SunTile
+    | PlanTile
 
 
 {-| What's open in a little box: on the map, a McDonald's (by id) or the
@@ -881,6 +896,23 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+        -- The Plan opens scrolled to the next stop (with one done above
+        -- it, for context).
+        Maximize tile ->
+            ( { model | maximized = tile }
+            , if tile == Just PlanTile then
+                Task.map3
+                    (\row tileEl list -> list.viewport.y + row.element.y - tileEl.element.y - 120)
+                    (Browser.Dom.getElement "plan-next")
+                    (Browser.Dom.getElement "stats-plan")
+                    (Browser.Dom.getViewportOf "stats-plan")
+                    |> Task.andThen (\y -> Browser.Dom.setViewportOf "stats-plan" 0 (max 0 y))
+                    |> Task.attempt (\_ -> NoOp)
+
+              else
+                Cmd.none
+            )
 
         RadioMsg radioMsg ->
             Radio.update radioMsg model.radio
@@ -1193,11 +1225,6 @@ positionChip model =
             status model
 
 
-viewStatus : Model -> Html Msg
-viewStatus model =
-    Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ] [ Html.text (status model) ]
-
-
 {-| The map, filling the space between the tabs and the radio,
 mapTabStretch times as wide as Manhattan's true proportions (see viewMap),
 less as it's zoomed in (see stretchAt), and zoomable: + and - at its top
@@ -1478,247 +1505,366 @@ viewTimelineTab model =
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
 
 
-{-| A grid of cells filling the page. (How it subdivides and collapses
-comes in a later pass.)
+{-| Stats: tiles filling the screen, like windows (website/LIVE-DESIGN.md).
+Tapping one, or its maximize button, makes it fill the screen; its restore
+button puts it back. Only a maximized tile scrolls.
 -}
 viewStatsTab : Model -> List (Html Msg)
 viewStatsTab model =
-    let
-        response =
-            Maybe.map .response model.latest
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            let
+                tiles =
+                    [ ( ProgressTile, "Progress", viewProgressTile response )
+                    , ( PaceTile, "Pace", viewPaceTile response )
+                    , ( WeatherTile, "Weather", viewWeatherTile now response )
+                    , ( SunTile, "Sun", viewSunTile now response )
+                    , ( PlanTile, "Plan", viewPlanTile response )
+                    ]
 
-        cell title body =
-            Html.section [ Attr.class "stats-cell" ] (Html.h2 [] [ Html.text title ] :: body)
+                shown =
+                    case model.maximized of
+                        Just open ->
+                            List.filter (\( tile, _, _ ) -> tile == open) tiles
+
+                        Nothing ->
+                            tiles
+            in
+            [ Html.div [ Attr.class "stats-tiles", Attr.classList [ ( "stats-maximized", model.maximized /= Nothing ) ] ]
+                (List.map (viewTile model.maximized) shown)
+            ]
+
+        _ ->
+            [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
+
+
+{-| A tile: its label and maximize (or restore) button, then its content,
+small or full.
+-}
+viewTile : Maybe Tile -> ( Tile, String, Bool -> List (Html Msg) ) -> Html Msg
+viewTile maximized ( tile, label, content ) =
+    let
+        big =
+            maximized == Just tile
     in
-    [ Html.div [ Attr.class "stats-grid" ]
-        [ cell "Status" [ Html.p [] [ Html.text (statusLine model) ] ]
-        , Html.section [ Attr.class "stats-cell stats-cell-conditions" ]
-            [ Html.h2 [] [ Html.text "Conditions" ]
-            , viewWeatherAfter (solarTime model) False model
-            , viewSky response
+    Html.section
+        ([ Attr.class ("stats-tile stats-tile-" ++ String.toLower label), Attr.id ("stats-" ++ String.toLower label) ]
+            ++ (if big then
+                    []
+
+                else
+                    [ Events.onClick (Maximize (Just tile)) ]
+               )
+        )
+        (Html.header [ Attr.class "stats-tile-head" ]
+            [ Html.h2 [ Attr.class "t-heading" ] [ Html.text label ]
+            , Html.button
+                [ Attr.class "stats-tile-toggle"
+                , Attr.type_ "button"
+                , Attr.attribute "aria-label"
+                    (if big then
+                        "Back to all stats"
+
+                     else
+                        "Show " ++ label ++ " full screen"
+                    )
+                , Events.stopPropagationOn "click"
+                    (Decode.succeed
+                        ( Maximize
+                            (if big then
+                                Nothing
+
+                             else
+                                Just tile
+                            )
+                        , True
+                        )
+                    )
+                ]
+                [ Icon.view
+                    (if big then
+                        Icon.Minimize
+
+                     else
+                        Icon.Maximize
+                    )
+                ]
             ]
-        , Html.section [ Attr.class "stats-cell stats-cell-plan" ]
-            [ Html.h2 [] [ Html.text "Plan" ]
-            , viewPlan
-                (Maybe.map .stores response |> Maybe.withDefault [])
-                (Maybe.map .visits response |> Maybe.withDefault [])
-            ]
-        ]
+            :: content big
+        )
+
+
+{-| Visited out of how many.
+-}
+viewProgressTile : LiveResponse -> Bool -> List (Html Msg)
+viewProgressTile response _ =
+    let
+        visited =
+            List.length (visitedStores response)
+
+        total =
+            List.length response.stores
+    in
+    [ Html.p [ Attr.class "stats-big t-display" ] [ Html.text (String.fromInt visited ++ " / " ++ String.fromInt total) ]
+    , Html.p [ Attr.class "t-helper" ] [ Html.text (String.fromInt (total - visited) ++ " to go") ]
     ]
 
 
-{-| The route plan as a schedule, like the simulator's printout
-(Simulator.elm, viewPrintSchedule): nickname, address, expected
-and actual arrival, the difference, and expected departure, in New York
-time. A time on a new day (the first, or after midnight) shows the date
-as well.
-
-Actual arrival is the time of the check-in (Check In on the upload page)
-that the recorder matched to that store by GPS. The difference is
-expected minus actual: positive (green) when ahead of plan, negative
-(red) when behind.
+{-| Ahead or behind plan at the latest McDonald's: planned arrival against
+the first check-in there.
 -}
-viewPlan : List Store -> List Visit -> Html Msg
-viewPlan stores visits =
-    if List.isEmpty stores then
-        Html.p [] [ Html.text "No route plan loaded." ]
+viewPaceTile : LiveResponse -> Bool -> List (Html Msg)
+viewPaceTile response _ =
+    case visitedStores response |> List.sortBy Tuple.second |> List.reverse |> List.head of
+        Just ( store, at ) ->
+            case store.arrive of
+                Just planned ->
+                    let
+                        minutes =
+                            round (toFloat (planned - at) / 60000)
+                    in
+                    [ Html.p [ Attr.class "stats-big t-display" ]
+                        [ Html.text
+                            (if minutes > 0 then
+                                "+" ++ String.fromInt minutes ++ " min"
 
-    else
-        let
-            dayOf ms =
-                NewYorkTime.format ms |> String.split "," |> List.head
+                             else if minutes < 0 then
+                                "−" ++ String.fromInt -minutes ++ " min"
 
-            -- A time, with its date if it's on a different day from the
-            -- time before it.
-            timeCell before time =
-                Html.td [ Attr.class "plan-time" ]
-                    [ Html.text
-                        (case time of
-                            Just ms ->
-                                if Maybe.andThen dayOf before == dayOf ms then
-                                    NewYorkTime.clock ms
+                             else
+                                "0 min"
+                            )
+                        ]
+                    , Html.p [ Attr.class "t-helper" ]
+                        [ Html.text
+                            (if minutes > 0 then
+                                "ahead of plan"
 
-                                else
-                                    NewYorkTime.formatShort ms
+                             else if minutes < 0 then
+                                "behind plan"
 
-                            Nothing ->
-                                "—"
-                        )
+                             else
+                                "on plan"
+                            )
+                        ]
                     ]
 
-            checkedIn store =
-                visits
-                    |> List.filter (\visit -> visit.match == Matched store.id)
-                    |> List.head
-                    |> Maybe.map .tapTs
+                Nothing ->
+                    [ Html.p [ Attr.class "stats-big t-display" ] [ Html.text "—" ], Html.p [ Attr.class "t-helper" ] [ Html.text "no planned times" ] ]
 
-            difference store =
-                case ( store.arrive, checkedIn store ) of
-                    ( Just expected, Just actual ) ->
-                        let
-                            minutes =
-                                round (toFloat (expected - actual) / 60000)
-
-                            ( sign, class ) =
-                                if minutes > 0 then
-                                    ( "+", "plan-ahead" )
-
-                                else if minutes < 0 then
-                                    ( "−", "plan-behind" )
-
-                                else
-                                    ( "", "" )
-                        in
-                        Html.td [ Attr.class ("plan-time plan-diff " ++ class) ]
-                            [ Html.text
-                                (if minutes == 0 then
-                                    "on time"
-
-                                 else
-                                    sign ++ duration (abs minutes * 60000)
-                                )
-                            ]
-
-                    _ ->
-                        Html.td [ Attr.class "plan-time plan-diff" ] [ Html.text "—" ]
-
-            row ( previous, store ) =
-                Html.tr []
-                    [ Html.td [] [ Html.text store.name ]
-                    , Html.td [] [ Html.text store.address ]
-                    , timeCell (Maybe.andThen .depart previous) store.arrive
-                    , timeCell store.arrive (checkedIn store)
-                    , difference store
-                    , timeCell store.arrive store.depart
-                    ]
-        in
-        Html.table [ Attr.class "plan-schedule" ]
-            [ Html.thead []
-                [ Html.tr []
-                    [ Html.th [] [ Html.text "Nickname" ]
-                    , Html.th [] [ Html.text "Address" ]
-                    , Html.th [] [ Html.text "Expected arrival" ]
-                    , Html.th [] [ Html.text "Actual arrival" ]
-                    , Html.th [] [ Html.text "Difference" ]
-                    , Html.th [] [ Html.text "Expected departure" ]
-                    ]
-                ]
-            , Html.tbody []
-                (List.map row (List.map2 Tuple.pair (Nothing :: List.map Just stores) stores))
+        Nothing ->
+            [ Html.p [ Attr.class "stats-big t-display" ] [ Html.text "—" ]
+            , Html.p [ Attr.class "t-helper" ]
+                [ Html.text (plannedStart response |> Maybe.map (\start -> "starts " ++ NewYorkTime.clock start) |> Maybe.withDefault "not started") ]
             ]
 
 
-{-| "54°F, clear, feels like 47°F. Wind 9 mph from the NW, gusts 12 mph."
+{-| Each McDonald's visited, with its first check-in, in plan order.
 -}
-viewWeather : Model -> Html Msg
-viewWeather model =
-    viewWeatherAfter Nothing True model
+visitedStores : LiveResponse -> List ( Store, Int )
+visitedStores response =
+    response.stores
+        |> List.filterMap
+            (\store ->
+                response.visits
+                    |> List.filter (\v -> v.match == Matched store.id)
+                    |> List.map .tapTs
+                    |> List.minimum
+                    |> Maybe.map (Tuple.pair store)
+            )
 
 
-{-| The time of day by the sun now ("Civil twilight", "2 hours before solar
-noon"; see SolarTime), from today's sun times.
+{-| The weather in two short lines, and the sky as tiny swatches labelled
+Z, NW, NE, SE, SW; full screen, bigger swatches and where and when the
+weather was read.
 -}
-solarTime : Model -> Maybe String
-solarTime model =
-    Maybe.map2 (\now { response } -> SolarTime.describe now response.sun) (serverNow model) model.latest
-
-
-{-| The weather sentence, after `lead` if there is one ("Civil twilight.
-44°F, clear, …"), and where and when it was observed ("Central Manhattan,
-10 min ago") if `withSource`. Just the lead before any weather's been
-fetched.
--}
-viewWeatherAfter : Maybe String -> Bool -> Model -> Html Msg
-viewWeatherAfter lead withSource model =
+viewWeatherTile : Int -> LiveResponse -> Bool -> List (Html Msg)
+viewWeatherTile now response big =
     let
-        leading =
-            lead |> Maybe.map (\text -> text ++ ". ") |> Maybe.withDefault ""
-    in
-    case ( Maybe.andThen (.response >> .weather) model.latest, serverNow model ) of
-        ( Just w, Just now ) ->
-            let
-                degrees f =
-                    String.fromInt (round f) ++ "°F"
+        degrees f =
+            String.fromInt (round f) ++ "°F"
 
-                mph f =
-                    String.fromInt (round f) ++ " mph"
-
-                first =
-                    [ Maybe.map degrees w.temperatureF
-                    , Maybe.map String.toLower w.summary
-                    , Maybe.map (\f -> "feels like " ++ degrees f) w.feelsLikeF
-                    ]
+        lines =
+            case response.weather of
+                Just w ->
+                    [ [ Maybe.map degrees w.temperatureF
+                      , Maybe.map String.toLower w.summary
+                      ]
                         |> List.filterMap identity
-                        |> String.join ", "
-
-                wind =
-                    case w.windMph of
+                        |> String.join " "
+                        |> (\first -> first ++ (w.feelsLikeF |> Maybe.map (\f -> " · feels " ++ String.fromInt (round f) ++ "°") |> Maybe.withDefault ""))
+                    , case w.windMph of
                         Just speed ->
                             "Wind "
-                                ++ mph speed
-                                ++ (w.windFrom |> Maybe.map (\d -> " from the " ++ d) |> Maybe.withDefault "")
-                                ++ (w.gustMph |> Maybe.map (\g -> ", gusts " ++ mph g) |> Maybe.withDefault "")
-                                ++ "."
+                                ++ (w.windFrom |> Maybe.map (\d -> d ++ " ") |> Maybe.withDefault "")
+                                ++ String.fromInt (round speed)
+                                ++ (w.gustMph |> Maybe.map (\g -> ", gusts " ++ String.fromInt (round g)) |> Maybe.withDefault "")
 
                         Nothing ->
                             ""
-            in
-            Html.p [ Attr.class "live-weather" ]
-                [ Html.text (leading ++ capitalize first ++ ". " ++ wind)
-                , if withSource then
-                    Html.span [ Attr.class "live-weather-when" ]
-                        [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
+                    ]
+                        ++ (if big then
+                                [ w.place ++ ", " ++ when now w.observedAt ]
+
+                            else
+                                []
+                           )
+
+                Nothing ->
+                    [ "No weather yet" ]
+
+        short label =
+            if label == "Zenith" then
+                "Z"
+
+            else
+                label
+    in
+    List.map (\line -> Html.p [ Attr.class "stats-line" ] [ Html.text line ]) (List.filter (not << String.isEmpty) lines)
+        ++ [ Html.ul [ Attr.class "stats-sky", Attr.title "The sky now, simulated from the sun and the weather" ]
+                (List.map
+                    (\square ->
+                        Html.li []
+                            [ Html.span
+                                [ Attr.class "stats-swatch"
+                                , Attr.style "background-color" square.color
+                                , Attr.attribute "role" "img"
+                                , Attr.attribute "aria-label" (square.label ++ ": " ++ square.color)
+                                ]
+                                []
+                            , Html.text (short square.label)
+                            ]
+                    )
+                    response.sky
+                )
+           ]
+
+
+{-| One bar from sunrise to sunset with the sun on it now; full screen,
+the time of day by the sun and the twilight table too.
+-}
+viewSunTile : Int -> LiveResponse -> Bool -> List (Html Msg)
+viewSunTile now response big =
+    let
+        sun =
+            response.sun
+
+        position =
+            case ( sun.sunrise, sun.sunset ) of
+                ( Just rise, Just set ) ->
+                    Just (clamp 0 1 (toFloat (now - rise) / toFloat (max 1 (set - rise))))
+
+                _ ->
+                    Nothing
+
+        time =
+            Maybe.map NewYorkTime.clock >> Maybe.withDefault "—"
+    in
+    [ Html.div [ Attr.class "stats-sun" ]
+        [ Html.span [ Attr.class "t-helper" ] [ Html.text (time sun.sunrise) ]
+        , Html.span [ Attr.class "stats-sun-track" ]
+            [ case position of
+                Just x ->
+                    Html.span [ Attr.class "stats-sun-now", Attr.style "left" (String.fromFloat (x * 100) ++ "%") ] []
+
+                Nothing ->
+                    Html.text ""
+            ]
+        , Html.span [ Attr.class "t-helper" ] [ Html.text (time sun.sunset) ]
+        ]
+    ]
+        ++ (if big then
+                [ Html.p [ Attr.class "stats-line" ] [ Html.text (SolarTime.describe now sun) ]
+                , viewSun (Just response)
+                ]
+
+            else
+                []
+           )
+
+
+{-| The next few stops (as many as fit); full screen, all of them: the
+nickname, planned and actual arrival and the difference, with the address
+small beneath, and the next stop marked.
+-}
+viewPlanTile : LiveResponse -> Bool -> List (Html Msg)
+viewPlanTile response big =
+    let
+        visits =
+            visitedStores response |> List.map (\( store, at ) -> ( store.id, at ))
+
+        actual store =
+            visits |> List.filter (\( id, _ ) -> id == store.id) |> List.head |> Maybe.map Tuple.second
+
+        next =
+            response.stores |> List.filter (\store -> actual store == Nothing) |> List.head |> Maybe.map .id
+
+        upcoming =
+            if big then
+                response.stores
+
+            else
+                -- From the latest visited, if any, then onward.
+                let
+                    lastDone =
+                        response.stores
+                            |> List.indexedMap Tuple.pair
+                            |> List.filter (\( _, store ) -> actual store /= Nothing)
+                            |> List.map Tuple.first
+                            |> List.maximum
+                            |> Maybe.withDefault 0
+                in
+                List.drop lastDone response.stores
+
+        diff store =
+            case ( store.arrive, actual store ) of
+                ( Just planned, Just at ) ->
+                    let
+                        minutes =
+                            round (toFloat (planned - at) / 60000)
+                    in
+                    if minutes > 0 then
+                        Html.span [ Attr.class "plan-diff plan-ahead" ] [ Html.text ("+" ++ String.fromInt minutes) ]
+
+                    else if minutes < 0 then
+                        Html.span [ Attr.class "plan-diff plan-behind" ] [ Html.text ("−" ++ String.fromInt -minutes) ]
+
+                    else
+                        Html.span [ Attr.class "plan-diff" ] [ Html.text "0" ]
+
+                _ ->
+                    Html.span [ Attr.class "plan-diff" ] []
+
+        row store =
+            Html.li
+                ([ Attr.classList [ ( "plan-row", True ), ( "plan-next", Just store.id == next ), ( "plan-done", actual store /= Nothing ) ] ]
+                    ++ (if Just store.id == next then
+                            [ Attr.id "plan-next" ]
+
+                        else
+                            []
+                       )
+                )
+                [ Html.span [ Attr.class "plan-name" ] [ Html.text store.name ]
+                , Html.span [ Attr.class "plan-time" ] [ Html.text (Maybe.map NewYorkTime.clock store.arrive |> Maybe.withDefault "—") ]
+                , if big then
+                    Html.span [ Attr.class "plan-time" ] [ Html.text (Maybe.map NewYorkTime.clock (actual store) |> Maybe.withDefault "") ]
+
+                  else
+                    Html.text ""
+                , diff store
+                , if big then
+                    Html.span [ Attr.class "plan-address t-helper" ] [ Html.text store.address ]
 
                   else
                     Html.text ""
                 ]
+    in
+    if List.isEmpty response.stores then
+        [ Html.p [ Attr.class "t-helper" ] [ Html.text "No route plan loaded." ] ]
 
-        _ ->
-            case lead of
-                Just text ->
-                    Html.p [ Attr.class "live-weather" ] [ Html.text (text ++ ".") ]
-
-                Nothing ->
-                    Html.text ""
-
-
-{-| The sky now, as coloured tiles labelled with where to look: a row on a
-phone, a column pinned to the bottom-left corner on a wide screen
-(live.html).
--}
-viewSky : Maybe LiveResponse -> Html Msg
-viewSky response =
-    case Maybe.map .sky response of
-        Just ((_ :: _) as squares) ->
-            Html.figure
-                [ Attr.class "live-sky"
-                , Attr.title "The sky now, simulated from the sun and the weather"
-                ]
-                [ Html.ul []
-                    (List.map
-                        (\square ->
-                            Html.li []
-                                [ Html.span
-                                    [ Attr.class "live-sky-swatch"
-                                    , Attr.style "background-color" square.color
-                                    , Attr.attribute "role" "img"
-                                    , Attr.attribute "aria-label" (square.label ++ ": " ++ square.color)
-                                    ]
-                                    []
-                                , Html.span [ Attr.class "live-sky-label" ] [ Html.text square.label ]
-                                ]
-                        )
-                        squares
-                    )
-                ]
-
-        _ ->
-            Html.text ""
-
-
-capitalize : String -> String
-capitalize text =
-    String.toUpper (String.left 1 text) ++ String.dropLeft 1 text
+    else
+        [ Html.ol [ Attr.classList [ ( "plan-list", True ), ( "plan-list-full", big ) ] ] (List.map row upcoming) ]
 
 
 {-| Today's sunrise, sunset and twilights, in New York time.
@@ -1806,71 +1952,6 @@ status model =
 
             else
                 "Connecting…"
-
-
-{-| Stats' status: "5 of 46 restaurants visited. Last position November
-21, 5:34 AM EST." (each restaurant counted once, however many check-ins
-it's had), or how the connection's going before there's anything.
--}
-statusLine : Model -> String
-statusLine model =
-    case Maybe.map .response model.latest of
-        Just response ->
-            let
-                visited =
-                    response.stores
-                        |> List.filter (\store -> List.any (\v -> v.match == Matched store.id) response.visits)
-                        |> List.length
-            in
-            String.fromInt visited
-                ++ " of "
-                ++ String.fromInt (List.length response.stores)
-                ++ " restaurants visited. "
-                ++ status model
-
-        Nothing ->
-            status model
-
-
-{-| "Visits 3 / 46 · 1 checking in". Attempts are set aside for now (the
-recorder's USE_ATTEMPTS), so every check-in counts and there's no "on the
-road for".
--}
-visitsLine : Model -> String
-visitsLine model =
-    case Maybe.map .response model.latest of
-        Just response ->
-            let
-                count status_ =
-                    List.length (List.filter (.match >> status_) response.visits)
-
-                extra label n =
-                    if n > 0 then
-                        " · " ++ String.fromInt n ++ " " ++ label
-
-                    else
-                        ""
-            in
-            "Visits "
-                ++ String.fromInt (count isMatched)
-                ++ " / "
-                ++ String.fromInt (List.length response.stores)
-                ++ extra "checking in" (count ((==) Pending))
-                ++ extra "unmatched" (count ((==) Unmatched))
-                ++ "."
-
-        Nothing ->
-            ""
-
-
-isMatched : Match -> Bool
-isMatched match =
-    case match of
-        Matched _ ->
-            True
-
-        _ ->
-            False
 
 
 {-| "12 min ago" for the first two hours, then the date and time in New
