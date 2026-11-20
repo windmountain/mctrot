@@ -1,6 +1,6 @@
 port module Radio exposing (Flags, Model, Msg, NowPlaying, OnAir, announce, init, links, nowPlaying, onAirDecoder, subscriptions, update, view)
 
-{-| The radio player in /live's top-right corner: play and stop McTrot
+{-| The radio player along the bottom of /live's screen: play and stop McTrot
 radio (recorder/host/radio.nix), set the volume, and find its links for
 other players.
 
@@ -256,41 +256,41 @@ subscriptions _ =
     radioIn FromAudio
 
 
-{-| The player: the title on now, and its artist (or how tuning in's
-going, or what went wrong); while it plays, the album and year too, and how
-far into the track it is. Without a program: "Radio", and whether it's on.
-`now` is the server's clock, ms since the epoch.
+{-| The player, as one line along the bottom of the screen (live.html,
+.radio): play or stop at the left, with what's on, or how tuning in's
+going, or what went wrong; the volume where a page can set it; and Links,
+whose panel opens upward. The whole left part is the play/stop button.
+`now` is the server's clock, ms since the epoch (unused since the stripe
+lost its progress bar; kept so callers needn't change).
 -}
 view : Maybe Int -> Maybe NowPlaying -> Model -> Html Msg
-view now playing model =
+view _ playing model =
     let
         on =
             model.state /= Stopped
 
-        status =
+        label =
             case ( model.state, playing ) of
                 ( Connecting, _ ) ->
-                    "Tuning in…"
+                    "Radio · Tuning in…"
 
                 ( Failed message, _ ) ->
-                    message
+                    "Radio · " ++ message
 
-                ( _, Just { artist } ) ->
-                    artist
-
-                ( Stopped, Nothing ) ->
-                    "Off"
+                ( Playing, Just { title, artist } ) ->
+                    "Now: " ++ title ++ " — " ++ artist
 
                 ( Playing, Nothing ) ->
-                    "On"
+                    "Radio · On"
 
-        name =
-            Maybe.map .title playing |> Maybe.withDefault "Radio"
+                ( Stopped, _ ) ->
+                    "Radio · Off"
     in
     Html.aside [ Attr.class "radio", Attr.attribute "aria-label" "Radio" ]
         [ Html.div [ Attr.class "radio-bar" ]
             [ Html.button
-                [ Attr.class "radio-play"
+                [ Attr.class "radio-toggle"
+                , Attr.classList [ ( "radio-on", on ), ( "radio-problem", isFailed model.state ) ]
                 , Attr.type_ "button"
                 , Events.onClick
                     (if on then
@@ -306,18 +306,6 @@ view now playing model =
                      else
                         "Play the radio"
                     )
-                ]
-                [ Html.text
-                    (if on then
-                        "■"
-
-                     else
-                        "▶"
-                    )
-                ]
-            , Html.div
-                [ Attr.class "radio-info"
-                , Attr.attribute "aria-live" "polite"
                 , case playing of
                     Just { artist, title } ->
                         Attr.title (title ++ " — " ++ artist)
@@ -325,21 +313,17 @@ view now playing model =
                     Nothing ->
                         Attr.classList []
                 ]
-                ([ Html.span [ Attr.class "radio-name" ] [ Html.text name ]
-                 , Html.span
-                    [ Attr.class "radio-status"
-                    , Attr.classList [ ( "radio-problem", isFailed model.state ), ( "radio-artist", playing /= Nothing && not (isFailed model.state) ) ]
-                    ]
-                    [ Html.text status ]
-                 ]
-                    ++ (case ( model.state, playing ) of
-                            ( Playing, Just slot ) ->
-                                viewDetails now slot
+                [ Html.span [ Attr.class "radio-icon", Attr.attribute "aria-hidden" "true" ]
+                    [ Html.text
+                        (if on then
+                            "■"
 
-                            _ ->
-                                []
-                       )
-                )
+                         else
+                            "▶"
+                        )
+                    ]
+                , Html.span [ Attr.class "radio-label", Attr.attribute "aria-live" "polite" ] [ Html.text label ]
+                ]
             , if model.volumeAdjustable then
                 Html.input
                     [ Attr.type_ "range"
@@ -375,81 +359,6 @@ view now playing model =
           else
             Html.text ""
         ]
-
-
-{-| While it plays: the album and its year, and the time into the track
-against its length, with a bar.
--}
-viewDetails : Maybe Int -> NowPlaying -> List (Html msg)
-viewDetails now slot =
-    let
-        album =
-            case ( slot.album, slot.year ) of
-                ( Just name, Just year ) ->
-                    Just (name ++ " · " ++ year)
-
-                ( Just name, Nothing ) ->
-                    Just name
-
-                ( Nothing, Just year ) ->
-                    Just year
-
-                ( Nothing, Nothing ) ->
-                    Nothing
-    in
-    (case album of
-        Just text ->
-            [ Html.span [ Attr.class "radio-album" ] [ Html.text text ] ]
-
-        Nothing ->
-            []
-    )
-        ++ (case ( now, slot.from, slot.to ) of
-                ( Just t, Just from, Just to ) ->
-                    let
-                        length =
-                            max 1 (to - from)
-
-                        elapsed =
-                            clamp 0 length (t - from)
-                    in
-                    [ Html.span [ Attr.class "radio-progress" ]
-                        [ Html.span
-                            [ Attr.class "radio-progress-bar"
-                            , Attr.attribute "aria-hidden" "true"
-                            ]
-                            [ Html.span
-                                [ Attr.class "radio-progress-fill"
-                                , Attr.style "width" (String.fromFloat (toFloat elapsed / toFloat length * 100) ++ "%")
-                                ]
-                                []
-                            ]
-                        , Html.span [ Attr.class "radio-times" ]
-                            [ Html.text (duration elapsed ++ " / " ++ duration length) ]
-                        ]
-                    ]
-
-                _ ->
-                    []
-           )
-
-
-{-| ms as "4:08" (or "1:02:03").
--}
-duration : Int -> String
-duration ms =
-    let
-        seconds =
-            ms // 1000
-
-        pad n =
-            String.padLeft 2 '0' (String.fromInt n)
-    in
-    if seconds >= 3600 then
-        String.fromInt (seconds // 3600) ++ ":" ++ pad (modBy 3600 seconds // 60) ++ ":" ++ pad (modBy 60 seconds)
-
-    else
-        String.fromInt (seconds // 60) ++ ":" ++ pad (modBy 60 seconds)
 
 
 {-| McTrot radio's addresses, for VLC, Apple Music and radio apps.

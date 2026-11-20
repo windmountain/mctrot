@@ -1,4 +1,4 @@
-module Guests exposing (Model, Msg, init, poll, update, viewAccount, viewPost)
+module Guests exposing (Model, Msg, init, poll, update, viewPost, viewSignOut)
 
 {-| Likes and comments under each post on /live, from guests who signed in
 with an emailed code at api.mctrot.nyc/account (recorder/api/src/guests/).
@@ -569,31 +569,18 @@ viewPost back postId model =
                 ]
 
 
-{-| Once, above the posts: who's signed in, and a way out. Nothing when
-signed out.
+{-| In the title row, at the right: "Sign out" while a guest is signed
+in; nothing otherwise. No name: it's on their likes and comments.
 -}
-viewAccount : Model -> Html Msg
-viewAccount model =
+viewSignOut : Model -> Html Msg
+viewSignOut model =
     case model of
-        On _ feed _ ->
-            case feed.me of
-                Just me ->
-                    Html.div [ Attr.class "guest guest-account" ]
-                        [ Html.span [ Attr.class "guest-meta" ]
-                            [ Html.text
-                                (case me.displayName of
-                                    Just name ->
-                                        "Signed in as " ++ name
+        On _ { me } _ ->
+            if me == Nothing then
+                Html.text ""
 
-                                    Nothing ->
-                                        "Signed in"
-                                )
-                            ]
-                        , Html.button [ Attr.class "guest-button", Events.onClick SignOut ] [ Html.text "Sign out" ]
-                        ]
-
-                Nothing ->
-                    Html.text ""
+            else
+                Html.button [ Attr.class "guest-signout", Attr.type_ "button", Events.onClick SignOut ] [ Html.text "Sign out" ]
 
         Off _ ->
             Html.text ""

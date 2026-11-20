@@ -34,23 +34,26 @@
        with theme-color above), the header and the tabs. Every theme of style.css's --bg, overridden. */
     :root, :root[data-theme="dark"], :root[data-theme="light"] { --bg: #fff; }
     @media (prefers-color-scheme: dark) { :root { --bg: #fff; } }
-    /* The shell, the same on every view (src/Live.elm): header with the
-       title and the radio, the view switcher, the view. */
+    /* The shell, the same on every view (src/Live.elm): the title row
+       and the view switcher pinned at the top, the view, and the radio
+       stripe pinned at the bottom (website/LIVE-DESIGN.md). */
+    body { background: var(--paper); }
     .app { flex: 1; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-    /* Stays put while the overview and the blog scroll (the other views
-       fit the screen anyway); the radio's Links panel opens over the page. */
-    .app-top { position: sticky; top: 0; z-index: 5; background: var(--bg); box-shadow: 0 1px 0 var(--rule); }
-    .app-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 16px 10px; }
-    .app-title h1 { margin: 0; font-size: clamp(1.75rem, 7vw, 2.5rem); line-height: 1; letter-spacing: -0.02em; color: var(--ink-1); }
-    .app-title h1 a { text-decoration: none; }
-    .app-subtitle { margin: 4px 0 0; font-size: 0.7rem; line-height: 1.3; font-weight: bold; letter-spacing: 0.08em; color: var(--ink-1); }
-    .app-tabs { background: var(--bg); padding: 0 16px 12px; }
-    .app-tabs ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 30rem; border: 2px solid var(--ink-1); border-radius: 999px; overflow: hidden; }
+    .app-top { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: var(--strong); }
+    .app-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+      padding: var(--space-3) var(--space-4) var(--space-2); }
+    .app-title { margin: 0; font: var(--t-display); letter-spacing: -0.02em; color: var(--ink); }
+    .app-title a { color: inherit; text-decoration: none; }
+    .guest-signout { font: var(--t-ui); color: var(--ink); background: none; border: 0; padding: 0; min-height: var(--control-h);
+      text-decoration: underline; cursor: pointer; }
+    .app-tabs { padding: 0 var(--space-4) var(--space-3); }
+    .app-tabs ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 30rem; border: var(--strong); }
     .app-tabs li { flex: 1; }
-    .app-tabs li + li a { border-left: 2px solid var(--ink-1); }
-    .app-tabs a { display: block; text-align: center; padding: 6px 4px; font-weight: bold; font-size: 0.9rem; text-decoration: none; color: var(--ink-1); }
-    .app-tabs a[aria-current="page"] { background: var(--ink-1); color: var(--bg); }
-    .app-tabs a:focus-visible { outline-offset: -4px; }
+    .app-tabs li + li a { border-left: var(--strong); }
+    .app-tabs a { display: flex; align-items: center; justify-content: center; min-height: calc(var(--control-h) - 4px); padding: 0 var(--space-1);
+      font: var(--t-ui); text-decoration: none; color: var(--ink); }
+    .app-tabs a[aria-current="page"] { background: var(--ink); color: var(--paper); }
+    .app-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
     .app-main { flex: 1; min-height: 0; }
     /* Map, timeline and stats take exactly the screen; the overview and
        the blog scroll like a page. */
@@ -143,31 +146,26 @@
     .live { max-width: var(--measure); margin: 0 auto; padding: 1rem 16px 2rem; }
     .live-status { margin: 0.25rem 0 0; min-height: 1.6em; }
     .live-visits { margin: 0 0 1rem; min-height: 1.6em; }
-    /* The radio (src/Radio.elm), at the header's right. */
-    .radio { position: relative; z-index: 2; font-size: 0.85em; max-width: calc(100vw - 32px); }
-    .radio-bar { display: flex; align-items: center; gap: 8px; background: #111; color: #fff; border-radius: 999px; padding: 4px 6px 4px 4px; }
-    .radio button { font: inherit; border: 0; cursor: pointer; }
-    .radio-play { flex: none; width: 2rem; height: 2rem; border-radius: 50%; background: #FFD100; color: #111; font-size: 0.85rem; line-height: 1; }
-    .radio-info { display: flex; flex-direction: column; line-height: 1.15; min-width: 4.5rem; max-width: 11rem; }
-    .radio-name { font-weight: bold; }
-    .radio-status { opacity: 0.8; font-size: 0.9em; overflow-wrap: anywhere; }
-    /* What's on: a line each, cut short (the whole of it is the info's title). */
-    .radio-name, .radio-artist, .radio-album { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* While it plays: the album, and how far into the track. */
-    .radio-album { opacity: 0.65; font-size: 0.85em; }
-    .radio-progress { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 0.8em; opacity: 0.85; }
-    .radio-progress-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25); overflow: hidden; }
-    .radio-progress-fill { display: block; height: 100%; background: #FFD100; }
-    .radio-times { font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .radio-bar .radio-problem { color: #ffb3a7; opacity: 1; }
-    .radio-volume { width: 5rem; accent-color: #FFD100; }
-    .radio-links-button { background: none; color: #fff; text-decoration: underline; padding: 4px 6px; }
-    .radio button:focus-visible, .radio input:focus-visible, .radio a:focus-visible { outline: 2px solid #FFD100; outline-offset: 2px; }
-    .radio-links { position: absolute; right: 0; top: calc(100% + 6px); width: min(20rem, calc(100vw - 32px)); box-sizing: border-box; margin: 0;
-      background: #fff; color: #111; border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15); }
-    .radio-links dt { font-weight: bold; margin-top: 6px; }
+    /* The radio (src/Radio.elm): one line pinned to the bottom of the
+       screen, above the home indicator. Its buttons' tap areas reach 12px
+       above the stripe, to 44px. */
+    .radio { position: sticky; bottom: 0; z-index: 5; background: var(--accent); color: var(--ink);
+      padding-bottom: env(safe-area-inset-bottom); }
+    .radio-bar { display: flex; align-items: stretch; height: var(--stripe-h); }
+    .radio button { position: relative; font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; color: inherit;
+      background: none; border: 0; padding: 0 var(--space-4); cursor: pointer; }
+    .radio button::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--stripe-h) - var(--control-h)); bottom: 0; }
+    .radio-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); text-align: left; }
+    .radio-icon { flex: none; width: var(--icon-s); text-align: center; }
+    .radio-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .radio-volume { align-self: center; width: 5rem; accent-color: var(--ink); }
+    .radio button:focus-visible, .radio input:focus-visible, .radio a:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+    .radio-links { position: absolute; right: var(--space-4); bottom: calc(100% + var(--space-2)); width: min(20rem, calc(100vw - 32px));
+      box-sizing: border-box; margin: 0; background: var(--paper); color: var(--ink); border: var(--strong); padding: var(--space-3); }
+    .radio-links dt { font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; margin-top: var(--space-2); }
     .radio-links dt:first-child { margin-top: 0; }
-    .radio-links dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+    .radio-links dd { margin: var(--space-1) 0 0; font: var(--t-helper); overflow-wrap: anywhere; }
+    .radio-links a { color: var(--ink); }
     .live-weather { margin: 0 0 1rem; }
     .live-weather-when { opacity: 0.7; }
     /* The sky tiles (src/Live.elm, viewSky): a row of five; on the
@@ -270,7 +268,6 @@
     .guest-button:active { background: #eee; }
     .guest-like { min-width: 2.75rem; }
     .guest-liked { color: #DA291C; }
-    .guest-account { display: flex; gap: 0.75rem; align-items: center; justify-content: flex-end; margin: 0 0 0.75rem; }
     .guest-link { border: 0; background: none; padding: 0; color: inherit; text-decoration: underline; }
     .guest-comments { list-style: none; padding: 0; margin: 0.4rem 0 0; }
     .guest-comment { margin: 0.25rem 0; overflow-wrap: anywhere; }

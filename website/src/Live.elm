@@ -838,8 +838,9 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     Html.div [ Attr.class ("app page-" ++ routeName model.route) ]
-        [ -- Title, radio and view switcher stay at the top as the page
-          -- scrolls (live.html, .app-top).
+        [ -- The title row and the view switcher stay at the top as the page
+          -- scrolls, and the radio at the bottom (live.html, .app-top and
+          -- .radio).
           Html.div [ Attr.class "app-top" ] [ viewHeader model, viewTabs model.route ]
         , Html.main_ [ Attr.id "main", Attr.class ("app-main tab-" ++ routeName model.route) ]
             (case model.route of
@@ -858,22 +859,23 @@ view model =
                 StatsTab ->
                     viewStatsTab model
             )
-        ]
-
-
-viewHeader : Model -> Html Msg
-viewHeader model =
-    Html.header [ Attr.class "app-header" ]
-        [ Html.div [ Attr.class "app-title" ]
-            [ Html.h1 [] [ link Overview [] [ Html.text "McTROT 5" ] ]
-            , Html.p [ Attr.class "app-subtitle" ] [ Html.text "EATING AT EVERY McDONALD’S IN MANHATTAN ON ONE WALK" ]
-            ]
         , Html.map RadioMsg (Radio.view (serverNow model) (radioNow model) model.radio)
         ]
 
 
-{-| The views, as a row of radio-button-style segments: links, so each
-has its own address, with the current one marked.
+{-| The title, back to the overview, and "Sign out" at the right while a
+guest is signed in.
+-}
+viewHeader : Model -> Html Msg
+viewHeader model =
+    Html.header [ Attr.class "app-header" ]
+        [ Html.h1 [ Attr.class "app-title" ] [ link Overview [] [ Html.text "McTROT 5" ] ]
+        , Html.map GuestsMsg (Guests.viewSignOut model.guests)
+        ]
+
+
+{-| The views, as a row of square segments: links, so each has its own
+address, with the current one marked.
 -}
 viewTabs : Route -> Html Msg
 viewTabs current =
@@ -2608,8 +2610,7 @@ viewPosts model =
                 -- Keyed by post, so a video that's playing keeps playing
                 -- when a newer post arrives above it.
                 Html.div []
-                    [ Html.map GuestsMsg (Guests.viewAccount model.guests)
-                    , Html.Keyed.ul [ Attr.class "live-posts" ]
+                    [ Html.Keyed.ul [ Attr.class "live-posts" ]
                     (List.map
                         (\post ->
                             ( post.id
