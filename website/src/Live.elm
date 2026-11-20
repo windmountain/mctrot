@@ -32,6 +32,7 @@ import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Keyed
 import Http
+import Icon
 import Json.Decode as Decode exposing (Decoder)
 import Dict
 import Guests
@@ -1342,14 +1343,14 @@ viewZoomButtons zoom =
             , Attr.disabled (zoom >= maxZoom)
             , Attr.attribute "aria-label" "Zoom in"
             ]
-            [ Html.text "+" ]
+            [ Icon.view Icon.Plus ]
         , Html.button
             [ Attr.type_ "button"
             , Events.onClick (Zoom 0.5)
             , Attr.disabled (zoom <= 1)
             , Attr.attribute "aria-label" "Zoom out"
             ]
-            [ Html.text "−" ]
+            [ Icon.view Icon.Minus ]
         ]
 
 
@@ -2613,7 +2614,7 @@ postsBox now target posts classes attributes =
             , Attr.attribute "aria-label" "Close"
             , Events.onClick (Focus target)
             ]
-            [ Html.text "×" ]
+            [ Icon.view Icon.Close ]
             :: List.map
                 (\post ->
                     Html.div [ Attr.class "live-focus-post" ]

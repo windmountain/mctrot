@@ -17,6 +17,7 @@ told to the phone's lock screen (`announce`).
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
+import Icon
 import Json.Decode as Decode
 import Json.Encode as Encode
 
@@ -313,15 +314,13 @@ view _ playing model =
                     Nothing ->
                         Attr.classList []
                 ]
-                [ Html.span [ Attr.class "radio-icon", Attr.attribute "aria-hidden" "true" ]
-                    [ Html.text
-                        (if on then
-                            "■"
+                [ Icon.view
+                    (if on then
+                        Icon.Stop
 
-                         else
-                            "▶"
-                        )
-                    ]
+                     else
+                        Icon.Play
+                    )
                 , Html.span [ Attr.class "radio-label", Attr.attribute "aria-live" "polite" ] [ Html.text label ]
                 ]
             , if model.volumeAdjustable then
@@ -351,7 +350,7 @@ view _ playing model =
                     )
                 , Events.onClick ToggleLinks
                 ]
-                [ Html.text "Links" ]
+                [ Icon.view Icon.Link, Html.text "Links" ]
             ]
         , if model.showingLinks then
             viewLinks

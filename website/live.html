@@ -34,6 +34,12 @@
        with theme-color above), the header and the tabs. Every theme of style.css's --bg, overridden. */
     :root, :root[data-theme="dark"], :root[data-theme="light"] { --bg: #fff; }
     @media (prefers-color-scheme: dark) { :root { --bg: #fff; } }
+    /* Icons (src/Icon.elm, Carbon): the disc takes the text colour unless
+       a control says otherwise; the glyph inside a filled icon is clear. */
+    .icon { display: block; flex: none; width: var(--icon-s); height: var(--icon-s); }
+    .icon-disc { fill: currentColor; }
+    .icon-glyph { fill: transparent; }
+
     /* The shell, the same on every view (src/Live.elm): the title row
        and the view switcher pinned at the top, the view, and the radio
        stripe pinned at the bottom (website/LIVE-DESIGN.md). */
@@ -82,9 +88,11 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Top right, clear of the map's scrollbar. */
     .live-map-zoom { position: absolute; top: var(--space-3); right: var(--space-4); z-index: 2; display: flex; flex-direction: column; gap: var(--space-2); }
-    .live-map-zoom button { width: var(--control-h); height: var(--control-h); padding: 0; border: var(--strong); border-radius: 0; background: var(--paper); color: var(--ink);
-      font: 700 24px/1 var(--font); cursor: pointer; }
-    .live-map-zoom button:disabled { color: var(--line); border-color: var(--line); cursor: default; }
+    .live-map-zoom button { display: flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h); padding: 0;
+      border: 0; background: none; color: var(--ink); cursor: pointer; }
+    .live-map-zoom .icon { width: var(--icon-l); height: var(--icon-l); }
+    .live-map-zoom .icon-glyph { fill: var(--paper); }
+    .live-map-zoom button:disabled { color: var(--line); cursor: default; }
     .tab-map .live-note { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-3); margin: 0; font: var(--t-helper); }
 
     /* Blog */
@@ -167,7 +175,12 @@
       background: none; border: 0; padding: 0 var(--space-4); cursor: pointer; }
     .radio button::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--stripe-h) - var(--control-h)); bottom: 0; }
     .radio-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); text-align: left; }
-    .radio-icon { flex: none; width: var(--icon-s); text-align: center; }
+    /* On the yellow stripe, play and stop are black discs with a yellow
+       symbol (a yellow disc wouldn't show). */
+    .radio .icon .icon-disc { fill: var(--ink); }
+    .radio .icon .icon-glyph { fill: var(--accent); }
+    .radio-links-button { display: flex; align-items: center; gap: var(--space-1); }
+    .radio-links-button .icon { width: 16px; height: 16px; }
     .radio-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .radio-volume { align-self: center; width: 5rem; accent-color: var(--ink); }
     .radio button:focus-visible, .radio input:focus-visible, .radio a:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
@@ -242,14 +255,16 @@
     @media (max-width: 40rem) {
       .live-focus-posts, .live-focus-posts.live-focus-left, .live-focus-posts.live-focus-below, .live-focus-posts.live-focus-above,
       .live-focus-posts.live-focus-left.live-focus-below, .live-focus-posts.live-focus-left.live-focus-above {
-        position: fixed; left: 16px !important; right: 16px; top: auto !important; bottom: 16px; width: auto; max-width: none;
+        position: fixed; left: 16px !important; right: 16px; top: auto !important; bottom: calc(var(--stripe-h) + var(--space-4) + env(safe-area-inset-bottom)); width: auto; max-width: none;
         max-height: 55vh; transform: none; z-index: 5; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
       .live-focus-post .live-post-photo img, .live-focus-post .live-post-video { max-height: 38vh; }
     }
     .live-focus-post { display: flex; flex-direction: column; gap: 3px; }
     .live-focus-close { position: sticky; top: 0; align-self: flex-end; margin: -4px -4px -34px 0; z-index: 1; width: 28px; height: 28px; padding: 0;
-      border: 2px solid #000; border-radius: 50%; background: #fff; color: #000; font: bold 18px/1 -apple-system, Helvetica, Arial, sans-serif; cursor: pointer; flex: none; }
-    .live-focus-post .live-post-photo img, .live-focus-post .live-post-video { max-height: 40vh; border-radius: 3px; }
+      border: 0; border-radius: 50%; background: var(--paper); color: var(--ink); cursor: pointer; flex: none; }
+    .live-focus-close .icon { width: 28px; height: 28px; }
+    .live-focus-close .icon-glyph { fill: var(--paper); }
+    .live-focus-post .live-post-photo img, .live-focus-post .live-post-video { max-height: 40vh; }
     .live-focus-when { font-size: 12px; opacity: 0.7; }
     .live-me-edge { fill: none; stroke: #fff; stroke-width: 7px; stroke-linecap: square; vector-effect: non-scaling-stroke; }
     .live-me { fill: none; stroke: #DA291C; stroke-width: 4px; stroke-linecap: square; vector-effect: non-scaling-stroke; }
@@ -277,7 +292,7 @@
        the latest comments, "More comments", "Add a comment…". */
     .guest { margin-top: var(--space-1); font: var(--t-body); color: var(--ink); }
     .guest button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-    .guest-like { display: flex; align-items: center; min-width: var(--control-h); min-height: var(--control-h); font-size: 24px !important; line-height: 1; }
+    .guest-like { display: flex; align-items: center; min-width: var(--control-h); min-height: var(--control-h); }
     .guest-liked { color: var(--signal) !important; }
     .guest-comments { list-style: none; padding: 0; margin: 0; }
     .guest-comment { margin: 0 0 var(--space-1); overflow-wrap: anywhere; }

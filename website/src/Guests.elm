@@ -29,6 +29,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Http
+import Icon
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 import Process
@@ -559,7 +560,14 @@ viewPost back postId model =
                             SignIn (signInUrl (LikeAfter postId))
                         )
                     ]
-                    [ Html.text (heart (canAct && social.liked)) ]
+                    [ Icon.view
+                        (if canAct && social.liked then
+                            Icon.HeartFilled
+
+                         else
+                            Icon.Heart
+                        )
+                    ]
                 , if List.isEmpty social.comments && List.isEmpty social.pending then
                     Html.text ""
 
@@ -690,15 +698,6 @@ viewComposer postId draft =
             , Html.button [ Attr.type_ "submit" ] [ Html.text "Send" ]
             ]
         ]
-
-
-heart : Bool -> String
-heart liked =
-    if liked then
-        "♥"
-
-    else
-        "♡"
 
 
 boolText : Bool -> String
