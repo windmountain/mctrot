@@ -1157,31 +1157,20 @@ stretchAt zoom =
     mapTabStretch ^ (1 - logBase 2 zoom / logBase 2 maxZoom)
 
 
-{-| The posts, newest first, scrolling down the page.
+{-| The posts, newest first, scrolling down the page. (When the walk
+starts is the overview's to say.)
 -}
 viewBlogTab : Model -> List (Html Msg)
 viewBlogTab model =
-    case ( Maybe.map .response model.latest, serverNow model ) of
-        ( Just response, Just now ) ->
-            (case plannedStart response of
-                Just start ->
-                    if response.attempt == Nothing && now < start then
-                        [ Html.p [ Attr.class "tab-empty" ] [ Html.text ("Starting " ++ NewYorkTime.format start) ] ]
+    case Maybe.map .response model.latest of
+        Just response ->
+            if List.isEmpty response.posts then
+                [ Html.p [ Attr.class "tab-empty" ] [ Html.text "No posts yet." ] ]
 
-                    else
-                        []
+            else
+                [ viewPosts model ]
 
-                Nothing ->
-                    []
-            )
-                ++ (if List.isEmpty response.posts then
-                        [ Html.p [ Attr.class "tab-empty" ] [ Html.text "No blog posts yet." ] ]
-
-                    else
-                        [ viewPosts model ]
-                   )
-
-        _ ->
+        Nothing ->
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
 
 
@@ -2667,31 +2656,31 @@ onMap placed =
 
 viewPosts : Model -> Html Msg
 viewPosts model =
-    case ( Maybe.map .response model.latest, serverNow model ) of
-        ( Just response, Just now ) ->
+    case Maybe.map .response model.latest of
+        Just response ->
             if List.isEmpty response.posts then
                 Html.text ""
 
             else
                 -- Keyed by post, so a video that's playing keeps playing
-                -- when a newer post arrives above it.
-                Html.div []
-                    [ Html.Keyed.ul [ Attr.class "live-posts" ]
+                -- when a newer post arrives above it. Each: its time of
+                -- day (no date: it's the walk's day), the post, then likes
+                -- and comments.
+                Html.Keyed.ul [ Attr.class "live-posts" ]
                     (List.map
                         (\post ->
                             ( post.id
                             , Html.li [ Attr.class "live-post" ]
-                                [ viewPostContent post.content
-                                , Html.p [ Attr.class "live-post-when" ] [ Html.text (when now post.ts) ]
+                                [ Html.p [ Attr.class "live-post-when" ] [ Html.text (NewYorkTime.clock post.ts) ]
+                                , viewPostContent post.content
                                 , Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.route) post.id model.guests)
                                 ]
                             )
                         )
                         response.posts
                     )
-                    ]
 
-        _ ->
+        Nothing ->
             Html.text ""
 
 

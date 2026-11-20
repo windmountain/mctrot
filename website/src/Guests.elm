@@ -7,7 +7,7 @@ Its own module so the feature comes out cleanly: Live.elm only keeps a
 Model, forwards Msgs, and calls viewPost under each post. While the server
 has no guest routes (a 404, or no answer), nothing is shown at all.
 
-A guest who clicks the heart or "Comment" while signed out goes to sign
+A guest who clicks the heart or "Add a comment…" while signed out goes to sign
 in with what they wanted in the return address's fragment (#like=<post>
 or #comment=<post>). live.html hands that fragment over and clears it
 from the address; once the feed says they're signed in, the like is sent
@@ -140,6 +140,9 @@ type alias Ui =
     , reporting : Maybe ( Int, String )
     , notes : Dict String String
     , reported : List Int
+
+    -- Posts showing all their comments, not just the latest two.
+    , expanded : List String
     }
 
 
@@ -150,7 +153,7 @@ emptySocial =
 
 emptyUi : Ui
 emptyUi =
-    { drafts = Dict.empty, open = Nothing, reporting = Nothing, notes = Dict.empty, reported = [] }
+    { drafts = Dict.empty, open = Nothing, reporting = Nothing, notes = Dict.empty, reported = [], expanded = [] }
 
 
 {-| The API's address, and the page's location.hash when it opened.
@@ -186,6 +189,8 @@ type Msg
     | SignOut
     | SignedOut (Result Http.Error ())
     | OpenComment String
+    | ShowAllComments String
+    | Ignore
     | Draft String String
     | SendComment String
     | Sent String (Result Http.Error ())
@@ -246,7 +251,13 @@ update msg model =
             ( model, Cmd.none )
 
         ( OpenComment postId, On config feed ui ) ->
-            ( On config feed { ui | open = Just postId }, Cmd.none )
+            -- Into the box once it's drawn.
+            ( On config feed { ui | open = Just postId }
+            , Task.attempt (\_ -> Ignore) (Process.sleep 50 |> Task.andThen (\_ -> Browser.Dom.focus (composerId postId)))
+            )
+
+        ( ShowAllComments postId, On config feed ui ) ->
+            ( On config feed { ui | expanded = postId :: ui.expanded }, Cmd.none )
 
         ( Draft postId text, On config feed ui ) ->
             ( On config feed { ui | drafts = Dict.insert postId text ui.drafts }, Cmd.none )
@@ -495,9 +506,10 @@ socialDecoder =
 -- VIEW
 
 
-{-| Under one post: the like button, approved comments, the guest's own
-waiting ones, and a way to comment. `back` is this page's address, for
-after signing in.
+{-| Under one post: the heart (no count: it only shows whether you liked
+it), the latest two approved comments with "More comments" if there are
+more, the guest's own waiting ones, and "Add a comment…". `back` is this
+page's address, for after signing in.
 -}
 viewPost : String -> String -> Model -> Html Msg
 viewPost back postId model =
@@ -516,27 +528,58 @@ viewPost back postId model =
                 canAct =
                     Maybe.map .complete feed.me |> Maybe.withDefault False
             in
-            Html.div [ Attr.class "guest", Attr.id (guestId postId) ]
-                [ Html.div [ Attr.class "guest-bar" ]
-                    -- Signed out (or not finished signing up), both go
-                    -- to sign in first; see resume.
-                    [ Html.button
-                        [ Attr.class "guest-button guest-like"
-                        , Attr.classList [ ( "guest-liked", canAct && social.liked ) ]
-                        , Attr.attribute "aria-label" "Like"
-                        , Attr.attribute "aria-pressed" (boolText (canAct && social.liked))
-                        , Events.onClick
-                            (if canAct then
-                                ToggleLike postId (not social.liked)
+            let
+                showAll =
+                    List.member postId ui.expanded
 
-                             else
-                                SignIn (signInUrl (LikeAfter postId))
-                            )
-                        ]
-                        [ Html.text (heart (canAct && social.liked)) ]
-                    , Html.button
-                        [ Attr.class "guest-button"
-                        , Attr.attribute "aria-expanded" (boolText (canAct && ui.open == Just postId))
+                hidden =
+                    if showAll then
+                        0
+
+                    else
+                        max 0 (List.length social.comments - 2)
+
+                composing =
+                    canAct && ui.open == Just postId
+            in
+            Html.div [ Attr.class "guest", Attr.id (guestId postId) ]
+                [ -- Signed out (or not finished signing up), the heart and
+                  -- "Add a comment…" go to sign in first; see resume.
+                  Html.button
+                    [ Attr.class "guest-like"
+                    , Attr.classList [ ( "guest-liked", canAct && social.liked ) ]
+                    , Attr.type_ "button"
+                    , Attr.attribute "aria-label" "Like"
+                    , Attr.attribute "aria-pressed" (boolText (canAct && social.liked))
+                    , Events.onClick
+                        (if canAct then
+                            ToggleLike postId (not social.liked)
+
+                         else
+                            SignIn (signInUrl (LikeAfter postId))
+                        )
+                    ]
+                    [ Html.text (heart (canAct && social.liked)) ]
+                , if List.isEmpty social.comments && List.isEmpty social.pending then
+                    Html.text ""
+
+                  else
+                    Html.ul [ Attr.class "guest-comments" ]
+                        (List.map (viewComment ui) (List.drop hidden social.comments)
+                            ++ List.map viewPending social.pending
+                        )
+                , if hidden > 0 then
+                    Html.button [ Attr.class "guest-more", Attr.type_ "button", Events.onClick (ShowAllComments postId) ] [ Html.text "More comments" ]
+
+                  else
+                    Html.text ""
+                , if composing then
+                    viewComposer postId (Dict.get postId ui.drafts |> Maybe.withDefault "")
+
+                  else
+                    Html.button
+                        [ Attr.class "guest-add"
+                        , Attr.type_ "button"
                         , Events.onClick
                             (if canAct then
                                 OpenComment postId
@@ -545,21 +588,7 @@ viewPost back postId model =
                                 SignIn (signInUrl (CommentAfter postId))
                             )
                         ]
-                        [ Html.text "Comment" ]
-                    ]
-                , if List.isEmpty social.comments && List.isEmpty social.pending then
-                    Html.text ""
-
-                  else
-                    Html.ul [ Attr.class "guest-comments" ]
-                        (List.map (viewComment ui) social.comments
-                            ++ List.map viewPending social.pending
-                        )
-                , if canAct && ui.open == Just postId then
-                    viewComposer postId (Dict.get postId ui.drafts |> Maybe.withDefault "")
-
-                  else
-                    Html.text ""
+                        [ Html.text "Add a comment…" ]
                 , case Dict.get postId ui.notes of
                     Just note ->
                         Html.p [ Attr.class "guest-note", Attr.attribute "role" "status" ] [ Html.text note ]
