@@ -685,6 +685,7 @@ type Msg
     | TimelineDragStart Float Float
     | TimelineDragTo Float
     | TimelineDragEnd
+    | TimelineStep Int
     | NoOp
 
 
@@ -954,6 +955,22 @@ update msg model =
 
         TimelineDragEnd ->
             ( { model | timelineDrag = Nothing }, Cmd.none )
+
+        -- ← or →: to the hour before or after the one at the left edge
+        -- (an hour's a third of the screen, see live.html).
+        TimelineStep by ->
+            ( model
+            , Browser.Dom.getViewportOf Burndown.scrollerId
+                |> Task.andThen
+                    (\v ->
+                        let
+                            hour =
+                                max 1 (v.viewport.width / 3)
+                        in
+                        Browser.Dom.setViewportOf Burndown.scrollerId (toFloat (round (v.viewport.x / hour) + by) * hour) 0
+                    )
+                |> Task.attempt (\_ -> NoOp)
+            )
 
         -- The Plan opens scrolled to the next stop (with one done above
         -- it, for context).
@@ -1514,6 +1531,7 @@ viewTimelineTab model =
                 { scrolled = TimelineScrolled
                 , jump = TimelineJump
                 , dragStart = TimelineDragStart
+                , step = TimelineStep
                 , visible = model.timelineVisible
                 , dragging = model.timelineDrag /= Nothing
                 }

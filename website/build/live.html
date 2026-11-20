@@ -115,7 +115,9 @@
     .burndown-dragging { scroll-snap-type: none; cursor: grabbing; }
     .burndown-track { position: relative; height: 100%; display: grid; grid-template-rows: 24px minmax(0, 1fr); }
     /* An hour's line: where the chart settles, and its label. */
-    .burndown-hour { position: absolute; top: 0; height: 24px; width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+    /* 1px wide, not 0: Safari ignores a snap point on an element with no
+       width, and then snaps any scroll from code (the ← and → buttons) to the end. */
+    .burndown-hour { position: absolute; top: 0; height: 24px; width: 1px; scroll-snap-align: start; scroll-snap-stop: always; }
     .burndown-hour-label { position: absolute; top: 2px; left: var(--space-1); font: var(--t-helper); color: var(--ink); white-space: nowrap; }
     .burndown-plot { grid-row: 2; position: relative; box-shadow: inset 0 0 0 1px var(--line); }
     .burndown-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
@@ -127,6 +129,14 @@
     .burndown-plan { fill: none; stroke: var(--plan); stroke-width: 2px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .burndown-actual { fill: none; stroke: var(--signal); stroke-width: 3px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .burndown-now { stroke: var(--ink); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+    /* ← and →, over the chart's top right, below the hour labels (like the map's + and -). */
+    .burndown-step { grid-row: 1; grid-column: 2; align-self: start; justify-self: end; z-index: 3; display: flex; gap: var(--space-2);
+      margin: calc(24px + var(--space-2)) var(--space-2) 0 0; }
+    .burndown-step button { display: flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h); padding: 0;
+      border: 0; background: none; color: var(--ink); cursor: pointer; }
+    .burndown-step .icon { width: var(--icon-l); height: var(--icon-l); }
+    .burndown-step .icon-glyph { fill: var(--paper); }
+    .burndown-step button:disabled { color: var(--line); cursor: default; }
     /* The day strip: the whole day small, the part on screen boxed. */
     .burndown-strip { grid-row: 2; grid-column: 1 / -1; position: relative; height: 32px; margin-top: var(--space-3); border: var(--hairline);
       touch-action: none; cursor: pointer; }
@@ -346,7 +356,7 @@
   </noscript>
 
   <script src="/js/pair-player.js?v=a92a0ea6eb"></script>
-  <script src="/js/live.js?v=88e7f94601"></script>
+  <script src="/js/live.js?v=a9a642f269"></script>
   <script>
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.

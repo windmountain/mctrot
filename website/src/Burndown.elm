@@ -24,6 +24,7 @@ ruler and the numbers are drawn at their own size, placed by percentage.
 -}
 
 import Html exposing (Html)
+import Icon
 import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode as Decode
@@ -124,13 +125,14 @@ type alias Visible =
 {-| What the chart reports: a scroll (for the day strip), a jump on the
 strip (to a fraction of the day, to centre), and a mouse drag starting on
 the chart (at this x, scrolled this far; Live.elm scrolls it as the mouse
-moves). `visible`: what's on screen, once known; `dragging`: while the
+moves), and a press of the ← or → buttons (-1 or 1: an hour back or on). `visible`: what's on screen, once known; `dragging`: while the
 mouse drags it, scroll snapping is off (it settles when let go).
 -}
 type alias Config msg =
     { scrolled : Visible -> msg
     , jump : Float -> msg
     , dragStart : Float -> Float -> msg
+    , step : Int -> msg
     , visible : Maybe Visible
     , dragging : Bool
     }
@@ -352,6 +354,7 @@ view config marks input =
                                ]
                         )
                     ]
+                , viewStepButtons config
                 , Html.div
                     [ Attr.class "burndown-strip"
                     , Attr.attribute "aria-hidden" "true"
@@ -391,6 +394,36 @@ view config marks input =
                     , Html.span [] [ Html.text (formatHour (modBy 1440 (NewYorkTime.minuteOfWeek end) // 60)) ]
                     ]
                 ]
+
+
+{-| ← and →, over the chart's top right (like the map's + and -): an hour
+back or on, for a mouse (a finger or a trackpad can just swipe). Each is
+off at its end of the day.
+-}
+viewStepButtons : Config msg -> Html msg
+viewStepButtons config =
+    let
+        ( atStart, atEnd ) =
+            case config.visible of
+                Just v ->
+                    ( v.left <= 1, v.left + v.width >= v.scene - 1 )
+
+                Nothing ->
+                    ( False, False )
+
+        button by icon label off =
+            Html.button
+                [ Attr.type_ "button"
+                , Events.onClick (config.step by)
+                , Attr.disabled off
+                , Attr.attribute "aria-label" label
+                ]
+                [ Icon.view icon ]
+    in
+    Html.div [ Attr.class "burndown-step" ]
+        [ button -1 Icon.Previous "An hour back" atStart
+        , button 1 Icon.Next "An hour on" atEnd
+        ]
 
 
 {-| An hour of the day (0-23) on a 12-hour clock: "12 AM", "8 PM".
