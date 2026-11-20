@@ -1,16 +1,21 @@
-module Burndown exposing (Input, Marks, steps, view, window)
+module Burndown exposing (Config, Input, Marks, Visible, scrollerId, steps, track, view, window)
 
 {-| /live's timeline: a burndown chart of the McDonald's still to visit,
-plan against actual, under a time ruler like the simulator's
-(Simulator.elm, viewTimeAxis). Over the chart, sharing its space, marks
-(/live's posts) at their time across and a height of their own (latitude),
-read off a second axis down the right.
+plan against actual, scrolling sideways an hour at a time
+(website/LIVE-DESIGN.md, "Timeline").
 
 Down the side, the McDonald's left (all of them at the top, none at the
-bottom); across, New York time from the plan's first arrival to its last
-departure (or to now, if the walk runs over). The plan is a grey staircase,
+bottom), on an axis that stays put; across, New York time, about three
+hours to a screen, from the hour before the plan's first arrival to the
+hour after its last departure (or now, if the walk runs over). The chart
+slides under the axis and settles with an hour's line at its left edge
+(CSS scroll snapping, one hour per swipe). The plan is a grey staircase,
 stepping down at each expected arrival; what's actually happened is a red
-one, stepping down at each store's first check-in, up to now.
+one, stepping down at each store's first check-in, up to now. Marks
+(/live's posts) sit on the red line at their time.
+
+Under it, the whole day small: both lines, with the part on screen
+highlighted; tapping or dragging it jumps there.
 
 The chart is an SVG stretched to fill its box (preserveAspectRatio none),
 its lines kept their width with non-scaling strokes, like /live's map; the
@@ -20,6 +25,8 @@ ruler and the numbers are drawn at their own size, placed by percentage.
 
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Events as Events
+import Json.Decode as Decode
 import NewYorkTime
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
@@ -94,21 +101,74 @@ scale =
     1000
 
 
-{-| Marks over the chart: each at a time (across) and `y`, 0 (top) to 1
-(bottom), drawn by a function given both as fractions of the chart; those
-outside the chart's span are left off. `axis`: the right axis's labels, at
-their `y`; `key`: what the marks are, for the key (none without marks).
+{-| Marks on the red line, each at a time, drawn by a function given where
+it is as fractions of the chart; those outside the chart's span are left
+off. `key`: what the marks are, for the key (none without marks).
 -}
 type alias Marks msg =
-    { items : List { at : Int, y : Float, draw : { x : Float, y : Float } -> Html msg }
-    , axis : List ( Float, String )
+    { items : List { at : Int, draw : { x : Float, y : Float } -> Html msg }
     , key : String
     }
 
 
-view : Marks msg -> Input -> Html msg
-view marks input =
-    case window input of
+{-| How far the chart is scrolled, in pixels: from its left, how much is
+on screen, and how wide it all is.
+-}
+type alias Visible =
+    { left : Float
+    , width : Float
+    , scene : Float
+    }
+
+
+{-| What the chart reports: a scroll (for the day strip), a jump on the
+strip (to a fraction of the day, to centre), and a mouse drag starting on
+the chart (at this x, scrolled this far; Live.elm scrolls it as the mouse
+moves). `visible`: what's on screen, once known; `dragging`: while the
+mouse drags it, scroll snapping is off (it settles when let go).
+-}
+type alias Config msg =
+    { scrolled : Visible -> msg
+    , jump : Float -> msg
+    , dragStart : Float -> Float -> msg
+    , visible : Maybe Visible
+    , dragging : Bool
+    }
+
+
+scrollerId : String
+scrollerId =
+    "burndown-scroller"
+
+
+{-| The chart's span, whole hours: the hour the window starts in to the
+hour after it ends.
+-}
+track : Input -> Maybe ( Int, Int )
+track input =
+    window input
+        |> Maybe.map
+            (\( start, end ) ->
+                let
+                    floorHour t =
+                        t - modBy hourMs (modBy (24 * hourMs) (NewYorkTime.minuteOfWeek t * 60000) + modBy 60000 t)
+
+                    endHour =
+                        floorHour end
+                in
+                ( floorHour start
+                , if endHour == end then
+                    end
+
+                  else
+                    endHour + hourMs
+                )
+            )
+
+
+view : Config msg -> Marks msg -> Input -> Html msg
+view config marks input =
+    case track input of
         Nothing ->
             Html.p [ Attr.class "tab-empty" ] [ Html.text "No route plan loaded." ]
 
@@ -116,6 +176,9 @@ view marks input =
             let
                 span =
                     toFloat (max 1 (end - start))
+
+                hoursLong =
+                    (end - start) // hourMs
 
                 x t =
                     toFloat (t - start) / span * scale
@@ -138,7 +201,7 @@ view marks input =
                         []
 
                 started =
-                    input.now >= start
+                    input.now >= start && not (List.isEmpty input.visits)
 
                 upToNow =
                     min input.now end
@@ -149,14 +212,9 @@ view marks input =
                 actual =
                     steps input.total start upToNow input.visits
 
-                leftAt corners =
-                    corners |> List.reverse |> List.head |> Maybe.map Tuple.second |> Maybe.withDefault input.total
-
-                plannedByNow =
-                    leftAt (steps input.total start upToNow input.plan)
-
-                actuallyLeft =
-                    leftAt actual
+                -- McDonald's left on the red line at a time.
+                leftAt t =
+                    steps input.total start t input.visits |> List.reverse |> List.head |> Maybe.map Tuple.second |> Maybe.withDefault input.total
 
                 levels =
                     -- Every ten, and the total at the top.
@@ -165,27 +223,160 @@ view marks input =
                         |> List.sort
 
                 hours =
-                    hourTicks start end
+                    List.range 0 hoursLong |> List.map (\i -> start + i * hourMs)
 
                 shown =
-                    List.filter (\mark -> mark.at >= start && mark.at <= end) marks.items
+                    List.filter (\mark -> mark.at >= start && mark.at <= min end input.now) marks.items
+
+                lines =
+                    [ line "burndown-plan" planned ]
+                        ++ (if started then
+                                [ line "burndown-actual" actual ]
+
+                            else
+                                []
+                           )
+
+                visibleScroll =
+                    Decode.map3 Visible
+                        (Decode.at [ "target", "scrollLeft" ] Decode.float)
+                        (Decode.at [ "target", "clientWidth" ] Decode.float)
+                        (Decode.at [ "target", "scrollWidth" ] Decode.float)
+
+                -- Where on the strip a pointer is, as a fraction of it.
+                stripAt =
+                    Decode.map2 (\offset width -> clamp 0 1 (offset / max 1 width))
+                        (Decode.field "offsetX" Decode.float)
+                        (Decode.at [ "currentTarget", "clientWidth" ] Decode.float)
+
+                pressed =
+                    Decode.field "buttons" Decode.int
+                        |> Decode.andThen
+                            (\buttons ->
+                                if buttons > 0 then
+                                    Decode.map config.jump stripAt
+
+                                else
+                                    Decode.fail "not pressed"
+                            )
             in
             Html.div [ Attr.class "burndown" ]
-                [ Html.p [ Attr.class "burndown-summary" ]
-                    [ Html.text
-                        (if started then
-                            String.fromInt actuallyLeft
-                                ++ " to go"
-                                ++ (if input.now <= end then
-                                        "; the plan says " ++ String.fromInt plannedByNow ++ " by now."
+                [ Html.div [ Attr.class "burndown-levels" ]
+                    (List.map
+                        (\left ->
+                            Html.span
+                                [ Attr.class "burndown-level", Attr.style "top" (pct (y left)) ]
+                                [ Html.text (String.fromInt left) ]
+                        )
+                        levels
+                    )
+                , Html.div
+                    [ Attr.class "burndown-scroller"
+                    , Attr.classList [ ( "burndown-dragging", config.dragging ) ]
+                    , Attr.id scrollerId
+                    , Attr.tabindex 0
+                    , Attr.attribute "aria-label" "Timeline, an hour at a time"
+                    , Events.on "scroll" (Decode.map config.scrolled visibleScroll)
+                    , Events.preventDefaultOn "mousedown"
+                        (Decode.map3 (\button cx left -> ( button, config.dragStart cx left ))
+                            (Decode.field "button" Decode.int)
+                            (Decode.field "clientX" Decode.float)
+                            (Decode.at [ "currentTarget", "scrollLeft" ] Decode.float)
+                            |> Decode.andThen
+                                (\( button, msg ) ->
+                                    if button == 0 then
+                                        Decode.succeed ( msg, True )
 
                                     else
-                                        "."
-                                   )
-
-                         else
-                            String.fromInt (input.total - List.length input.visits) ++ " to go. Starts " ++ NewYorkTime.format start ++ "."
+                                        Decode.fail "not the main button"
+                                )
                         )
+                    ]
+                    [ Html.div [ Attr.class "burndown-track", Attr.style "width" ("calc(" ++ String.fromInt hoursLong ++ " * 100cqw / 3)") ]
+                        (List.map
+                            (\t ->
+                                Html.div [ Attr.class "burndown-hour", Attr.style "left" (pct (x t)) ]
+                                    [ if t < end then
+                                        Html.span [ Attr.class "burndown-hour-label" ] [ Html.text (formatHour (modBy 1440 (NewYorkTime.minuteOfWeek t) // 60)) ]
+
+                                      else
+                                        Html.text ""
+                                    ]
+                            )
+                            hours
+                            ++ [ Html.div [ Attr.class "burndown-plot" ]
+                                    [ Svg.svg
+                                        [ SvgAttr.viewBox ("0 0 " ++ String.fromFloat scale ++ " " ++ String.fromFloat scale)
+                                        , SvgAttr.preserveAspectRatio "none"
+                                        , Attr.attribute "role" "img"
+                                        , Attr.attribute "aria-label" "McDonald's still to visit over time: the plan, and what's actually happened so far"
+                                        ]
+                                        (List.map
+                                            (\t ->
+                                                Svg.line [ SvgAttr.class "burndown-grid", SvgAttr.x1 (String.fromFloat (x t)), SvgAttr.x2 (String.fromFloat (x t)), SvgAttr.y1 "0", SvgAttr.y2 (String.fromFloat scale) ] []
+                                            )
+                                            hours
+                                            ++ List.map
+                                                (\left ->
+                                                    Svg.line [ SvgAttr.class "burndown-grid", SvgAttr.x1 "0", SvgAttr.x2 (String.fromFloat scale), SvgAttr.y1 (String.fromFloat (y left)), SvgAttr.y2 (String.fromFloat (y left)) ] []
+                                                )
+                                                levels
+                                            ++ lines
+                                            ++ (if input.now >= start && input.now <= end then
+                                                    [ Svg.line [ SvgAttr.class "burndown-now", SvgAttr.x1 (String.fromFloat (x input.now)), SvgAttr.x2 (String.fromFloat (x input.now)), SvgAttr.y1 "0", SvgAttr.y2 (String.fromFloat scale) ] [] ]
+
+                                                else
+                                                    []
+                                               )
+                                        )
+                                    , Html.div [ Attr.class "burndown-marks" ]
+                                        (List.map
+                                            (\mark ->
+                                                let
+                                                    across =
+                                                        toFloat (mark.at - start) / span
+
+                                                    down =
+                                                        y (leftAt mark.at) / scale
+                                                in
+                                                Html.div
+                                                    [ Attr.class "burndown-mark"
+                                                    , Attr.style "left" (String.fromFloat (across * 100) ++ "%")
+                                                    , Attr.style "top" (String.fromFloat (down * 100) ++ "%")
+                                                    ]
+                                                    [ mark.draw { x = across, y = down } ]
+                                            )
+                                            shown
+                                        )
+                                    ]
+                               ]
+                        )
+                    ]
+                , Html.div
+                    [ Attr.class "burndown-strip"
+                    , Attr.attribute "aria-hidden" "true"
+                    , Events.on "pointerdown" (Decode.map config.jump stripAt)
+                    , Events.on "pointermove" pressed
+                    ]
+                    [ Svg.svg
+                        [ SvgAttr.viewBox ("0 0 " ++ String.fromFloat scale ++ " " ++ String.fromFloat scale)
+                        , SvgAttr.preserveAspectRatio "none"
+                        ]
+                        lines
+                    , case config.visible of
+                        Just v ->
+                            Html.span
+                                [ Attr.class "burndown-strip-window"
+                                , Attr.style "left" (String.fromFloat (v.left / max 1 v.scene * 100) ++ "%")
+                                , Attr.style "width" (String.fromFloat (v.width / max 1 v.scene * 100) ++ "%")
+                                ]
+                                []
+
+                        Nothing ->
+                            Html.text ""
+                    ]
+                , Html.div [ Attr.class "burndown-strip-labels" ]
+                    [ Html.span [] [ Html.text (formatHour (modBy 1440 (NewYorkTime.minuteOfWeek start) // 60)) ]
                     , Html.span [ Attr.class "burndown-key" ]
                         ([ Html.span [ Attr.class "burndown-key-plan" ] [ Html.text "Plan" ]
                          , Html.span [ Attr.class "burndown-key-actual" ] [ Html.text "Actual" ]
@@ -197,211 +388,9 @@ view marks input =
                                     [ Html.span [ Attr.class "burndown-key-marks" ] [ Html.text marks.key ] ]
                                )
                         )
+                    , Html.span [] [ Html.text (formatHour (modBy 1440 (NewYorkTime.minuteOfWeek end) // 60)) ]
                     ]
-                , Html.div [] []
-                , viewRuler start end
-                , Html.div [] []
-                , Html.div [ Attr.class "burndown-levels" ]
-                    (List.map
-                        (\left ->
-                            Html.span
-                                [ Attr.class "burndown-level", Attr.style "top" (pct (y left)) ]
-                                [ Html.text (String.fromInt left) ]
-                        )
-                        levels
-                    )
-                , Html.div [ Attr.class "burndown-plot" ]
-                    [ Html.div [ Attr.class "burndown-marks" ]
-                        (List.map
-                            (\mark ->
-                                let
-                                    across =
-                                        toFloat (mark.at - start) / span
-                                in
-                                Html.div
-                                    [ Attr.class "burndown-mark"
-                                    , Attr.style "left" (String.fromFloat (across * 100) ++ "%")
-                                    , Attr.style "top" (String.fromFloat (mark.y * 100) ++ "%")
-                                    ]
-                                    [ mark.draw { x = across, y = mark.y } ]
-                            )
-                            shown
-                        )
-                    , Svg.svg
-                        [ SvgAttr.viewBox ("0 0 " ++ String.fromFloat scale ++ " " ++ String.fromFloat scale)
-                        , SvgAttr.preserveAspectRatio "none"
-                        , Attr.attribute "role" "img"
-                        , Attr.attribute "aria-label" "McDonald's still to visit over time: the plan, and what's actually happened so far"
-                        ]
-                        (List.map
-                            (\( t, _ ) ->
-                                Svg.line [ SvgAttr.class "burndown-grid", SvgAttr.x1 (String.fromFloat (x t)), SvgAttr.x2 (String.fromFloat (x t)), SvgAttr.y1 "0", SvgAttr.y2 (String.fromFloat scale) ] []
-                            )
-                            hours
-                            ++ List.map
-                                (\left ->
-                                    Svg.line [ SvgAttr.class "burndown-grid", SvgAttr.x1 "0", SvgAttr.x2 (String.fromFloat scale), SvgAttr.y1 (String.fromFloat (y left)), SvgAttr.y2 (String.fromFloat (y left)) ] []
-                                )
-                                levels
-                            ++ [ line "burndown-plan" planned ]
-                            ++ (if started then
-                                    [ line "burndown-actual" actual ]
-
-                                else
-                                    []
-                               )
-                            ++ (if started && input.now <= end then
-                                    [ Svg.line [ SvgAttr.class "burndown-now", SvgAttr.x1 (String.fromFloat (x input.now)), SvgAttr.x2 (String.fromFloat (x input.now)), SvgAttr.y1 "0", SvgAttr.y2 (String.fromFloat scale) ] [] ]
-
-                                else
-                                    []
-                               )
-                        )
-                    ]
-                , Html.div [ Attr.class "burndown-marks-axis" ]
-                    (if List.isEmpty shown then
-                        []
-
-                     else
-                        List.map
-                            (\( at, label ) ->
-                                Html.span [ Attr.class "burndown-marks-level", Attr.style "top" (String.fromFloat (at * 100) ++ "%") ] [ Html.text label ]
-                            )
-                            marks.axis
-                    )
                 ]
-
-
-{-| The hours in the span, as (time, hour of the day in New York).
--}
-hourTicks : Int -> Int -> List ( Int, Int )
-hourTicks start end =
-    quarterTicks start end
-        |> List.filterMap
-            (\t ->
-                let
-                    minuteOfDay =
-                        modBy 1440 (NewYorkTime.minuteOfWeek t)
-                in
-                if modBy 60 minuteOfDay == 0 then
-                    Just ( t, minuteOfDay // 60 )
-
-                else
-                    Nothing
-            )
-
-
-{-| Every quarter hour of New York clock time in the span.
--}
-quarterTicks : Int -> Int -> List Int
-quarterTicks start end =
-    let
-        quarterMs =
-            15 * 60000
-
-        -- The quarter hour starting the start's minute or after it, then
-        -- the next one if that's before the start (a start part-way
-        -- through a quarter hour's first minute).
-        onOrAfterMinute =
-            (start - modBy 60000 start)
-                + modBy 15 (15 - modBy 15 (NewYorkTime.minuteOfWeek start))
-                * 60000
-
-        first =
-            if onOrAfterMinute < start then
-                onOrAfterMinute + quarterMs
-
-            else
-                onOrAfterMinute
-    in
-    List.range 0 ((end - first) // quarterMs)
-        |> List.map (\i -> first + i * quarterMs)
-
-
-rulerHeight : Float
-rulerHeight =
-    26
-
-
-{-| The time ruler, as the simulator draws it: a tick every 15 minutes,
-taller ticks on the hour, and hour labels ("8 AM") every 1, 2, 3, ...
-hours, as many as fit (assuming a phone-ish 360px). Labels too close to
-either end to fit are left off.
--}
-viewRuler : Int -> Int -> Html msg
-viewRuler start end =
-    let
-        span =
-            toFloat (max 1 (end - start))
-
-        pct t =
-            String.fromFloat (toFloat (t - start) / span * 100) ++ "%"
-
-        hoursLong =
-            span / toFloat hourMs
-
-        labelEveryHours =
-            [ 1, 2, 3, 4, 6, 12, 24 ]
-                |> List.filter (\every -> toFloat every * 360 / hoursLong >= 44)
-                |> List.head
-                |> Maybe.withDefault 24
-
-        baseline =
-            rulerHeight - 2
-
-        tick t =
-            let
-                minuteOfDay =
-                    modBy 1440 (NewYorkTime.minuteOfWeek t)
-
-                isHour =
-                    modBy 60 minuteOfDay == 0
-
-                fraction =
-                    toFloat (t - start) / span
-
-                tickLine =
-                    Svg.line
-                        [ SvgAttr.x1 (pct t)
-                        , SvgAttr.x2 (pct t)
-                        , SvgAttr.y1 (String.fromFloat baseline)
-                        , SvgAttr.y2
-                            (String.fromFloat
-                                (if isHour then
-                                    baseline - 8
-
-                                 else
-                                    baseline - 4
-                                )
-                            )
-                        , SvgAttr.class "burndown-axis"
-                        ]
-                        []
-            in
-            if isHour && modBy labelEveryHours (minuteOfDay // 60) == 0 && fraction > 0.03 && fraction < 0.97 then
-                [ tickLine
-                , Svg.text_
-                    [ SvgAttr.x (pct t)
-                    , SvgAttr.y (String.fromFloat (baseline - 11))
-                    , SvgAttr.textAnchor "middle"
-                    , SvgAttr.class "burndown-axis-label"
-                    ]
-                    [ Svg.text (formatHour (minuteOfDay // 60)) ]
-                ]
-
-            else
-                [ tickLine ]
-    in
-    Svg.svg
-        [ SvgAttr.class "burndown-ruler"
-        , SvgAttr.width "100%"
-        , SvgAttr.height (String.fromFloat rulerHeight)
-        ]
-        (Svg.line
-            [ SvgAttr.x1 "0", SvgAttr.x2 "100%", SvgAttr.y1 (String.fromFloat baseline), SvgAttr.y2 (String.fromFloat baseline), SvgAttr.class "burndown-axis" ]
-            []
-            :: List.concatMap tick (quarterTicks start end)
-        )
 
 
 {-| An hour of the day (0-23) on a 12-hour clock: "12 AM", "8 PM".

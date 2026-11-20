@@ -32,6 +32,7 @@ import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Keyed
 import Http
+import Icon
 import Json.Decode as Decode exposing (Decoder)
 import Dict
 import Guests
@@ -43,6 +44,7 @@ import Radio
 import SnapToStreets
 import Simplify
 import SolarTime
+import Status
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Svg.Events
@@ -538,6 +540,25 @@ type alias Model =
     , outlineZoom : Float
     , drag : Maybe Drag
     , dragged : Bool
+
+    -- Two fingers on the map: their distance when the last zoom step
+    -- began (see Touch).
+    , pinch : Maybe Float
+
+    -- One finger down on the map: where and when, to tell a tap from a
+    -- scroll; and the last tap, for a double-tap.
+    , touchStart : Maybe Tap
+    , lastTap : Maybe Tap
+
+    -- The Stats tile filling the screen, if one is.
+    , maximized : Maybe Tile
+
+    -- The timeline: how far it's scrolled (for its day strip), a mouse
+    -- drag of it (where the mouse was pressed, how far it was scrolled),
+    -- and whether it's been scrolled to now since the tab opened.
+    , timelineVisible : Maybe Burndown.Visible
+    , timelineDrag : Maybe ( Float, Float )
+    , timelinePlaced : Bool
     , focused : Maybe Focused
     , walked : List (List ( Float, Float ))
 
@@ -554,6 +575,37 @@ type alias Drag =
     , y : Float
     , scrollX : Float
     , scrollY : Float
+    }
+
+
+{-| A finger on the map, in the window's coordinates, and when (the
+event's timeStamp, ms).
+-}
+type alias Tap =
+    { x : Float
+    , y : Float
+    , at : Float
+    }
+
+
+{-| A touch event on the map: the fingers still down (each at x, y), and
+for touchend the one just lifted.
+-}
+type alias Touch =
+    { down : List ( Float, Float )
+    , lifted : Maybe ( Float, Float )
+    , at : Float
+    }
+
+
+{-| What a zoom keeps in place: a point in the page's coordinates, and where
+it falls across the map's box (0 to 1 each way).
+-}
+type alias Anchor =
+    { x : Float
+    , y : Float
+    , fx : Float
+    , fy : Float
     }
 
 
@@ -589,6 +641,13 @@ init flags =
       , outlineZoom = 1
       , drag = Nothing
       , dragged = False
+      , pinch = Nothing
+      , touchStart = Nothing
+      , lastTap = Nothing
+      , maximized = Nothing
+      , timelineVisible = Nothing
+      , timelineDrag = Nothing
+      , timelinePlaced = False
       , focused = Nothing
       , walked = []
       }
@@ -609,14 +668,34 @@ type Msg
     | Navigate Route
     | PathChanged String
     | Zoom Float
-    | ZoomFrom Float Browser.Dom.Viewport
+    | ZoomAt Float (Maybe ( Float, Float ))
+    | ZoomFrom Float Anchor
+    | TouchStarted Touch
+    | TouchMoved Touch
+    | TouchEnded Touch
     | OutlineFor Float
     | DragStart Drag
     | DragTo Float Float
     | DragEnd
     | Focus Focused
     | GuestsMsg Guests.Msg
+    | Maximize (Maybe Tile)
+    | TimelineScrolled Burndown.Visible
+    | TimelineJump Float
+    | TimelineDragStart Float Float
+    | TimelineDragTo Float
+    | TimelineDragEnd
     | NoOp
+
+
+{-| The Stats tab's tiles.
+-}
+type Tile
+    = ProgressTile
+    | PaceTile
+    | WeatherTile
+    | SunTile
+    | PlanTile
 
 
 {-| What's open in a little box: on the map, a McDonald's (by id) or the
@@ -633,15 +712,120 @@ type Focused
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        -- The map's + or - (zoom times 2 or 1/2), within its limits. The
-        -- map grows or shrinks around the middle of what's in view, so
-        -- first see what's in view (Browser.Dom measures after the page is
-        -- next drawn, so this must come before the zoom changes it).
+        -- The map's + or - (zoom times 2 or 1/2), within its limits:
+        -- around the middle of what's in view, or the dot that's open.
         Zoom by ->
-            ( model
-            , Browser.Dom.getViewportOf mapFrameId
-                |> Task.attempt (Result.map (ZoomFrom by) >> Result.withDefault NoOp)
-            )
+            update (ZoomAt by Nothing) model
+
+        -- A step in or out around a point (in the window's coordinates;
+        -- Nothing for the middle of the map's frame). First see where that
+        -- point falls on the map's box, before the zoom changes it.
+        ZoomAt by point ->
+            if clamp 1 maxZoom (model.zoom * by) == model.zoom then
+                ( model, Cmd.none )
+
+            else
+                ( model
+                , Task.map3
+                    (\frame box page ->
+                        let
+                            ( x, y ) =
+                                case point of
+                                    Just ( cx, cy ) ->
+                                        ( page.viewport.x + cx, page.viewport.y + cy )
+
+                                    Nothing ->
+                                        ( frame.element.x + frame.element.width / 2, frame.element.y + frame.element.height / 2 )
+                        in
+                        { x = x
+                        , y = y
+                        , fx = (x - box.element.x) / max 1 box.element.width
+                        , fy = (y - box.element.y) / max 1 box.element.height
+                        }
+                    )
+                    (Browser.Dom.getElement mapFrameId)
+                    (Browser.Dom.getElement mapBoxId)
+                    Browser.Dom.getViewport
+                    |> Task.attempt (Result.map (ZoomFrom by) >> Result.withDefault NoOp)
+                )
+
+        -- Two fingers down: start counting a pinch. One: maybe a tap.
+        TouchStarted touch ->
+            case touch.down of
+                [ a, b ] ->
+                    ( { model | pinch = Just (distance a b), touchStart = Nothing }, Cmd.none )
+
+                [ ( x, y ) ] ->
+                    ( { model | touchStart = Just { x = x, y = y, at = touch.at } }, Cmd.none )
+
+                _ ->
+                    ( { model | touchStart = Nothing }, Cmd.none )
+
+        -- A pinch steps the zoom each time the fingers spread past
+        -- pinchStep (or close past 1 / pinchStep) of where the last step
+        -- began, around the point between them.
+        TouchMoved touch ->
+            case ( model.pinch, touch.down ) of
+                ( Just from, [ a, b ] ) ->
+                    let
+                        now =
+                            distance a b
+
+                        middle =
+                            ( (Tuple.first a + Tuple.first b) / 2, (Tuple.second a + Tuple.second b) / 2 )
+                    in
+                    if now > from * pinchStep then
+                        update (ZoomAt 2 (Just middle)) { model | pinch = Just now }
+
+                    else if now < from / pinchStep then
+                        update (ZoomAt 0.5 (Just middle)) { model | pinch = Just now }
+
+                    else
+                        ( model, Cmd.none )
+
+                _ ->
+                    ( { model | touchStart = Nothing }, Cmd.none )
+
+        -- A finger lifted: the end of a pinch, or a tap; two taps close
+        -- together in time and place zoom one step in, there.
+        TouchEnded touch ->
+            if model.pinch /= Nothing then
+                ( { model
+                    | pinch =
+                        if List.length touch.down == 2 then
+                            model.pinch
+
+                        else
+                            Nothing
+                    , lastTap = Nothing
+                  }
+                , Cmd.none
+                )
+
+            else
+                case ( model.touchStart, touch.lifted, touch.down ) of
+                    ( Just start, Just ( x, y ), [] ) ->
+                        if abs (x - start.x) + abs (y - start.y) < 12 && touch.at - start.at < 300 then
+                            let
+                                tap =
+                                    { x = x, y = y, at = touch.at }
+                            in
+                            case model.lastTap of
+                                Just last ->
+                                    if tap.at - last.at < 350 && abs (tap.x - last.x) + abs (tap.y - last.y) < 40 then
+                                        update (ZoomAt 2 (Just ( x, y ))) { model | lastTap = Nothing, touchStart = Nothing }
+
+                                    else
+                                        ( { model | lastTap = Just tap, touchStart = Nothing }, Cmd.none )
+
+                                Nothing ->
+                                    ( { model | lastTap = Just tap, touchStart = Nothing }, Cmd.none )
+
+                        else
+                            ( { model | lastTap = Nothing, touchStart = Nothing }, Cmd.none )
+
+                    _ ->
+                        ( { model | touchStart = Nothing }, Cmd.none )
 
         -- Dragging the map with the mouse scrolls it, so what was under
         -- the pointer stays under it. (Touch scrolls it natively.)
@@ -674,7 +858,7 @@ update msg model =
             else
                 ( { model | focused = Just target }, Cmd.none )
 
-        ZoomFrom by before ->
+        ZoomFrom by anchor ->
             let
                 zoom =
                     clamp 1 maxZoom (model.zoom * by)
@@ -685,15 +869,15 @@ update msg model =
             else
                 ( { model | zoom = zoom }
                 , Cmd.batch
-                    [ case model.focused of
-                        Just (FocusedStore _) ->
-                            centreOnFocused before
+                    [ case ( model.focused, model.pinch == Nothing && model.lastTap == Nothing ) of
+                        ( Just (FocusedStore _), True ) ->
+                            centreOnFocused anchor
 
-                        Just (FocusedPosts _) ->
-                            centreOnFocused before
+                        ( Just (FocusedPosts _), True ) ->
+                            centreOnFocused anchor
 
                         _ ->
-                            keepMapCentre before
+                            keepAnchor anchor
 
                     -- Zoom first; re-simplify the outline once that's on
                     -- screen (and only for the last of several quick clicks).
@@ -711,8 +895,15 @@ update msg model =
         -- A tab (or the title) clicked: switch views without reloading,
         -- so the radio keeps playing.
         Navigate route ->
-            ( { model | route = route }
-            , navigate { path = pathOf route, title = titleOf route }
+            ( { model | route = route, timelinePlaced = route == TimelineTab && model.latest /= Nothing }
+            , Cmd.batch
+                [ navigate { path = pathOf route, title = titleOf route }
+                , if route == TimelineTab then
+                    placeTimeline model
+
+                  else
+                    Cmd.none
+                ]
             )
 
         -- Back or Forward.
@@ -721,12 +912,65 @@ update msg model =
                 route =
                     routeFromPath path
             in
-            ( { model | route = route }
-            , setTitle (titleOf route)
+            ( { model | route = route, timelinePlaced = route == TimelineTab && model.latest /= Nothing }
+            , Cmd.batch
+                [ setTitle (titleOf route)
+                , if route == TimelineTab then
+                    placeTimeline model
+
+                  else
+                    Cmd.none
+                ]
             )
 
         NoOp ->
             ( model, Cmd.none )
+
+        TimelineScrolled visible ->
+            ( { model | timelineVisible = Just visible }, Cmd.none )
+
+        -- A tap or drag on the day strip: centre that part of the day (it
+        -- then settles on an hour).
+        TimelineJump fraction ->
+            ( model
+            , Browser.Dom.getViewportOf Burndown.scrollerId
+                |> Task.andThen (\v -> Browser.Dom.setViewportOf Burndown.scrollerId (fraction * v.scene.width - v.viewport.width / 2) 0)
+                |> Task.attempt (\_ -> NoOp)
+            )
+
+        -- Dragging the timeline with the mouse scrolls it (snapping off
+        -- meanwhile); let go and it settles on the nearest hour. (Touch
+        -- scrolls it natively.)
+        TimelineDragStart x left ->
+            ( { model | timelineDrag = Just ( x, left ) }, Cmd.none )
+
+        TimelineDragTo x ->
+            case model.timelineDrag of
+                Just ( from, left ) ->
+                    ( model, Browser.Dom.setViewportOf Burndown.scrollerId (left - (x - from)) 0 |> Task.attempt (\_ -> NoOp) )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        TimelineDragEnd ->
+            ( { model | timelineDrag = Nothing }, Cmd.none )
+
+        -- The Plan opens scrolled to the next stop (with one done above
+        -- it, for context).
+        Maximize tile ->
+            ( { model | maximized = tile }
+            , if tile == Just PlanTile then
+                Task.map3
+                    (\row tileEl list -> list.viewport.y + row.element.y - tileEl.element.y - 120)
+                    (Browser.Dom.getElement "plan-next")
+                    (Browser.Dom.getElement "stats-plan")
+                    (Browser.Dom.getViewportOf "stats-plan")
+                    |> Task.andThen (\y -> Browser.Dom.setViewportOf "stats-plan" 0 (max 0 y))
+                    |> Task.attempt (\_ -> NoOp)
+
+              else
+                Cmd.none
+            )
 
         RadioMsg radioMsg ->
             Radio.update radioMsg model.radio
@@ -761,11 +1005,23 @@ update msg model =
               }
             , Cmd.none
             )
+                |> placeTimelineOnce
                 |> announceRadio
 
         Tick now ->
             ( { model | now = Just now }, Cmd.none )
                 |> announceRadio
+
+
+{-| The first data on the Timeline tab: scroll it to now.
+-}
+placeTimelineOnce : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+placeTimelineOnce ( model, cmd ) =
+    if model.route == TimelineTab && not model.timelinePlaced then
+        ( { model | timelinePlaced = True }, Cmd.batch [ cmd, placeTimeline model ] )
+
+    else
+        ( model, cmd )
 
 
 {-| What's on McTrot radio now, by the server's clock.
@@ -820,6 +1076,15 @@ subscriptions model =
         , -- Overland sends every 30 s, so polling faster shows nothing new.
           Time.every 15000 (\_ -> Poll)
         , Time.every 1000 Tick
+        , case model.timelineDrag of
+            Just _ ->
+                Sub.batch
+                    [ Browser.Events.onMouseMove (Decode.map TimelineDragTo (Decode.field "clientX" Decode.float))
+                    , Browser.Events.onMouseUp (Decode.succeed TimelineDragEnd)
+                    ]
+
+            Nothing ->
+                Sub.none
         , if model.drag == Nothing then
             Sub.none
 
@@ -838,8 +1103,9 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     Html.div [ Attr.class ("app page-" ++ routeName model.route) ]
-        [ -- Title, radio and view switcher stay at the top as the page
-          -- scrolls (live.html, .app-top).
+        [ -- The title row and the view switcher stay at the top as the page
+          -- scrolls, and the radio at the bottom (live.html, .app-top and
+          -- .radio).
           Html.div [ Attr.class "app-top" ] [ viewHeader model, viewTabs model.route ]
         , Html.main_ [ Attr.id "main", Attr.class ("app-main tab-" ++ routeName model.route) ]
             (case model.route of
@@ -858,22 +1124,23 @@ view model =
                 StatsTab ->
                     viewStatsTab model
             )
-        ]
-
-
-viewHeader : Model -> Html Msg
-viewHeader model =
-    Html.header [ Attr.class "app-header" ]
-        [ Html.div [ Attr.class "app-title" ]
-            [ Html.h1 [] [ link Overview [] [ Html.text "McTROT 5" ] ]
-            , Html.p [ Attr.class "app-subtitle" ] [ Html.text "EATING AT EVERY McDONALD’S IN MANHATTAN ON ONE WALK" ]
-            ]
         , Html.map RadioMsg (Radio.view (serverNow model) (radioNow model) model.radio)
         ]
 
 
-{-| The views, as a row of radio-button-style segments: links, so each
-has its own address, with the current one marked.
+{-| The title, back to the overview, and "Sign out" at the right while a
+guest is signed in.
+-}
+viewHeader : Model -> Html Msg
+viewHeader model =
+    Html.header [ Attr.class "app-header" ]
+        [ Html.h1 [ Attr.class "app-title" ] [ link Overview [] [ Html.text "McTROT 5" ] ]
+        , Html.map GuestsMsg (Guests.viewSignOut model.guests)
+        ]
+
+
+{-| The views, as a row of square segments: links, so each has its own
+address, with the current one marked.
 -}
 viewTabs : Route -> Html Msg
 viewTabs current =
@@ -931,39 +1198,121 @@ plainClick msg =
         |> Decode.andThen identity
 
 
-{-| Plain /live: everything on one page, as it was before the tabs.
+{-| Plain /live: one paragraph, what McTrot is and where the walk stands
+(src/Status.elm), and nothing below it.
 -}
 viewOverview : Model -> List (Html Msg)
 viewOverview model =
-    let
-        response =
-            Maybe.map .response model.latest
-    in
     [ Html.div [ Attr.class "live" ]
-        [ viewStatus model
-        , Html.p [ Attr.class "live-visits" ] [ Html.text (visitsLine model) ]
-        , viewWeather model
-        , viewSky response
-        , viewMap Nothing model.focused model.walked (serverNow model) response
-        , viewSun response
-        , viewPosts model
+        [ Html.p [ Attr.class "live-paragraph" ]
+            [ Html.text
+                (case ( Maybe.map .response model.latest, serverNow model ) of
+                    ( Just response, Just now ) ->
+                        Status.paragraph (statusInput now model response)
+                            ++ (if model.failing then
+                                    " Can’t reach the recorder; retrying."
+
+                                else
+                                    ""
+                               )
+
+                    _ ->
+                        status model
+                )
+            ]
         ]
     ]
 
 
-viewStatus : Model -> Html Msg
-viewStatus model =
-    Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ] [ Html.text (status model) ]
+{-| What the overview's paragraph is made from.
+-}
+statusInput : Int -> Model -> LiveResponse -> Status.Input {}
+statusInput now model response =
+    { now = now
+    , stores = List.length response.stores
+    , start =
+        List.head response.stores
+            |> Maybe.andThen (\first -> Maybe.map (\at -> { at = at, address = first.address }) (plannedStart response))
+    , visits =
+        response.stores
+            |> List.filterMap
+                (\store ->
+                    response.visits
+                        |> List.filter (\v -> v.match == Matched store.id)
+                        |> List.map .tapTs
+                        |> List.minimum
+                        |> Maybe.map (\at -> { planned = store.arrive, at = at })
+                )
+    , weather =
+        response.weather
+            |> Maybe.map
+                (\w ->
+                    { summary = w.summary
+                    , temperatureF = w.temperatureF
+                    , feelsLikeF = w.feelsLikeF
+                    , windMph = w.windMph
+                    , gustMph = w.gustMph
+                    , windFrom = w.windFrom
+                    }
+                )
+    , sun = Just response.sun
+    , latestPost =
+        List.head response.posts
+            |> Maybe.map
+                (\post ->
+                    { at = post.ts
+                    , kind =
+                        case post.content of
+                            Text text ->
+                                Status.TextPost text
+
+                            Photo _ _ ->
+                                Status.PhotoPost
+
+                            Video _ _ ->
+                                Status.VideoPost
+
+                            Pair _ ->
+                                Status.VideoPost
+
+                            Voice _ ->
+                                Status.VoicePost
+                    }
+                )
+    , radio = radioNow model |> Maybe.map (\{ title, artist } -> { title = title, artist = artist })
+    }
 
 
-{-| The map, filling the page's height, mapTabStretch times as wide as
-Manhattan's true proportions (see viewMap), less as it's zoomed in (see
-stretchAt), and zoomable: + and - in its
-top-left corner, then scroll to look around.
+{-| The map's chip: "9:16 PM · 14 min ago", or how the connection's going.
+-}
+positionChip : Model -> String
+positionChip model =
+    case ( Maybe.andThen (.response >> .position) model.latest, serverNow model ) of
+        ( Just position, Just now ) ->
+            NewYorkTime.clock position.ts
+                ++ " · "
+                ++ duration (now - position.ts)
+                ++ " ago"
+                ++ (if model.failing then
+                        " · offline"
+
+                    else
+                        ""
+                   )
+
+        _ ->
+            status model
+
+
+{-| The map, filling the space between the tabs and the radio,
+mapTabStretch times as wide as Manhattan's true proportions (see viewMap),
+less as it's zoomed in (see stretchAt), and zoomable: + and - at its top
+right, a pinch, or a double-tap; then drag or scroll to look around. The
+last position floats at its top left.
 -}
 viewMapTab : Model -> List (Html Msg)
 viewMapTab model =
-    [ viewStatus model
+    [ Html.p [ Attr.class "live-map-chip", Attr.attribute "aria-live" "polite" ] [ Html.text (positionChip model) ]
     , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, outlineZoom = model.outlineZoom, dragging = model.drag /= Nothing }) model.focused model.walked (serverNow model) (Maybe.map .response model.latest)
     ]
 
@@ -1001,35 +1350,74 @@ mapFrameId =
     "live-map-frame"
 
 
-{-| After a zoom, scroll the map so what was in the middle of the view
-`before` still is. (Browser.Dom measures once the page is drawn at the new
-size.)
+{-| After a zoom, scroll the map so the same place on it is back under the
+anchor point (the middle of the frame, or the fingers). Measured on the
+box itself, so the margin around it when zoomed in and its stretch, which
+eases with each step, both take care of themselves. (Browser.Dom measures
+once the page is drawn at the new size.)
 -}
-keepMapCentre : Browser.Dom.Viewport -> Cmd Msg
-keepMapCentre before =
-    keepMapCentreTask before |> Task.attempt (\_ -> NoOp)
+keepAnchor : Anchor -> Cmd Msg
+keepAnchor anchor =
+    keepAnchorTask anchor |> Task.attempt (\_ -> NoOp)
 
 
-keepMapCentreTask : Browser.Dom.Viewport -> Task.Task Browser.Dom.Error ()
-keepMapCentreTask before =
-    Browser.Dom.getViewportOf mapFrameId
+keepAnchorTask : Anchor -> Task.Task Browser.Dom.Error ()
+keepAnchorTask anchor =
+    Task.map2 Tuple.pair (Browser.Dom.getElement mapBoxId) (Browser.Dom.getViewportOf mapFrameId)
         |> Task.andThen
-            (\after ->
-                let
-                    centre scroll seen sceneBefore sceneAfter =
-                        (scroll + seen / 2) * sceneAfter / sceneBefore - seen / 2
-                in
+            (\( box, frame ) ->
                 Browser.Dom.setViewportOf mapFrameId
-                    (centre before.viewport.x before.viewport.width before.scene.width after.scene.width)
-                    (centre before.viewport.y before.viewport.height before.scene.height after.scene.height)
+                    (frame.viewport.x + box.element.x + anchor.fx * box.element.width - anchor.x)
+                    (frame.viewport.y + box.element.y + anchor.fy * box.element.height - anchor.y)
             )
+
+
+{-| How far two fingers must spread (or close, by its inverse) to step the
+zoom: a guess, to tune on a phone.
+-}
+pinchStep : Float
+pinchStep =
+    1.5
+
+
+distance : ( Float, Float ) -> ( Float, Float ) -> Float
+distance ( x1, y1 ) ( x2, y2 ) =
+    sqrt ((x1 - x2) ^ 2 + (y1 - y2) ^ 2)
+
+
+{-| A touch event: the fingers down, the one lifted (touchend), and when.
+-}
+touchDecoder : Decoder Touch
+touchDecoder =
+    let
+        point =
+            Decode.map2 Tuple.pair (Decode.field "clientX" Decode.float) (Decode.field "clientY" Decode.float)
+
+        list field =
+            Decode.field field (Decode.field "length" Decode.int)
+                |> Decode.andThen
+                    (\n ->
+                        List.range 0 (min 2 n - 1)
+                            |> List.map (\i -> Decode.field field (Decode.field (String.fromInt i) point))
+                            |> List.foldr (Decode.map2 (::)) (Decode.succeed [])
+                    )
+    in
+    Decode.map3 Touch
+        (list "touches")
+        (list "changedTouches" |> Decode.map List.head)
+        (Decode.field "timeStamp" Decode.float)
+
+
+mapBoxId : String
+mapBoxId =
+    "live-map-box"
 
 
 {-| After a zoom with a dot selected on the map (a McDonald's or a post's),
 scroll so that dot's in the middle of the view; if it can't be found, keep
-the middle as it was (keepMapCentre).
+the anchor in place (keepAnchor).
 -}
-centreOnFocused : Browser.Dom.Viewport -> Cmd Msg
+centreOnFocused : Anchor -> Cmd Msg
 centreOnFocused before =
     Task.map3
         (\frame dot after ->
@@ -1041,7 +1429,7 @@ centreOnFocused before =
         (Browser.Dom.getElement focusedDotId)
         (Browser.Dom.getViewportOf mapFrameId)
         |> Task.andThen (\{ x, y } -> Browser.Dom.setViewportOf mapFrameId x y)
-        |> Task.onError (\_ -> keepMapCentreTask before)
+        |> Task.onError (\_ -> keepAnchorTask before)
         |> Task.attempt (\_ -> NoOp)
 
 
@@ -1061,14 +1449,14 @@ viewZoomButtons zoom =
             , Attr.disabled (zoom >= maxZoom)
             , Attr.attribute "aria-label" "Zoom in"
             ]
-            [ Html.text "+" ]
+            [ Icon.view Icon.Plus ]
         , Html.button
             [ Attr.type_ "button"
             , Events.onClick (Zoom 0.5)
             , Attr.disabled (zoom <= 1)
             , Attr.attribute "aria-label" "Zoom out"
             ]
-            [ Html.text "−" ]
+            [ Icon.view Icon.Minus ]
         ]
 
 
@@ -1089,31 +1477,20 @@ stretchAt zoom =
     mapTabStretch ^ (1 - logBase 2 zoom / logBase 2 maxZoom)
 
 
-{-| The posts, newest first, scrolling down the page.
+{-| The posts, newest first, scrolling down the page. (When the walk
+starts is the overview's to say.)
 -}
 viewBlogTab : Model -> List (Html Msg)
 viewBlogTab model =
-    case ( Maybe.map .response model.latest, serverNow model ) of
-        ( Just response, Just now ) ->
-            (case plannedStart response of
-                Just start ->
-                    if response.attempt == Nothing && now < start then
-                        [ Html.p [ Attr.class "tab-empty" ] [ Html.text ("Starting " ++ NewYorkTime.format start) ] ]
+    case Maybe.map .response model.latest of
+        Just response ->
+            if List.isEmpty response.posts then
+                [ Html.p [ Attr.class "tab-empty" ] [ Html.text "No posts yet." ] ]
 
-                    else
-                        []
+            else
+                [ viewPosts model ]
 
-                Nothing ->
-                    []
-            )
-                ++ (if List.isEmpty response.posts then
-                        [ Html.p [ Attr.class "tab-empty" ] [ Html.text "No blog posts yet." ] ]
-
-                    else
-                        [ viewPosts model ]
-                   )
-
-        _ ->
+        Nothing ->
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
 
 
@@ -1126,328 +1503,467 @@ plannedStart response =
 
 
 {-| A burndown chart of the McDonald's still to visit, plan against
-actual, under a time ruler (see Burndown).
+actual, scrolling sideways an hour at a time, with the posts as dots on the
+red line and the whole day small underneath (see Burndown).
 -}
 viewTimelineTab : Model -> List (Html Msg)
 viewTimelineTab model =
     case ( Maybe.map .response model.latest, serverNow model ) of
         ( Just response, Just now ) ->
-            let
-                stores =
-                    response.stores
-
-                latitudes =
-                    latitudeScale
-
-                firstVisits =
-                    stores
-                        |> List.filterMap
-                            (\store ->
-                                response.visits
-                                    |> List.filter (\v -> v.match == Matched store.id)
-                                    |> List.map .tapTs
-                                    |> List.minimum
-                            )
-            in
             [ Burndown.view
+                { scrolled = TimelineScrolled
+                , jump = TimelineJump
+                , dragStart = TimelineDragStart
+                , visible = model.timelineVisible
+                , dragging = model.timelineDrag /= Nothing
+                }
                 { items =
-                    postMoments (onWalkDay stores) response.posts
+                    postMoments (onWalkDay response.stores) response.posts
                         |> List.filterMap
                             (\posts ->
                                 case posts of
                                     newest :: _ ->
-                                        Maybe.map
-                                            (\( lat, _ ) ->
-                                                { at = onWalkDay stores newest.ts
-                                                , y = latitudes.y lat
-                                                , draw =
-                                                    \at ->
-                                                        let
-                                                            target =
-                                                                FocusedMoment (momentId posts)
-                                                        in
-                                                        Html.div []
-                                                            [ postDot model.focused target posts []
-                                                            , if model.focused == Just target then
-                                                                postsBox (Just now)
-                                                                    target
-                                                                    posts
-                                                                    [ ( "live-focus-left", at.x > 0.55 )
-                                                                    , ( "live-focus-below", at.y < 0.35 )
-                                                                    , ( "live-focus-above", at.y > 0.65 )
-                                                                    ]
-                                                                    []
+                                        Just
+                                            { at = onWalkDay response.stores newest.ts
+                                            , draw =
+                                                \at ->
+                                                    let
+                                                        target =
+                                                            FocusedMoment (momentId posts)
+                                                    in
+                                                    Html.div []
+                                                        [ postDot model.focused target posts []
+                                                        , if model.focused == Just target then
+                                                            postsBox (Just now)
+                                                                target
+                                                                posts
+                                                                [ ( "live-focus-left", at.x > 0.55 )
+                                                                , ( "live-focus-below", at.y < 0.35 )
+                                                                , ( "live-focus-above", at.y > 0.65 )
+                                                                ]
+                                                                []
 
-                                                              else
-                                                                Html.text ""
-                                                            ]
-                                                }
-                                            )
-                                            newest.at
+                                                          else
+                                                            Html.text ""
+                                                        ]
+                                            }
 
                                     [] ->
                                         Nothing
                             )
-                , axis = latitudes.axis
-                , key = "Posts, by latitude"
+                , key = "Posts"
                 }
-                { plan = List.filterMap .arrive stores
-                , planEnd =
-                    List.filterMap .depart stores
-                        ++ List.filterMap .arrive stores
-                        |> List.maximum
-                        |> Maybe.withDefault 0
-                , visits = firstVisits
-                , total = List.length stores
-                , now = now
-                }
+                (burndownInput now response)
             ]
 
         _ ->
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
 
 
-{-| A grid of cells filling the page. (How it subdivides and collapses
-comes in a later pass.)
+burndownInput : Int -> LiveResponse -> Burndown.Input
+burndownInput now response =
+    { plan = List.filterMap .arrive response.stores
+    , planEnd =
+        List.filterMap .depart response.stores
+            ++ List.filterMap .arrive response.stores
+            |> List.maximum
+            |> Maybe.withDefault 0
+    , visits = visitedStores response |> List.map Tuple.second
+    , total = List.length response.stores
+    , now = now
+    }
+
+
+{-| Scroll the timeline so now is a third of the way in from the left (it
+then settles on an hour).
+-}
+placeTimeline : Model -> Cmd Msg
+placeTimeline model =
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            case Burndown.track (burndownInput now response) of
+                Just ( start, end ) ->
+                    let
+                        fraction =
+                            clamp 0 1 (toFloat (now - start) / toFloat (max 1 (end - start)))
+                    in
+                    -- Then report what's on screen, for the day strip (there's
+                    -- no scroll event if it was already there).
+                    Browser.Dom.getViewportOf Burndown.scrollerId
+                        |> Task.andThen (\v -> Browser.Dom.setViewportOf Burndown.scrollerId (fraction * v.scene.width - v.viewport.width / 3) 0)
+                        |> Task.andThen (\_ -> Browser.Dom.getViewportOf Burndown.scrollerId)
+                        |> Task.attempt
+                            (Result.map (\v -> TimelineScrolled { left = v.viewport.x, width = v.viewport.width, scene = v.scene.width })
+                                >> Result.withDefault NoOp
+                            )
+
+                Nothing ->
+                    Cmd.none
+
+        _ ->
+            Cmd.none
+
+
+{-| Stats: tiles filling the screen, like windows (website/LIVE-DESIGN.md).
+Tapping one, or its maximize button, makes it fill the screen; its restore
+button puts it back. Only a maximized tile scrolls.
 -}
 viewStatsTab : Model -> List (Html Msg)
 viewStatsTab model =
-    let
-        response =
-            Maybe.map .response model.latest
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            let
+                tiles =
+                    [ ( ProgressTile, "Progress", viewProgressTile response )
+                    , ( PaceTile, "Pace", viewPaceTile response )
+                    , ( WeatherTile, "Weather", viewWeatherTile now response )
+                    , ( SunTile, "Sun", viewSunTile now response )
+                    , ( PlanTile, "Plan", viewPlanTile response )
+                    ]
 
-        cell title body =
-            Html.section [ Attr.class "stats-cell" ] (Html.h2 [] [ Html.text title ] :: body)
+                shown =
+                    case model.maximized of
+                        Just open ->
+                            List.filter (\( tile, _, _ ) -> tile == open) tiles
+
+                        Nothing ->
+                            tiles
+            in
+            [ Html.div [ Attr.class "stats-tiles", Attr.classList [ ( "stats-maximized", model.maximized /= Nothing ) ] ]
+                (List.map (viewTile model.maximized) shown)
+            ]
+
+        _ ->
+            [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
+
+
+{-| A tile: its label and maximize (or restore) button, then its content,
+small or full.
+-}
+viewTile : Maybe Tile -> ( Tile, String, Bool -> List (Html Msg) ) -> Html Msg
+viewTile maximized ( tile, label, content ) =
+    let
+        big =
+            maximized == Just tile
     in
-    [ Html.div [ Attr.class "stats-grid" ]
-        [ cell "Status" [ Html.p [] [ Html.text (statusLine model) ] ]
-        , Html.section [ Attr.class "stats-cell stats-cell-conditions" ]
-            [ Html.h2 [] [ Html.text "Conditions" ]
-            , viewWeatherAfter (solarTime model) False model
-            , viewSky response
+    Html.section
+        ([ Attr.class ("stats-tile stats-tile-" ++ String.toLower label), Attr.id ("stats-" ++ String.toLower label) ]
+            ++ (if big then
+                    []
+
+                else
+                    [ Events.onClick (Maximize (Just tile)) ]
+               )
+        )
+        (Html.header [ Attr.class "stats-tile-head" ]
+            [ Html.h2 [ Attr.class "t-heading" ] [ Html.text label ]
+            , Html.button
+                [ Attr.class "stats-tile-toggle"
+                , Attr.type_ "button"
+                , Attr.attribute "aria-label"
+                    (if big then
+                        "Back to all stats"
+
+                     else
+                        "Show " ++ label ++ " full screen"
+                    )
+                , Events.stopPropagationOn "click"
+                    (Decode.succeed
+                        ( Maximize
+                            (if big then
+                                Nothing
+
+                             else
+                                Just tile
+                            )
+                        , True
+                        )
+                    )
+                ]
+                [ Icon.view
+                    (if big then
+                        Icon.Minimize
+
+                     else
+                        Icon.Maximize
+                    )
+                ]
             ]
-        , Html.section [ Attr.class "stats-cell stats-cell-plan" ]
-            [ Html.h2 [] [ Html.text "Plan" ]
-            , viewPlan
-                (Maybe.map .stores response |> Maybe.withDefault [])
-                (Maybe.map .visits response |> Maybe.withDefault [])
-            ]
-        ]
+            :: content big
+        )
+
+
+{-| Visited out of how many.
+-}
+viewProgressTile : LiveResponse -> Bool -> List (Html Msg)
+viewProgressTile response _ =
+    let
+        visited =
+            List.length (visitedStores response)
+
+        total =
+            List.length response.stores
+    in
+    [ Html.p [ Attr.class "stats-big t-display" ] [ Html.text (String.fromInt visited ++ " / " ++ String.fromInt total) ]
+    , Html.p [ Attr.class "t-helper" ] [ Html.text (String.fromInt (total - visited) ++ " to go") ]
     ]
 
 
-{-| The route plan as a schedule, like the simulator's printout
-(Simulator.elm, viewPrintSchedule): nickname, address, expected
-and actual arrival, the difference, and expected departure, in New York
-time. A time on a new day (the first, or after midnight) shows the date
-as well.
-
-Actual arrival is the time of the check-in (Check In on the upload page)
-that the recorder matched to that store by GPS. The difference is
-expected minus actual: positive (green) when ahead of plan, negative
-(red) when behind.
+{-| Ahead or behind plan at the latest McDonald's: planned arrival against
+the first check-in there.
 -}
-viewPlan : List Store -> List Visit -> Html Msg
-viewPlan stores visits =
-    if List.isEmpty stores then
-        Html.p [] [ Html.text "No route plan loaded." ]
+viewPaceTile : LiveResponse -> Bool -> List (Html Msg)
+viewPaceTile response _ =
+    case visitedStores response |> List.sortBy Tuple.second |> List.reverse |> List.head of
+        Just ( store, at ) ->
+            case store.arrive of
+                Just planned ->
+                    let
+                        minutes =
+                            round (toFloat (planned - at) / 60000)
+                    in
+                    [ Html.p [ Attr.class "stats-big t-display" ]
+                        [ Html.text
+                            (if minutes > 0 then
+                                "+" ++ String.fromInt minutes ++ " min"
 
-    else
-        let
-            dayOf ms =
-                NewYorkTime.format ms |> String.split "," |> List.head
+                             else if minutes < 0 then
+                                "−" ++ String.fromInt -minutes ++ " min"
 
-            -- A time, with its date if it's on a different day from the
-            -- time before it.
-            timeCell before time =
-                Html.td [ Attr.class "plan-time" ]
-                    [ Html.text
-                        (case time of
-                            Just ms ->
-                                if Maybe.andThen dayOf before == dayOf ms then
-                                    NewYorkTime.clock ms
+                             else
+                                "0 min"
+                            )
+                        ]
+                    , Html.p [ Attr.class "t-helper" ]
+                        [ Html.text
+                            (if minutes > 0 then
+                                "ahead of plan"
 
-                                else
-                                    NewYorkTime.formatShort ms
+                             else if minutes < 0 then
+                                "behind plan"
 
-                            Nothing ->
-                                "—"
-                        )
+                             else
+                                "on plan"
+                            )
+                        ]
                     ]
 
-            checkedIn store =
-                visits
-                    |> List.filter (\visit -> visit.match == Matched store.id)
-                    |> List.head
-                    |> Maybe.map .tapTs
+                Nothing ->
+                    [ Html.p [ Attr.class "stats-big t-display" ] [ Html.text "—" ], Html.p [ Attr.class "t-helper" ] [ Html.text "no planned times" ] ]
 
-            difference store =
-                case ( store.arrive, checkedIn store ) of
-                    ( Just expected, Just actual ) ->
-                        let
-                            minutes =
-                                round (toFloat (expected - actual) / 60000)
-
-                            ( sign, class ) =
-                                if minutes > 0 then
-                                    ( "+", "plan-ahead" )
-
-                                else if minutes < 0 then
-                                    ( "−", "plan-behind" )
-
-                                else
-                                    ( "", "" )
-                        in
-                        Html.td [ Attr.class ("plan-time plan-diff " ++ class) ]
-                            [ Html.text
-                                (if minutes == 0 then
-                                    "on time"
-
-                                 else
-                                    sign ++ duration (abs minutes * 60000)
-                                )
-                            ]
-
-                    _ ->
-                        Html.td [ Attr.class "plan-time plan-diff" ] [ Html.text "—" ]
-
-            row ( previous, store ) =
-                Html.tr []
-                    [ Html.td [] [ Html.text store.name ]
-                    , Html.td [] [ Html.text store.address ]
-                    , timeCell (Maybe.andThen .depart previous) store.arrive
-                    , timeCell store.arrive (checkedIn store)
-                    , difference store
-                    , timeCell store.arrive store.depart
-                    ]
-        in
-        Html.table [ Attr.class "plan-schedule" ]
-            [ Html.thead []
-                [ Html.tr []
-                    [ Html.th [] [ Html.text "Nickname" ]
-                    , Html.th [] [ Html.text "Address" ]
-                    , Html.th [] [ Html.text "Expected arrival" ]
-                    , Html.th [] [ Html.text "Actual arrival" ]
-                    , Html.th [] [ Html.text "Difference" ]
-                    , Html.th [] [ Html.text "Expected departure" ]
-                    ]
-                ]
-            , Html.tbody []
-                (List.map row (List.map2 Tuple.pair (Nothing :: List.map Just stores) stores))
+        Nothing ->
+            [ Html.p [ Attr.class "stats-big t-display" ] [ Html.text "—" ]
+            , Html.p [ Attr.class "t-helper" ]
+                [ Html.text (plannedStart response |> Maybe.map (\start -> "starts " ++ NewYorkTime.clock start) |> Maybe.withDefault "not started") ]
             ]
 
 
-{-| "54°F, clear, feels like 47°F. Wind 9 mph from the NW, gusts 12 mph."
+{-| Each McDonald's visited, with its first check-in, in plan order.
 -}
-viewWeather : Model -> Html Msg
-viewWeather model =
-    viewWeatherAfter Nothing True model
+visitedStores : LiveResponse -> List ( Store, Int )
+visitedStores response =
+    response.stores
+        |> List.filterMap
+            (\store ->
+                response.visits
+                    |> List.filter (\v -> v.match == Matched store.id)
+                    |> List.map .tapTs
+                    |> List.minimum
+                    |> Maybe.map (Tuple.pair store)
+            )
 
 
-{-| The time of day by the sun now ("Civil twilight", "2 hours before solar
-noon"; see SolarTime), from today's sun times.
+{-| The weather in two short lines, and the sky as tiny swatches labelled
+Z, NW, NE, SE, SW; full screen, bigger swatches and where and when the
+weather was read.
 -}
-solarTime : Model -> Maybe String
-solarTime model =
-    Maybe.map2 (\now { response } -> SolarTime.describe now response.sun) (serverNow model) model.latest
-
-
-{-| The weather sentence, after `lead` if there is one ("Civil twilight.
-44°F, clear, …"), and where and when it was observed ("Central Manhattan,
-10 min ago") if `withSource`. Just the lead before any weather's been
-fetched.
--}
-viewWeatherAfter : Maybe String -> Bool -> Model -> Html Msg
-viewWeatherAfter lead withSource model =
+viewWeatherTile : Int -> LiveResponse -> Bool -> List (Html Msg)
+viewWeatherTile now response big =
     let
-        leading =
-            lead |> Maybe.map (\text -> text ++ ". ") |> Maybe.withDefault ""
-    in
-    case ( Maybe.andThen (.response >> .weather) model.latest, serverNow model ) of
-        ( Just w, Just now ) ->
-            let
-                degrees f =
-                    String.fromInt (round f) ++ "°F"
+        degrees f =
+            String.fromInt (round f) ++ "°F"
 
-                mph f =
-                    String.fromInt (round f) ++ " mph"
-
-                first =
-                    [ Maybe.map degrees w.temperatureF
-                    , Maybe.map String.toLower w.summary
-                    , Maybe.map (\f -> "feels like " ++ degrees f) w.feelsLikeF
-                    ]
+        lines =
+            case response.weather of
+                Just w ->
+                    [ [ Maybe.map degrees w.temperatureF
+                      , Maybe.map String.toLower w.summary
+                      ]
                         |> List.filterMap identity
-                        |> String.join ", "
-
-                wind =
-                    case w.windMph of
+                        |> String.join " "
+                        |> (\first -> first ++ (w.feelsLikeF |> Maybe.map (\f -> " · feels " ++ String.fromInt (round f) ++ "°") |> Maybe.withDefault ""))
+                    , case w.windMph of
                         Just speed ->
                             "Wind "
-                                ++ mph speed
-                                ++ (w.windFrom |> Maybe.map (\d -> " from the " ++ d) |> Maybe.withDefault "")
-                                ++ (w.gustMph |> Maybe.map (\g -> ", gusts " ++ mph g) |> Maybe.withDefault "")
-                                ++ "."
+                                ++ (w.windFrom |> Maybe.map (\d -> d ++ " ") |> Maybe.withDefault "")
+                                ++ String.fromInt (round speed)
+                                ++ (w.gustMph |> Maybe.map (\g -> ", gusts " ++ String.fromInt (round g)) |> Maybe.withDefault "")
 
                         Nothing ->
                             ""
-            in
-            Html.p [ Attr.class "live-weather" ]
-                [ Html.text (leading ++ capitalize first ++ ". " ++ wind)
-                , if withSource then
-                    Html.span [ Attr.class "live-weather-when" ]
-                        [ Html.text (" " ++ w.place ++ ", " ++ when now w.observedAt ++ ".") ]
+                    ]
+                        ++ (if big then
+                                [ w.place ++ ", " ++ when now w.observedAt ]
+
+                            else
+                                []
+                           )
+
+                Nothing ->
+                    [ "No weather yet" ]
+
+        short label =
+            if label == "Zenith" then
+                "Z"
+
+            else
+                label
+    in
+    List.map (\line -> Html.p [ Attr.class "stats-line" ] [ Html.text line ]) (List.filter (not << String.isEmpty) lines)
+        ++ [ Html.ul [ Attr.class "stats-sky", Attr.title "The sky now, simulated from the sun and the weather" ]
+                (List.map
+                    (\square ->
+                        Html.li []
+                            [ Html.span
+                                [ Attr.class "stats-swatch"
+                                , Attr.style "background-color" square.color
+                                , Attr.attribute "role" "img"
+                                , Attr.attribute "aria-label" (square.label ++ ": " ++ square.color)
+                                ]
+                                []
+                            , Html.text (short square.label)
+                            ]
+                    )
+                    response.sky
+                )
+           ]
+
+
+{-| One bar from sunrise to sunset with the sun on it now; full screen,
+the time of day by the sun and the twilight table too.
+-}
+viewSunTile : Int -> LiveResponse -> Bool -> List (Html Msg)
+viewSunTile now response big =
+    let
+        sun =
+            response.sun
+
+        position =
+            case ( sun.sunrise, sun.sunset ) of
+                ( Just rise, Just set ) ->
+                    Just (clamp 0 1 (toFloat (now - rise) / toFloat (max 1 (set - rise))))
+
+                _ ->
+                    Nothing
+
+        time =
+            Maybe.map NewYorkTime.clock >> Maybe.withDefault "—"
+    in
+    [ Html.div [ Attr.class "stats-sun" ]
+        [ Html.span [ Attr.class "t-helper" ] [ Html.text (time sun.sunrise) ]
+        , Html.span [ Attr.class "stats-sun-track" ]
+            [ case position of
+                Just x ->
+                    Html.span [ Attr.class "stats-sun-now", Attr.style "left" (String.fromFloat (x * 100) ++ "%") ] []
+
+                Nothing ->
+                    Html.text ""
+            ]
+        , Html.span [ Attr.class "t-helper" ] [ Html.text (time sun.sunset) ]
+        ]
+    ]
+        ++ (if big then
+                [ Html.p [ Attr.class "stats-line" ] [ Html.text (SolarTime.describe now sun) ]
+                , viewSun (Just response)
+                ]
+
+            else
+                []
+           )
+
+
+{-| The next few stops (as many as fit); full screen, all of them: the
+nickname, planned and actual arrival and the difference, with the address
+small beneath, and the next stop marked.
+-}
+viewPlanTile : LiveResponse -> Bool -> List (Html Msg)
+viewPlanTile response big =
+    let
+        visits =
+            visitedStores response |> List.map (\( store, at ) -> ( store.id, at ))
+
+        actual store =
+            visits |> List.filter (\( id, _ ) -> id == store.id) |> List.head |> Maybe.map Tuple.second
+
+        next =
+            response.stores |> List.filter (\store -> actual store == Nothing) |> List.head |> Maybe.map .id
+
+        upcoming =
+            if big then
+                response.stores
+
+            else
+                -- From the latest visited, if any, then onward.
+                let
+                    lastDone =
+                        response.stores
+                            |> List.indexedMap Tuple.pair
+                            |> List.filter (\( _, store ) -> actual store /= Nothing)
+                            |> List.map Tuple.first
+                            |> List.maximum
+                            |> Maybe.withDefault 0
+                in
+                List.drop lastDone response.stores
+
+        diff store =
+            case ( store.arrive, actual store ) of
+                ( Just planned, Just at ) ->
+                    let
+                        minutes =
+                            round (toFloat (planned - at) / 60000)
+                    in
+                    if minutes > 0 then
+                        Html.span [ Attr.class "plan-diff plan-ahead" ] [ Html.text ("+" ++ String.fromInt minutes) ]
+
+                    else if minutes < 0 then
+                        Html.span [ Attr.class "plan-diff plan-behind" ] [ Html.text ("−" ++ String.fromInt -minutes) ]
+
+                    else
+                        Html.span [ Attr.class "plan-diff" ] [ Html.text "0" ]
+
+                _ ->
+                    Html.span [ Attr.class "plan-diff" ] []
+
+        row store =
+            Html.li
+                ([ Attr.classList [ ( "plan-row", True ), ( "plan-next", Just store.id == next ), ( "plan-done", actual store /= Nothing ) ] ]
+                    ++ (if Just store.id == next then
+                            [ Attr.id "plan-next" ]
+
+                        else
+                            []
+                       )
+                )
+                [ Html.span [ Attr.class "plan-name" ] [ Html.text store.name ]
+                , Html.span [ Attr.class "plan-time" ] [ Html.text (Maybe.map NewYorkTime.clock store.arrive |> Maybe.withDefault "—") ]
+                , if big then
+                    Html.span [ Attr.class "plan-time" ] [ Html.text (Maybe.map NewYorkTime.clock (actual store) |> Maybe.withDefault "") ]
+
+                  else
+                    Html.text ""
+                , diff store
+                , if big then
+                    Html.span [ Attr.class "plan-address t-helper" ] [ Html.text store.address ]
 
                   else
                     Html.text ""
                 ]
+    in
+    if List.isEmpty response.stores then
+        [ Html.p [ Attr.class "t-helper" ] [ Html.text "No route plan loaded." ] ]
 
-        _ ->
-            case lead of
-                Just text ->
-                    Html.p [ Attr.class "live-weather" ] [ Html.text (text ++ ".") ]
-
-                Nothing ->
-                    Html.text ""
-
-
-{-| The sky now, as coloured tiles labelled with where to look: a row on a
-phone, a column pinned to the bottom-left corner on a wide screen
-(live.html).
--}
-viewSky : Maybe LiveResponse -> Html Msg
-viewSky response =
-    case Maybe.map .sky response of
-        Just ((_ :: _) as squares) ->
-            Html.figure
-                [ Attr.class "live-sky"
-                , Attr.title "The sky now, simulated from the sun and the weather"
-                ]
-                [ Html.ul []
-                    (List.map
-                        (\square ->
-                            Html.li []
-                                [ Html.span
-                                    [ Attr.class "live-sky-swatch"
-                                    , Attr.style "background-color" square.color
-                                    , Attr.attribute "role" "img"
-                                    , Attr.attribute "aria-label" (square.label ++ ": " ++ square.color)
-                                    ]
-                                    []
-                                , Html.span [ Attr.class "live-sky-label" ] [ Html.text square.label ]
-                                ]
-                        )
-                        squares
-                    )
-                ]
-
-        _ ->
-            Html.text ""
-
-
-capitalize : String -> String
-capitalize text =
-    String.toUpper (String.left 1 text) ++ String.dropLeft 1 text
+    else
+        [ Html.ol [ Attr.classList [ ( "plan-list", True ), ( "plan-list-full", big ) ] ] (List.map row upcoming) ]
 
 
 {-| Today's sunrise, sunset and twilights, in New York time.
@@ -1535,71 +2051,6 @@ status model =
 
             else
                 "Connecting…"
-
-
-{-| Stats' status: "5 of 46 restaurants visited. Last position November
-21, 5:34 AM EST." (each restaurant counted once, however many check-ins
-it's had), or how the connection's going before there's anything.
--}
-statusLine : Model -> String
-statusLine model =
-    case Maybe.map .response model.latest of
-        Just response ->
-            let
-                visited =
-                    response.stores
-                        |> List.filter (\store -> List.any (\v -> v.match == Matched store.id) response.visits)
-                        |> List.length
-            in
-            String.fromInt visited
-                ++ " of "
-                ++ String.fromInt (List.length response.stores)
-                ++ " restaurants visited. "
-                ++ status model
-
-        Nothing ->
-            status model
-
-
-{-| "Visits 3 / 46 · 1 checking in". Attempts are set aside for now (the
-recorder's USE_ATTEMPTS), so every check-in counts and there's no "on the
-road for".
--}
-visitsLine : Model -> String
-visitsLine model =
-    case Maybe.map .response model.latest of
-        Just response ->
-            let
-                count status_ =
-                    List.length (List.filter (.match >> status_) response.visits)
-
-                extra label n =
-                    if n > 0 then
-                        " · " ++ String.fromInt n ++ " " ++ label
-
-                    else
-                        ""
-            in
-            "Visits "
-                ++ String.fromInt (count isMatched)
-                ++ " / "
-                ++ String.fromInt (List.length response.stores)
-                ++ extra "checking in" (count ((==) Pending))
-                ++ extra "unmatched" (count ((==) Unmatched))
-                ++ "."
-
-        Nothing ->
-            ""
-
-
-isMatched : Match -> Bool
-isMatched match =
-    case match of
-        Matched _ ->
-            True
-
-        _ ->
-            False
 
 
 {-| "12 min ago" for the first two hours, then the date and time in New
@@ -1741,17 +2192,28 @@ viewMap shape focused walked now response =
 
                 Nothing ->
                     Attr.class ""
+            , onTouch shape "touchstart" TouchStarted
+            , onTouch shape "touchmove" TouchMoved
+            , onTouch shape "touchend" TouchEnded
+            , onTouch shape "touchcancel" TouchEnded
             , Attr.attribute "role" "img"
             , Attr.attribute "aria-label" "Map of Manhattan, stretched to fill the page: the streets between McDonald's, the planned route from start flag to finish flag, the path I've walked, every McDonald's (visited, not yet, or closed now) and my last position"
             ]
-            [ Html.div
+            [ -- Zoomed in, the box gets half a frame of empty margin all
+              -- round (live.html, .live-map-zoomed), so any place on it,
+              -- even at its edge, can be scrolled to the middle.
+              Html.div
+                [ Attr.class "live-map-scene"
+                , Attr.classList [ ( "live-map-zoomed", Maybe.map .zoom shape |> Maybe.map (\z -> z > 1) |> Maybe.withDefault False ) ]
+                ]
+                [ Html.div
                 (Attr.class "live-map-box"
                     :: (case ( shape, stretchBox ) of
                             ( Just { stretch, zoom }, [ _, _, width, height ] ) ->
-                                [ Attr.style "aspect-ratio" (String.fromFloat (width * stretch) ++ " / " ++ String.fromFloat height)
-                                , Attr.style "height" (String.fromFloat (zoom * 100) ++ "%")
-                                , Attr.style "max-width" (String.fromFloat (zoom * 100) ++ "%")
-                                , Attr.style "margin" "0 auto"
+                                [ Attr.id mapBoxId
+                                , Attr.style "aspect-ratio" (String.fromFloat (width * stretch) ++ " / " ++ String.fromFloat height)
+                                , Attr.style "height" (String.fromFloat (zoom * 100) ++ "cqh")
+                                , Attr.style "max-width" (String.fromFloat (zoom * 100) ++ "cqw")
                                 ]
 
                             _ ->
@@ -1793,6 +2255,7 @@ viewMap shape focused walked now response =
                            )
                     )
                 ]
+                ]
             ]
         , if placed /= Nothing && not (onMap placed) then
             Html.p [ Attr.class "live-note" ] [ Html.text "The last position is off this map." ]
@@ -1800,6 +2263,18 @@ viewMap shape focused walked now response =
           else
             Html.text ""
         ]
+
+
+{-| A touch handler on the zoomable map; nothing on a fixed one.
+-}
+onTouch : Maybe a -> String -> (Touch -> Msg) -> Html.Attribute Msg
+onTouch shape event toMsg =
+    case shape of
+        Just _ ->
+            Events.on event (Decode.map toMsg touchDecoder)
+
+        Nothing ->
+            Attr.class ""
 
 
 {-| The store whose dot a flag goes over: the one nearest an end of the
@@ -2319,7 +2794,7 @@ postsBox now target posts classes attributes =
             , Attr.attribute "aria-label" "Close"
             , Events.onClick (Focus target)
             ]
-            [ Html.text "×" ]
+            [ Icon.view Icon.Close ]
             :: List.map
                 (\post ->
                     Html.div [ Attr.class "live-focus-post" ]
@@ -2336,25 +2811,19 @@ postsBox now target posts classes attributes =
         )
 
 
-{-| The posts with a place, gathered into moments for the timeline, by
-`timeOf` (see onWalkDay): each joins the newest moment (newest first) if
-within momentMinutes and momentDegrees (of latitude) of its newest post,
-or starts its own.
+{-| The posts gathered into moments for the timeline, by `timeOf` (see
+onWalkDay): each joins the newest moment (newest first) if within
+momentMinutes of its newest post, or starts its own.
 -}
 postMoments : (Int -> Int) -> List Post -> List (List Post)
 postMoments timeOf posts =
-    let
-        latitude post =
-            Maybe.map Tuple.first post.at |> Maybe.withDefault 0
-    in
     posts
-        |> List.filter (\post -> post.at /= Nothing)
         |> List.sortBy (.ts >> timeOf >> negate)
         |> List.foldl
             (\post moments ->
                 case moments of
                     (newest :: rest) :: others ->
-                        if timeOf newest.ts - timeOf post.ts <= momentMinutes * 60000 && abs (latitude newest - latitude post) <= momentDegrees then
+                        if timeOf newest.ts - timeOf post.ts <= momentMinutes * 60000 then
                             (newest :: rest ++ [ post ]) :: others
 
                         else
@@ -2368,45 +2837,11 @@ postMoments timeOf posts =
 
 
 {-| Posts this close in time share a dot on the timeline: about a dot's
-width on a phone, over a day's walk.
+width on a phone at three hours to a screen.
 -}
 momentMinutes : Int
 momentMinutes =
     10
-
-
-{-| And this close in latitude: about a dot's height (some 700 ft).
--}
-momentDegrees : Float
-momentDegrees =
-    0.002
-
-
-{-| The timeline's latitude axis (for posts; see Burndown.Marks): Manhattan
-from the Battery (40.70°) to Inwood's northern tip (40.88°), north at the
-top. `y` places a latitude, 0 (top) to 1 (bottom), held to the axis (a post
-off the island sits at its edge); `axis` labels every 0.05°: "40.75°".
--}
-latitudeScale : { y : Float -> Float, axis : List ( Float, String ) }
-latitudeScale =
-    let
-        south =
-            40.7
-
-        north =
-            40.88
-
-        y lat =
-            clamp 0 1 ((north - lat) / (north - south))
-
-        label hundredths =
-            String.fromInt (hundredths // 100) ++ "." ++ String.padLeft 2 '0' (String.fromInt (modBy 100 hundredths)) ++ "°"
-    in
-    { y = y
-    , axis =
-        List.range (ceiling (south * 20 - 1.0e-6)) (floor (north * 20 + 1.0e-6))
-            |> List.map (\twentieths -> ( y (toFloat twentieths / 20), label (twentieths * 5) ))
-    }
 
 
 {-| A time moved to the same time of day (New York's) on the walk's day,
@@ -2599,32 +3034,31 @@ onMap placed =
 
 viewPosts : Model -> Html Msg
 viewPosts model =
-    case ( Maybe.map .response model.latest, serverNow model ) of
-        ( Just response, Just now ) ->
+    case Maybe.map .response model.latest of
+        Just response ->
             if List.isEmpty response.posts then
                 Html.text ""
 
             else
                 -- Keyed by post, so a video that's playing keeps playing
-                -- when a newer post arrives above it.
-                Html.div []
-                    [ Html.map GuestsMsg (Guests.viewAccount model.guests)
-                    , Html.Keyed.ul [ Attr.class "live-posts" ]
+                -- when a newer post arrives above it. Each: its time of
+                -- day (no date: it's the walk's day), the post, then likes
+                -- and comments.
+                Html.Keyed.ul [ Attr.class "live-posts" ]
                     (List.map
                         (\post ->
                             ( post.id
                             , Html.li [ Attr.class "live-post" ]
-                                [ viewPostContent post.content
-                                , Html.p [ Attr.class "live-post-when" ] [ Html.text (when now post.ts) ]
+                                [ Html.p [ Attr.class "live-post-when" ] [ Html.text (NewYorkTime.clock post.ts) ]
+                                , viewPostContent post.content
                                 , Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.route) post.id model.guests)
                                 ]
                             )
                         )
                         response.posts
                     )
-                    ]
 
-        _ ->
+        Nothing ->
             Html.text ""
 
 
