@@ -15,6 +15,45 @@
      Running-text margins below are multiples of this so baselines land
      on a shared grid. Fluid, clamp()-sized headings sit outside it. */
   --rhythm: 1.7rem;
+
+  /* Design tokens (website/LIVE-DESIGN.md). /live uses only these; the
+     rest of the site can move to them over time. Colours are named by
+     role, so the palette can change in one place. */
+  --ink: #0D0D08;        /* text, borders, black icon discs */
+  --ink-muted: #6b6b6b;  /* helper text */
+  --paper: #ffffff;      /* /live's background */
+  --line: #cccccc;       /* hairlines */
+  --accent: #FFD100;     /* radio stripe, play disc (placeholder) */
+  --signal: #DA291C;     /* liked, visited, the actual line, post dots */
+  --plan: #999999;       /* the planned line */
+
+  /* Spacing: steps of 4 and 8. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Lines. Corners are square everywhere. */
+  --hairline: 1px solid var(--line);
+  --strong: 2px solid var(--ink);
+
+  /* Five text styles, as font shorthands (weight size/line family);
+     heading also wants text-transform: uppercase and letter-spacing
+     0.08em, display letter-spacing -0.02em (see .t-* below). */
+  --t-display: 700 32px/32px var(--font);
+  --t-heading: 700 12px/16px var(--font);
+  --t-body: 400 17px/26px var(--font);
+  --t-ui: 700 15px/20px var(--font);
+  --t-helper: 400 13px/18px var(--font);
+
+  /* Controls. */
+  --control-h: 44px;
+  --stripe-h: 32px;
+  --icon-s: 20px;
+  --icon-l: 32px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1230,3 +1269,10 @@ body.sim-page {
     display: none;
   }
 }
+
+/* The five text styles (tokens above), as classes. */
+.t-display { font: var(--t-display); letter-spacing: -0.02em; color: var(--ink); }
+.t-heading { font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+.t-body    { font: var(--t-body); color: var(--ink); }
+.t-ui      { font: var(--t-ui); color: var(--ink); }
+.t-helper  { font: var(--t-helper); color: var(--ink-muted); }
