@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<!--
+  McTrot Radio's home page, at https://radio.mctrot.nyc/: a full-page
+  player, like the radio stripe along the bottom of mctrot.nyc/live
+  (website/src/Radio.elm), plus the stream's links for other players.
+  Served by Caddy (host/radio.nix); plain HTML and JS, no build step.
+
+  What's on comes from the recorder's public /live (its `radio`, the same
+  program Liquidsoap plays: station/program.liq). ?api=http://localhost:3000
+  points it at a local recorder.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>McTrot Radio</title>
+  <meta name="description" content="The soundtrack to a walk to every McDonald’s in Manhattan.">
+  <meta name="theme-color" content="#FFD100">
+  <meta name="theme-color" content="#E8B800" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <style>
+    :root {
+      --bg: #FFD100;
+      --ink: #0D0D08;
+      --ink-2: #26241A;
+      --rule: rgba(13, 13, 8, 0.25);
+      --font: Helvetica, Arial, sans-serif;
+      color-scheme: light;
+    }
+    /* Still yellow at night, a shade down (as on mctrot.nyc). */
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #E8B800; --ink: #0A0A06; --ink-2: #201F14; --rule: rgba(10, 10, 6, 0.3); }
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
+      background: var(--bg); color: var(--ink); font: 400 17px/26px var(--font); -webkit-text-size-adjust: 100%; }
+    a { color: var(--ink); text-underline-offset: 0.15em; }
+    a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+    .page { flex: 1; width: 100%; max-width: 36rem; margin: 0 auto; display: flex; flex-direction: column;
+      padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+
+    .masthead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+      padding-bottom: 12px; border-bottom: 2px solid var(--ink); }
+    .wordmark { margin: 0; font: 700 32px/32px var(--font); letter-spacing: -0.02em; }
+    .masthead a { font: 700 12px/16px var(--font); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+
+    /* The player: fills the middle of the screen. */
+    .player { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: 48px 0; }
+    .status { margin: 0; font: 700 12px/16px var(--font); letter-spacing: 0.08em; text-transform: uppercase; min-height: 16px; }
+    .status-problem::before { content: "⚠ "; }
+
+    .controls { display: flex; align-items: center; gap: 16px; }
+    .toggle { flex: none; width: 96px; height: 96px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--ink); cursor: pointer; }
+    .toggle svg { display: block; width: 100%; height: 100%; }
+    .toggle .disc { fill: var(--ink); }
+    .toggle .glyph { fill: var(--bg); }
+    .toggle .stop { display: none; }
+    .on .toggle .play { display: none; }
+    .on .toggle .stop { display: inline; }
+    .volume { flex: 1; min-width: 0; max-width: 14rem; accent-color: var(--ink); }
+    .volume[hidden] { display: none; }
+
+    .now { margin: 0; }
+    .now-title { margin: 0; font: 700 clamp(28px, 7vw, 44px)/1.1 var(--font); letter-spacing: -0.01em; overflow-wrap: anywhere; }
+    .now-artist { margin: 8px 0 0; font: 700 20px/26px var(--font); overflow-wrap: anywhere; }
+    .now-album { margin: 4px 0 0; color: var(--ink-2); overflow-wrap: anywhere; }
+    .now-album:empty { display: none; }
+
+    .progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px;
+      font: 400 13px/18px var(--font); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+    .progress[hidden] { display: none; }
+    .bar { height: 4px; background: var(--rule); }
+    .bar-fill { height: 100%; width: 0; background: var(--ink); }
+
+    .next { margin: 0; padding-top: 12px; border-top: 1px solid var(--rule); font: 400 15px/22px var(--font); color: var(--ink-2); overflow-wrap: anywhere; }
+    .next b { color: var(--ink); }
+    .next:empty { display: none; }
+
+    /* Other players. */
+    .elsewhere { padding-top: 16px; border-top: 2px solid var(--ink); }
+    .elsewhere h2 { margin: 0 0 8px; font: 700 15px/20px var(--font); }
+    .elsewhere dl { margin: 0; }
+    .elsewhere dt { margin-top: 12px; font: 700 12px/16px var(--font); letter-spacing: 0.08em; text-transform: uppercase; }
+    .elsewhere dd { margin: 2px 0 0; font: 400 15px/22px var(--font); overflow-wrap: anywhere; }
+    .elsewhere p { margin: 12px 0 0; font: 400 13px/18px var(--font); color: var(--ink-2); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <h1 class="wordmark">McTrot Radio</h1>
+      <a href="https://mctrot.nyc/live">Follow the walk</a>
+    </header>
+
+    <main class="player" id="player">
+      <p class="status" id="status" aria-live="polite">Radio · Off</p>
+
+      <div class="controls">
+        <button class="toggle" id="toggle" type="button" aria-label="Play the radio">
+          <!-- IBM Carbon's play--filled and stop--filled (Apache-2.0), as on /live. -->
+          <svg class="play" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <path class="disc" d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2Zm7.4473,14.8945-12,6A1,1,0,0,1,10,22V10a1,1,0,0,1,1.4473-.8945l12,6a1,1,0,0,1,0,1.789Z"/>
+            <path class="glyph" d="M11,23a1,1,0,0,1-1-1V10a1,1,0,0,1,1.4473-.8945l12,6a1,1,0,0,1,0,1.789l-12,6A1.001,1.001,0,0,1,11,23Z"/>
+          </svg>
+          <svg class="stop" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <path class="disc" d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2Zm6,18a2,2,0,0,1-2,2H12a2,2,0,0,1-2-2V12a2,2,0,0,1,2-2h8a2,2,0,0,1,2,2Z"/>
+            <path class="glyph" d="M12,10h8a2,2,0,0,1,2,2v8a2,2,0,0,1-2,2H12a2,2,0,0,1-2-2V12a2,2,0,0,1,2-2Z"/>
+          </svg>
+        </button>
+        <input class="volume" id="volume" type="range" min="0" max="1" step="0.05" value="0.8" aria-label="Volume" hidden>
+      </div>
+
+      <div class="now">
+        <p class="now-title" id="title">McTrot Radio</p>
+        <p class="now-artist" id="artist"></p>
+        <p class="now-album" id="album"></p>
+      </div>
+
+      <div class="progress" id="progress" hidden>
+        <span id="elapsed">0:00</span>
+        <div class="bar"><div class="bar-fill" id="bar"></div></div>
+        <span id="length">0:00</span>
+      </div>
+
+      <p class="next" id="next"></p>
+    </main>
+
+    <section class="elsewhere" aria-labelledby="elsewhere-heading">
+      <h2 id="elsewhere-heading">Already have an internet radio player?</h2>
+      <dl>
+        <dt>Stream (MP3, 128 kbps)</dt>
+        <dd><a href="/live.mp3">https://radio.mctrot.nyc/live.mp3</a></dd>
+        <dt>Playlist (M3U)</dt>
+        <dd><a href="/live.m3u">https://radio.mctrot.nyc/live.m3u</a></dd>
+        <dt>Playlist (PLS)</dt>
+        <dd><a href="/live.pls">https://radio.mctrot.nyc/live.pls</a></dd>
+      </dl>
+      <p>VLC, Apple Music (File › Open Stream URL) and most radio apps take the stream URL; some older players want a playlist.</p>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var STREAM = "https://radio.mctrot.nyc/live.mp3";
+      var params = new URLSearchParams(location.search);
+      var apiParam = params.get("api");
+      var API = /^https?:\/\//.test(apiParam || "") ? apiParam.replace(/\/+$/, "") : "https://api.mctrot.nyc";
+
+      var $ = function (id) { return document.getElementById(id); };
+      var player = $("player"), toggle = $("toggle"), statusEl = $("status"), volumeEl = $("volume");
+
+      // --- Playing (as website/live.html does for /live's stripe) ---------
+      var audio = new Audio();
+      audio.preload = "none";
+      // iPhones and iPads ignore a page setting the volume: the buttons do.
+      audio.volume = 0.5;
+      if (audio.volume === 0.5) volumeEl.hidden = false;
+      audio.volume = Number(volumeEl.value);
+
+      // stopped | connecting | playing | failed
+      var state = "stopped", problemText = "", stopping = false;
+
+      var setState = function (next, message) {
+        state = next;
+        problemText = message || "";
+        render();
+      };
+
+      // Browsers give the same error for a stream they can't reach and one
+      // they can't play, so a failed start asks the address directly: no
+      // answer at all means unreachable.
+      var diagnose = function (url) {
+        var e = audio.error;
+        if (e && e.code === 3) return Promise.resolve("The stream broke off.");
+        var abort = new AbortController();
+        setTimeout(function () { abort.abort(); }, 8000);
+        return fetch(url, { mode: "no-cors", signal: abort.signal })
+          .then(function () { abort.abort(); return "That isn’t audio this browser can play."; })
+          .catch(function () { return "Can’t reach the stream."; });
+      };
+      var fail = function () {
+        var url = audio.getAttribute("src");
+        if (!url) return;
+        diagnose(url).then(function (message) {
+          if (!stopping && audio.getAttribute("src") === url) setState("failed", message);
+        });
+      };
+
+      var play = function () {
+        stopping = false;
+        setState("connecting");
+        audio.src = STREAM;
+        audio.play().catch(function (err) {
+          if (err.name === "NotAllowedError") setState("failed", "The browser wants a tap on ▶ first.");
+          else if (err.name !== "AbortError" && !audio.error) fail();
+        });
+      };
+      // Drop the connection, so playing again joins the stream live rather
+      // than resuming from a buffer.
+      var stop = function () {
+        stopping = true;
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+        setState("stopped");
+      };
+
+      audio.addEventListener("playing", function () { if (state !== "stopped") setState("playing"); });
+      audio.addEventListener("waiting", function () { if (state !== "stopped") setState("connecting"); });
+      // Paused from outside the page: the lock screen, headphones.
+      audio.addEventListener("pause", function () { if (!stopping) stop(); });
+      audio.addEventListener("ended", function () { if (!stopping) setState("failed", "The stream ended."); });
+      audio.addEventListener("error", function () { if (!stopping) fail(); });
+
+      toggle.addEventListener("click", function () { if (state === "stopped") play(); else stop(); });
+      volumeEl.addEventListener("input", function () { audio.volume = Number(volumeEl.value); });
+
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.setActionHandler("play", play);
+        navigator.mediaSession.setActionHandler("pause", stop);
+        try { navigator.mediaSession.setActionHandler("stop", stop); } catch (e) { /* not everywhere */ }
+      }
+
+      // --- What's on (the recorder's /live `radio`) -----------------------
+      var radio = null;       // the latest `radio`, or null: no program
+      var offset = 0;         // server clock minus ours, ms
+      var loaded = false;     // heard from the recorder at least once
+      var serverNow = function () { return Date.now() + offset; };
+
+      // What's on now: the next slot once the current one's over, so titles
+      // change on time between polls (as Radio.elm's nowPlaying).
+      var onNow = function () {
+        if (!radio) return null;
+        var c = radio.current, n = radio.next;
+        if (c.to !== null && n && serverNow() >= c.to) return n;
+        return c;
+      };
+      var upNext = function () {
+        if (!radio) return null;
+        var c = radio.current;
+        return c.to !== null && radio.next && serverNow() >= c.to ? null : radio.next;
+      };
+
+      var clock = function (ms) {
+        return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+      };
+      var duration = function (ms) {
+        var s = Math.max(0, Math.round(ms / 1000));
+        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+        var mm = h ? String(m).padStart(2, "0") : String(m);
+        return (h ? h + ":" : "") + mm + ":" + String(sec).padStart(2, "0");
+      };
+
+      var lastAnnounced = "";
+      var render = function () {
+        var slot = onNow(), next = upNext();
+        player.classList.toggle("on", state !== "stopped");
+        toggle.setAttribute("aria-label", state === "stopped" ? "Play the radio" : "Stop the radio");
+
+        statusEl.classList.toggle("status-problem", state === "failed");
+        statusEl.textContent =
+          state === "connecting" ? "Tuning in…" :
+          state === "failed" ? problemText :
+          state === "playing" ? "Listening live" :
+          "Radio · Off";
+
+        if (slot) {
+          $("title").textContent = slot.title;
+          $("artist").textContent = slot.artist;
+          $("album").textContent = [slot.album, slot.year].filter(Boolean).join(" · ");
+        } else {
+          $("title").textContent = loaded ? "Off air" : "McTrot Radio";
+          $("artist").textContent = loaded ? "McTrot Radio" : "";
+          $("album").textContent = "";
+        }
+
+        // How far into this one, for tracks and breaks with a known span.
+        var timed = slot && slot.kind !== "holding" && slot.from !== null && slot.to !== null;
+        $("progress").hidden = !timed;
+        if (timed) {
+          var length = slot.to - slot.from, done = Math.min(length, Math.max(0, serverNow() - slot.from));
+          $("elapsed").textContent = duration(done);
+          $("length").textContent = duration(length);
+          $("bar").style.width = (length > 0 ? (done / length) * 100 : 0) + "%";
+        }
+
+        var nextEl = $("next");
+        nextEl.textContent = "";
+        if (next && next.from !== null) {
+          var label = slot && slot.kind === "holding" && next.kind !== "holding" ? "On air at " : "Next, at ";
+          nextEl.append(label + clock(next.from) + ": ");
+          var b = document.createElement("b");
+          b.textContent = next.title;
+          nextEl.append(b, " — " + next.artist);
+        }
+
+        var key = slot ? [slot.title, slot.artist, slot.album].join("\u0000") : "";
+        if (key !== lastAnnounced) {
+          lastAnnounced = key;
+          var album = slot ? [slot.album, slot.year].filter(Boolean).join(" · ") : "";
+          document.title = slot && slot.kind !== "holding" ? slot.title + " — " + slot.artist + " · McTrot Radio" : "McTrot Radio";
+          if ("mediaSession" in navigator && window.MediaMetadata) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: slot ? slot.title : "McTrot Radio",
+              artist: slot ? slot.artist : "McTrot",
+              album: album || "McTrot Radio",
+              artwork: [
+                { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+                { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }
+              ]
+            });
+          }
+        }
+      };
+
+      // Ask again every 30 s, and as soon as what's on is due to change
+      // (so the one after next is known by the time it's needed).
+      var timer = null;
+      var poll = function () {
+        clearTimeout(timer);
+        fetch(API + "/live", { cache: "no-store" })
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function (live) {
+            if (typeof live.serverTs === "number") offset = live.serverTs - Date.now();
+            radio = live.radio || null;
+            loaded = true;
+          })
+          .catch(function () { /* keep what's showing; try again soon */ })
+          .then(function () {
+            render();
+            var wait = 30000;
+            var slot = onNow();
+            if (slot && slot.to !== null) wait = Math.min(wait, Math.max(1000, slot.to - serverNow() + 500));
+            timer = setTimeout(poll, wait);
+          });
+      };
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) poll(); });
+
+      setInterval(render, 1000);
+      render();
+      poll();
+    })();
+  </script>
+</body>
+</html>
