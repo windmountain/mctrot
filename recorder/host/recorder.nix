@@ -7,7 +7,9 @@ let
 
   # Empties the Volume: back to the "fresh out of the box" state. Keeps
   # everything that isn't event data (config, secrets, SSH keys, HTTPS
-  # certificates), so the box stays deployable. Run from the laptop with
+  # certificates), so the box stays deployable, and the radio show
+  # (station/), which is uploaded by hand and isn't event data. Run from
+  # the laptop with
   # `nix run .#wipe`, or on the box as `mctrot-wipe`.
   wipe = pkgs.writeShellApplication {
     name = "mctrot-wipe";
@@ -27,12 +29,15 @@ let
       shopt -s nullglob dotglob
       items=()
       for item in "$data"/*; do
-        [ "$(basename "$item")" = lost+found ] || items+=("$item")
+        case "$(basename "$item")" in
+          lost+found|station) ;;
+          *) items+=("$item") ;;
+        esac
       done
       if [ ''${#items[@]} -eq 0 ]; then
         echo "$data is already empty."
       else
-        echo "This deletes everything under $data on $(hostname):"
+        echo "This deletes everything under $data on $(hostname) except the radio show (station/):"
         du -sh "''${items[@]}"
       fi
       echo "Services stopped and restarted around it: ${services}"
@@ -40,7 +45,7 @@ let
       [ "$answer" = wipe ] || { echo "Aborted; nothing deleted."; exit 1; }
 
       systemctl stop ${services}
-      find "$data" -mindepth 1 -maxdepth 1 ! -name lost+found -exec rm -rf {} +
+      find "$data" -mindepth 1 -maxdepth 1 ! -name lost+found ! -name station -exec rm -rf {} +
       systemctl start ${services}
       echo "Done: $data is empty and the services are back up."
     '';

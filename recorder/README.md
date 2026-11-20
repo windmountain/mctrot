@@ -181,7 +181,8 @@ nix run .#wipe
 
 Lists what's on the Volume, asks you to type `wipe`, stops the services
 that use it, empties it, and starts them again. Config, secrets, SSH keys
-and HTTPS certificates are untouched. Overland's queue on the phone isn't:
+and HTTPS certificates are untouched, and so is the radio show
+(`station/`), which isn't event data. Overland's queue on the phone isn't:
 anything still waiting there uploads after the wipe.
 
 **Making a test walk look like Manhattan:**
