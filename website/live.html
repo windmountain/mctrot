@@ -54,7 +54,7 @@
       font: var(--t-ui); text-decoration: none; color: var(--ink); }
     .app-tabs a[aria-current="page"] { background: var(--ink); color: var(--paper); }
     .app-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
-    .app-main { flex: 1; min-height: 0; }
+    .app-main { flex: 1; min-height: 0; padding-bottom: 0; }
     /* Map, timeline and stats take exactly the screen; the overview and
        the blog scroll like a page. */
     /* (flex: none: in the body's flex column, flex: 1 would override the
@@ -62,20 +62,30 @@
     .page-map, .page-timeline, .page-stats { flex: none; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
     .tab-empty { padding: 1rem 16px; text-align: center; }
 
-    /* Map */
-    .tab-map { display: flex; flex-direction: column; padding: 8px 16px; }
-    .tab-map .live-status { text-align: center; margin: 0 0 4px; min-height: 0; }
+    /* Map: fills the space between the tabs and the radio. The frame
+       scrolls; the scene inside it is the map's box, with half a frame of
+       empty margin all round once zoomed in (50cqh/50cqw: the frame is a
+       size container), so any place can be scrolled to the middle. */
+    .tab-map { position: relative; display: flex; flex-direction: column; }
     .tab-map .live-map { flex: 1; min-height: 0; }
     /* Pinching or double-tapping the map mustn't zoom the page (a finger still scrolls it): the map has its own zoom. */
     .tab-map .live-map { position: relative; touch-action: pan-x pan-y; }
-    .tab-map .live-map-frame { height: 100%; max-width: none; overflow: auto; overscroll-behavior: contain; }
+    .tab-map .live-map-frame { height: 100%; max-width: none; overflow: auto; overscroll-behavior: contain; container-type: size;
+      text-align: center; padding: 48px 12px 12px; }
+    .tab-map .live-map-scene { display: inline-block; vertical-align: top; text-align: left; }
+    .tab-map .live-map-zoomed { padding: 50cqh 50cqw; }
     .live-map-draggable { cursor: grab; user-select: none; -webkit-user-select: none; }
     .live-map-dragging { cursor: grabbing; }
+    /* The last position, floating at the top left. */
+    .live-map-chip { position: absolute; top: var(--space-3); left: var(--space-4); z-index: 2; margin: 0; max-width: calc(100% - 96px);
+      padding: var(--space-1) var(--space-2); background: var(--paper); border: var(--strong); font: var(--t-helper); color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Top right, clear of the map's scrollbar. */
-    .live-map-zoom { position: absolute; top: 8px; right: 24px; z-index: 1; display: flex; flex-direction: column; gap: 4px; }
-    .live-map-zoom button { width: 32px; height: 32px; padding: 0; border: 2px solid #000; border-radius: 0; background: #fff; color: #000;
-      font: 700 20px/1 system-ui, sans-serif; cursor: pointer; }
-    .live-map-zoom button:disabled { color: #aaa; border-color: #aaa; cursor: default; }
+    .live-map-zoom { position: absolute; top: var(--space-3); right: var(--space-4); z-index: 2; display: flex; flex-direction: column; gap: var(--space-2); }
+    .live-map-zoom button { width: var(--control-h); height: var(--control-h); padding: 0; border: var(--strong); border-radius: 0; background: var(--paper); color: var(--ink);
+      font: 700 24px/1 var(--font); cursor: pointer; }
+    .live-map-zoom button:disabled { color: var(--line); border-color: var(--line); cursor: default; }
+    .tab-map .live-note { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-3); margin: 0; font: var(--t-helper); }
 
     /* Blog */
     .tab-blog .live-posts { padding: 0 var(--space-4) var(--space-6); }

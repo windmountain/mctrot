@@ -539,6 +539,15 @@ type alias Model =
     , outlineZoom : Float
     , drag : Maybe Drag
     , dragged : Bool
+
+    -- Two fingers on the map: their distance when the last zoom step
+    -- began (see Touch).
+    , pinch : Maybe Float
+
+    -- One finger down on the map: where and when, to tell a tap from a
+    -- scroll; and the last tap, for a double-tap.
+    , touchStart : Maybe Tap
+    , lastTap : Maybe Tap
     , focused : Maybe Focused
     , walked : List (List ( Float, Float ))
 
@@ -555,6 +564,37 @@ type alias Drag =
     , y : Float
     , scrollX : Float
     , scrollY : Float
+    }
+
+
+{-| A finger on the map, in the window's coordinates, and when (the
+event's timeStamp, ms).
+-}
+type alias Tap =
+    { x : Float
+    , y : Float
+    , at : Float
+    }
+
+
+{-| A touch event on the map: the fingers still down (each at x, y), and
+for touchend the one just lifted.
+-}
+type alias Touch =
+    { down : List ( Float, Float )
+    , lifted : Maybe ( Float, Float )
+    , at : Float
+    }
+
+
+{-| What a zoom keeps in place: a point in the page's coordinates, and where
+it falls across the map's box (0 to 1 each way).
+-}
+type alias Anchor =
+    { x : Float
+    , y : Float
+    , fx : Float
+    , fy : Float
     }
 
 
@@ -590,6 +630,9 @@ init flags =
       , outlineZoom = 1
       , drag = Nothing
       , dragged = False
+      , pinch = Nothing
+      , touchStart = Nothing
+      , lastTap = Nothing
       , focused = Nothing
       , walked = []
       }
@@ -610,7 +653,11 @@ type Msg
     | Navigate Route
     | PathChanged String
     | Zoom Float
-    | ZoomFrom Float Browser.Dom.Viewport
+    | ZoomAt Float (Maybe ( Float, Float ))
+    | ZoomFrom Float Anchor
+    | TouchStarted Touch
+    | TouchMoved Touch
+    | TouchEnded Touch
     | OutlineFor Float
     | DragStart Drag
     | DragTo Float Float
@@ -634,15 +681,120 @@ type Focused
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        -- The map's + or - (zoom times 2 or 1/2), within its limits. The
-        -- map grows or shrinks around the middle of what's in view, so
-        -- first see what's in view (Browser.Dom measures after the page is
-        -- next drawn, so this must come before the zoom changes it).
+        -- The map's + or - (zoom times 2 or 1/2), within its limits:
+        -- around the middle of what's in view, or the dot that's open.
         Zoom by ->
-            ( model
-            , Browser.Dom.getViewportOf mapFrameId
-                |> Task.attempt (Result.map (ZoomFrom by) >> Result.withDefault NoOp)
-            )
+            update (ZoomAt by Nothing) model
+
+        -- A step in or out around a point (in the window's coordinates;
+        -- Nothing for the middle of the map's frame). First see where that
+        -- point falls on the map's box, before the zoom changes it.
+        ZoomAt by point ->
+            if clamp 1 maxZoom (model.zoom * by) == model.zoom then
+                ( model, Cmd.none )
+
+            else
+                ( model
+                , Task.map3
+                    (\frame box page ->
+                        let
+                            ( x, y ) =
+                                case point of
+                                    Just ( cx, cy ) ->
+                                        ( page.viewport.x + cx, page.viewport.y + cy )
+
+                                    Nothing ->
+                                        ( frame.element.x + frame.element.width / 2, frame.element.y + frame.element.height / 2 )
+                        in
+                        { x = x
+                        , y = y
+                        , fx = (x - box.element.x) / max 1 box.element.width
+                        , fy = (y - box.element.y) / max 1 box.element.height
+                        }
+                    )
+                    (Browser.Dom.getElement mapFrameId)
+                    (Browser.Dom.getElement mapBoxId)
+                    Browser.Dom.getViewport
+                    |> Task.attempt (Result.map (ZoomFrom by) >> Result.withDefault NoOp)
+                )
+
+        -- Two fingers down: start counting a pinch. One: maybe a tap.
+        TouchStarted touch ->
+            case touch.down of
+                [ a, b ] ->
+                    ( { model | pinch = Just (distance a b), touchStart = Nothing }, Cmd.none )
+
+                [ ( x, y ) ] ->
+                    ( { model | touchStart = Just { x = x, y = y, at = touch.at } }, Cmd.none )
+
+                _ ->
+                    ( { model | touchStart = Nothing }, Cmd.none )
+
+        -- A pinch steps the zoom each time the fingers spread past
+        -- pinchStep (or close past 1 / pinchStep) of where the last step
+        -- began, around the point between them.
+        TouchMoved touch ->
+            case ( model.pinch, touch.down ) of
+                ( Just from, [ a, b ] ) ->
+                    let
+                        now =
+                            distance a b
+
+                        middle =
+                            ( (Tuple.first a + Tuple.first b) / 2, (Tuple.second a + Tuple.second b) / 2 )
+                    in
+                    if now > from * pinchStep then
+                        update (ZoomAt 2 (Just middle)) { model | pinch = Just now }
+
+                    else if now < from / pinchStep then
+                        update (ZoomAt 0.5 (Just middle)) { model | pinch = Just now }
+
+                    else
+                        ( model, Cmd.none )
+
+                _ ->
+                    ( { model | touchStart = Nothing }, Cmd.none )
+
+        -- A finger lifted: the end of a pinch, or a tap; two taps close
+        -- together in time and place zoom one step in, there.
+        TouchEnded touch ->
+            if model.pinch /= Nothing then
+                ( { model
+                    | pinch =
+                        if List.length touch.down == 2 then
+                            model.pinch
+
+                        else
+                            Nothing
+                    , lastTap = Nothing
+                  }
+                , Cmd.none
+                )
+
+            else
+                case ( model.touchStart, touch.lifted, touch.down ) of
+                    ( Just start, Just ( x, y ), [] ) ->
+                        if abs (x - start.x) + abs (y - start.y) < 12 && touch.at - start.at < 300 then
+                            let
+                                tap =
+                                    { x = x, y = y, at = touch.at }
+                            in
+                            case model.lastTap of
+                                Just last ->
+                                    if tap.at - last.at < 350 && abs (tap.x - last.x) + abs (tap.y - last.y) < 40 then
+                                        update (ZoomAt 2 (Just ( x, y ))) { model | lastTap = Nothing, touchStart = Nothing }
+
+                                    else
+                                        ( { model | lastTap = Just tap, touchStart = Nothing }, Cmd.none )
+
+                                Nothing ->
+                                    ( { model | lastTap = Just tap, touchStart = Nothing }, Cmd.none )
+
+                        else
+                            ( { model | lastTap = Nothing, touchStart = Nothing }, Cmd.none )
+
+                    _ ->
+                        ( { model | touchStart = Nothing }, Cmd.none )
 
         -- Dragging the map with the mouse scrolls it, so what was under
         -- the pointer stays under it. (Touch scrolls it natively.)
@@ -675,7 +827,7 @@ update msg model =
             else
                 ( { model | focused = Just target }, Cmd.none )
 
-        ZoomFrom by before ->
+        ZoomFrom by anchor ->
             let
                 zoom =
                     clamp 1 maxZoom (model.zoom * by)
@@ -686,15 +838,15 @@ update msg model =
             else
                 ( { model | zoom = zoom }
                 , Cmd.batch
-                    [ case model.focused of
-                        Just (FocusedStore _) ->
-                            centreOnFocused before
+                    [ case ( model.focused, model.pinch == Nothing && model.lastTap == Nothing ) of
+                        ( Just (FocusedStore _), True ) ->
+                            centreOnFocused anchor
 
-                        Just (FocusedPosts _) ->
-                            centreOnFocused before
+                        ( Just (FocusedPosts _), True ) ->
+                            centreOnFocused anchor
 
                         _ ->
-                            keepMapCentre before
+                            keepAnchor anchor
 
                     -- Zoom first; re-simplify the outline once that's on
                     -- screen (and only for the last of several quick clicks).
@@ -1019,19 +1171,41 @@ statusInput now model response =
     }
 
 
+{-| The map's chip: "9:16 PM · 14 min ago", or how the connection's going.
+-}
+positionChip : Model -> String
+positionChip model =
+    case ( Maybe.andThen (.response >> .position) model.latest, serverNow model ) of
+        ( Just position, Just now ) ->
+            NewYorkTime.clock position.ts
+                ++ " · "
+                ++ duration (now - position.ts)
+                ++ " ago"
+                ++ (if model.failing then
+                        " · offline"
+
+                    else
+                        ""
+                   )
+
+        _ ->
+            status model
+
+
 viewStatus : Model -> Html Msg
 viewStatus model =
     Html.p [ Attr.class "live-status", Attr.attribute "aria-live" "polite" ] [ Html.text (status model) ]
 
 
-{-| The map, filling the page's height, mapTabStretch times as wide as
-Manhattan's true proportions (see viewMap), less as it's zoomed in (see
-stretchAt), and zoomable: + and - in its
-top-left corner, then scroll to look around.
+{-| The map, filling the space between the tabs and the radio,
+mapTabStretch times as wide as Manhattan's true proportions (see viewMap),
+less as it's zoomed in (see stretchAt), and zoomable: + and - at its top
+right, a pinch, or a double-tap; then drag or scroll to look around. The
+last position floats at its top left.
 -}
 viewMapTab : Model -> List (Html Msg)
 viewMapTab model =
-    [ viewStatus model
+    [ Html.p [ Attr.class "live-map-chip", Attr.attribute "aria-live" "polite" ] [ Html.text (positionChip model) ]
     , viewMap (Just { stretch = stretchAt model.zoom, zoom = model.zoom, outlineZoom = model.outlineZoom, dragging = model.drag /= Nothing }) model.focused model.walked (serverNow model) (Maybe.map .response model.latest)
     ]
 
@@ -1069,35 +1243,74 @@ mapFrameId =
     "live-map-frame"
 
 
-{-| After a zoom, scroll the map so what was in the middle of the view
-`before` still is. (Browser.Dom measures once the page is drawn at the new
-size.)
+{-| After a zoom, scroll the map so the same place on it is back under the
+anchor point (the middle of the frame, or the fingers). Measured on the
+box itself, so the margin around it when zoomed in and its stretch, which
+eases with each step, both take care of themselves. (Browser.Dom measures
+once the page is drawn at the new size.)
 -}
-keepMapCentre : Browser.Dom.Viewport -> Cmd Msg
-keepMapCentre before =
-    keepMapCentreTask before |> Task.attempt (\_ -> NoOp)
+keepAnchor : Anchor -> Cmd Msg
+keepAnchor anchor =
+    keepAnchorTask anchor |> Task.attempt (\_ -> NoOp)
 
 
-keepMapCentreTask : Browser.Dom.Viewport -> Task.Task Browser.Dom.Error ()
-keepMapCentreTask before =
-    Browser.Dom.getViewportOf mapFrameId
+keepAnchorTask : Anchor -> Task.Task Browser.Dom.Error ()
+keepAnchorTask anchor =
+    Task.map2 Tuple.pair (Browser.Dom.getElement mapBoxId) (Browser.Dom.getViewportOf mapFrameId)
         |> Task.andThen
-            (\after ->
-                let
-                    centre scroll seen sceneBefore sceneAfter =
-                        (scroll + seen / 2) * sceneAfter / sceneBefore - seen / 2
-                in
+            (\( box, frame ) ->
                 Browser.Dom.setViewportOf mapFrameId
-                    (centre before.viewport.x before.viewport.width before.scene.width after.scene.width)
-                    (centre before.viewport.y before.viewport.height before.scene.height after.scene.height)
+                    (frame.viewport.x + box.element.x + anchor.fx * box.element.width - anchor.x)
+                    (frame.viewport.y + box.element.y + anchor.fy * box.element.height - anchor.y)
             )
+
+
+{-| How far two fingers must spread (or close, by its inverse) to step the
+zoom: a guess, to tune on a phone.
+-}
+pinchStep : Float
+pinchStep =
+    1.5
+
+
+distance : ( Float, Float ) -> ( Float, Float ) -> Float
+distance ( x1, y1 ) ( x2, y2 ) =
+    sqrt ((x1 - x2) ^ 2 + (y1 - y2) ^ 2)
+
+
+{-| A touch event: the fingers down, the one lifted (touchend), and when.
+-}
+touchDecoder : Decoder Touch
+touchDecoder =
+    let
+        point =
+            Decode.map2 Tuple.pair (Decode.field "clientX" Decode.float) (Decode.field "clientY" Decode.float)
+
+        list field =
+            Decode.field field (Decode.field "length" Decode.int)
+                |> Decode.andThen
+                    (\n ->
+                        List.range 0 (min 2 n - 1)
+                            |> List.map (\i -> Decode.field field (Decode.field (String.fromInt i) point))
+                            |> List.foldr (Decode.map2 (::)) (Decode.succeed [])
+                    )
+    in
+    Decode.map3 Touch
+        (list "touches")
+        (list "changedTouches" |> Decode.map List.head)
+        (Decode.field "timeStamp" Decode.float)
+
+
+mapBoxId : String
+mapBoxId =
+    "live-map-box"
 
 
 {-| After a zoom with a dot selected on the map (a McDonald's or a post's),
 scroll so that dot's in the middle of the view; if it can't be found, keep
-the middle as it was (keepMapCentre).
+the anchor in place (keepAnchor).
 -}
-centreOnFocused : Browser.Dom.Viewport -> Cmd Msg
+centreOnFocused : Anchor -> Cmd Msg
 centreOnFocused before =
     Task.map3
         (\frame dot after ->
@@ -1109,7 +1322,7 @@ centreOnFocused before =
         (Browser.Dom.getElement focusedDotId)
         (Browser.Dom.getViewportOf mapFrameId)
         |> Task.andThen (\{ x, y } -> Browser.Dom.setViewportOf mapFrameId x y)
-        |> Task.onError (\_ -> keepMapCentreTask before)
+        |> Task.onError (\_ -> keepAnchorTask before)
         |> Task.attempt (\_ -> NoOp)
 
 
@@ -1798,17 +2011,28 @@ viewMap shape focused walked now response =
 
                 Nothing ->
                     Attr.class ""
+            , onTouch shape "touchstart" TouchStarted
+            , onTouch shape "touchmove" TouchMoved
+            , onTouch shape "touchend" TouchEnded
+            , onTouch shape "touchcancel" TouchEnded
             , Attr.attribute "role" "img"
             , Attr.attribute "aria-label" "Map of Manhattan, stretched to fill the page: the streets between McDonald's, the planned route from start flag to finish flag, the path I've walked, every McDonald's (visited, not yet, or closed now) and my last position"
             ]
-            [ Html.div
+            [ -- Zoomed in, the box gets half a frame of empty margin all
+              -- round (live.html, .live-map-zoomed), so any place on it,
+              -- even at its edge, can be scrolled to the middle.
+              Html.div
+                [ Attr.class "live-map-scene"
+                , Attr.classList [ ( "live-map-zoomed", Maybe.map .zoom shape |> Maybe.map (\z -> z > 1) |> Maybe.withDefault False ) ]
+                ]
+                [ Html.div
                 (Attr.class "live-map-box"
                     :: (case ( shape, stretchBox ) of
                             ( Just { stretch, zoom }, [ _, _, width, height ] ) ->
-                                [ Attr.style "aspect-ratio" (String.fromFloat (width * stretch) ++ " / " ++ String.fromFloat height)
-                                , Attr.style "height" (String.fromFloat (zoom * 100) ++ "%")
-                                , Attr.style "max-width" (String.fromFloat (zoom * 100) ++ "%")
-                                , Attr.style "margin" "0 auto"
+                                [ Attr.id mapBoxId
+                                , Attr.style "aspect-ratio" (String.fromFloat (width * stretch) ++ " / " ++ String.fromFloat height)
+                                , Attr.style "height" (String.fromFloat (zoom * 100) ++ "cqh")
+                                , Attr.style "max-width" (String.fromFloat (zoom * 100) ++ "cqw")
                                 ]
 
                             _ ->
@@ -1850,6 +2074,7 @@ viewMap shape focused walked now response =
                            )
                     )
                 ]
+                ]
             ]
         , if placed /= Nothing && not (onMap placed) then
             Html.p [ Attr.class "live-note" ] [ Html.text "The last position is off this map." ]
@@ -1857,6 +2082,18 @@ viewMap shape focused walked now response =
           else
             Html.text ""
         ]
+
+
+{-| A touch handler on the zoomable map; nothing on a fixed one.
+-}
+onTouch : Maybe a -> String -> (Touch -> Msg) -> Html.Attribute Msg
+onTouch shape event toMsg =
+    case shape of
+        Just _ ->
+            Events.on event (Decode.map toMsg touchDecoder)
+
+        Nothing ->
+            Attr.class ""
 
 
 {-| The store whose dot a flag goes over: the one nearest an end of the
