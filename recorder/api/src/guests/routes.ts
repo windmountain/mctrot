@@ -136,7 +136,7 @@ export async function registerGuests(app: FastifyInstance, deps: GuestDeps) {
         .code(code)
         .header("content-type", "text/html; charset=utf-8")
         .header("cache-control", "no-store")
-        .header("content-security-policy", "default-src 'none'; style-src 'unsafe-inline'; img-src " + siteOrigin + "; form-action 'self'; frame-ancestors 'none'")
+        .header("content-security-policy", "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' " + siteOrigin + "; form-action 'self'; frame-ancestors 'none'")
         .header("referrer-policy", "same-origin")
         .send(body);
 

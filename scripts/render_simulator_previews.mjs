@@ -1,9 +1,13 @@
-// Renders the simulator's share image in website/sim/ from its
-// hand-editable SVG source, with headless Chrome:
+// Renders the simulator's and /live's share images from their
+// hand-editable SVG sources, with headless Chrome:
 //
-//   og.svg       -> og.png (1200x630, the og:image; social sites need a PNG)
+//   sim/og.svg        -> sim/og.png        (the simulator's og:image)
+//   live-share/og.svg -> live-share/og.png (/live's; a copy of the
+//                                           simulator's with "Live" as
+//                                           text, which needs Helvetica Neue)
 //
-// (The simulator uses the site's own icons.)
+// Both 1200x630; social sites need a PNG. (Both pages use the site's own
+// icons.)
 //
 // Usage: node scripts/render_simulator_previews.mjs, then website/build.sh.
 // Set CHROME to the browser binary if it isn't at the macOS default.
@@ -14,11 +18,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const sim = join(dirname(fileURLToPath(import.meta.url)), "..", "website", "sim");
+const website = join(dirname(fileURLToPath(import.meta.url)), "..", "website");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const renders = [
-  ["og.svg", 1200, 630, "og.png"],
+  ["sim/og.svg", 1200, 630, "sim/og.png"],
+  ["live-share/og.svg", 1200, 630, "live-share/og.png"],
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -42,15 +47,15 @@ const tab = await connect(wsUrl.replace(/browser\/.*/, "page/" + targetId));
 
 try {
   for (const [src, width, height, name] of renders) {
-    const svg = readFileSync(join(sim, src)).toString("base64");
+    const svg = readFileSync(join(website, src)).toString("base64");
     const html = `<!DOCTYPE html><style>html,body{margin:0;background:transparent}img{display:block}</style><img src="data:image/svg+xml;base64,${svg}" width="${width}" height="${height}">`;
     await tab.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     await tab.send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
     await tab.send("Page.navigate", { url: "data:text/html;base64," + Buffer.from(html).toString("base64") });
     await sleep(800);
     const { data } = await tab.send("Page.captureScreenshot", { format: "png" });
-    writeFileSync(join(sim, name), Buffer.from(data, "base64"));
-    console.log(`website/sim/${src} -> ${name}`);
+    writeFileSync(join(website, name), Buffer.from(data, "base64"));
+    console.log(`website/${src} -> website/${name}`);
   }
 } finally {
   tab.close();

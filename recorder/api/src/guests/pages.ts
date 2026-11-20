@@ -45,7 +45,9 @@ export function page(ctx: PageContext, title: string, body: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>${esc(title)} — McTrot</title>
-  <link rel="icon" href="${esc(ctx.siteOrigin)}/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/account/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/account/icons/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="/account/icons/apple-touch-icon.png">
   <style>${STYLE}</style>
 </head>
 <body>

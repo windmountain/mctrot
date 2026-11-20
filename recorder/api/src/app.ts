@@ -97,6 +97,11 @@ const POST_FILES: Record<string, { file: string | URL; type: string }> = {
   "/post/icons/apple-touch-icon.png": { file: "icons/apple-touch-icon.png", type: "image/png" },
   "/post/icons/icon-192.png": { file: "icons/icon-192.png", type: "image/png" },
   "/post/icons/icon-512.png": { file: "icons/icon-512.png", type: "image/png" },
+  // The guest account pages' icons (src/guests/pages.ts): copies of the
+  // site's own (website/), since this flake can't reach them.
+  "/account/icons/favicon.svg": { file: "account-icons/favicon.svg", type: "image/svg+xml" },
+  "/account/icons/favicon.ico": { file: "account-icons/favicon.ico", type: "image/x-icon" },
+  "/account/icons/apple-touch-icon.png": { file: "account-icons/apple-touch-icon.png", type: "image/png" },
 };
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {

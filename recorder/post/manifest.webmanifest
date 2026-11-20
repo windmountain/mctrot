@@ -4,7 +4,7 @@
   "start_url": "/post",
   "scope": "/post",
   "display": "standalone",
-  "background_color": "#FFD100",
+  "background_color": "#D7261E",
   "theme_color": "#FFD100",
   "icons": [
     { "src": "/post/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

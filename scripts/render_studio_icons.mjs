@@ -2,13 +2,14 @@
 // share-image studio), in headless Chrome: sets its text, clicks each
 // download button, and saves what it would have downloaded.
 //
-//   node scripts/render_studio_icons.mjs OUT_DIR [TEXT] [SMALL_TEXT]
+//   node scripts/render_studio_icons.mjs OUT_DIR [TEXT] [SMALL_TEXT] [BG INK]
 //
 // TEXT may hold "\n" for a second line; SMALL_TEXT is what the 48 px and
-// smaller icons show (default: the first letter). With neither, it renders
-// the site's own icons. The upload page's (recorder/post/icons/):
+// smaller icons show (default: the first letter). BG and INK are hex colors
+// (default: the site's light theme). With none, it renders the site's own
+// icons. The upload page's (recorder/post/icons/), white on red:
 //
-//   node scripts/render_studio_icons.mjs recorder/post/icons 'McTrot\nCTRL' C
+//   node scripts/render_studio_icons.mjs recorder/post/icons 'McTrot\nCTRL' C '#D7261E' '#FFFFFF'
 //
 // Set CHROME to the browser binary if it isn't at the macOS default.
 
@@ -18,9 +19,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const [outArg, textArg, smallArg] = process.argv.slice(2);
-if (!outArg) {
-  console.error("usage: node scripts/render_studio_icons.mjs OUT_DIR [TEXT] [SMALL_TEXT]");
+const [outArg, textArg, smallArg, bgArg, inkArg] = process.argv.slice(2);
+if (!outArg || (bgArg && !inkArg)) {
+  console.error("usage: node scripts/render_studio_icons.mjs OUT_DIR [TEXT] [SMALL_TEXT] [BG INK]");
   process.exit(2);
 }
 const out = resolve(outArg);
@@ -67,6 +68,13 @@ try {
     const set = (id, value) => { const el = document.getElementById(id); el.value = value; el.dispatchEvent(new Event("input")); };
     set("text", ${JSON.stringify(text)});
     set("smallText", ${JSON.stringify(small)});
+    if (${JSON.stringify(bgArg ?? "")}) {
+      const custom = document.querySelector('input[name="theme"][value="custom"]');
+      custom.checked = true;
+      custom.dispatchEvent(new Event("change"));
+      set("bgCustom", ${JSON.stringify(bgArg ?? "")});
+      set("inkCustom", ${JSON.stringify(inkArg ?? "")});
+    }
     true`);
   await sleep(300);
   // Every icon card's button, the .ico and the .svg (not adaptive: the site's

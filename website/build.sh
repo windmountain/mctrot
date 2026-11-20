@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Assembles the deployable site in build/: copies the public pages and
 # assets (including geo/route-legs.json, which the simulator fetches for its
-# GPX export, and sim/, the simulator's own share image and manifest), and
+# GPX export, sim/, the simulator's own share image and manifest, and
+# live-share/og.png, /live's share image), and
 # compiles the Elm programs into build/js/: the simulator, the mega search
 # page, the mega search's worker, and /live (alongside js/'s hand-written
 # scripts).
@@ -19,6 +20,8 @@ for page in *.html; do
 done
 
 cp -R css geo sim build/
+mkdir -p build/live-share
+cp live-share/og.png build/live-share/
 cp favicon.svg favicon.ico favicon-16.png favicon-32.png favicon-48.png \
   apple-touch-icon.png icon-192.png icon-512.png \
   site.webmanifest og-image.png robots.txt sitemap.xml _redirects build/

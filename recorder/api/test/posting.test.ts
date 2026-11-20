@@ -133,6 +133,9 @@ test("the upload page and its scripts are served, locked down", async () => {
     ["/post/icons/apple-touch-icon.png", "image/png"],
     ["/post/icons/icon-192.png", "image/png"],
     ["/post/icons/icon-512.png", "image/png"],
+    ["/account/icons/favicon.svg", "image/svg+xml"],
+    ["/account/icons/favicon.ico", "image/x-icon"],
+    ["/account/icons/apple-touch-icon.png", "image/png"],
   ] as const) {
     const res = await app.inject({ url });
     assert.equal(res.statusCode, 200, url);
