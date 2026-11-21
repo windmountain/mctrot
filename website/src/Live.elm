@@ -3081,7 +3081,7 @@ viewPosts model =
 
 
 {-| Media from media.mctrot.nyc: a photo (its thumbnail or full size,
-whichever is sharp on this screen) linking to its full size, and video and voice that only fetch their headers until played.
+whichever is sharp on this screen; not a link), and video and voice that only fetch their headers until played.
 -}
 viewPostContent : PostContent -> Html Msg
 viewPostContent content =
@@ -3090,7 +3090,7 @@ viewPostContent content =
             Html.p [ Attr.class "live-post-text" ] [ Html.text text ]
 
         Photo url thumbUrl ->
-            Html.a [ Attr.href url, Attr.class "live-post-photo" ]
+            Html.div [ Attr.class "live-post-photo" ]
                 [ Html.img
                     ([ Attr.src url
                      , Attr.alt "Photo"
