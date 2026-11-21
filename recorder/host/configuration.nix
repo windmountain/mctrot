@@ -40,7 +40,7 @@
   # Before going live, set this to true and deploy: it protects event data
   # (no mctrot-wipe or mctrot-dislocate, no database reset on a schema
   # change). See host/recorder.nix.
-  recorder.live = false;
+  recorder.live = true;
 
   # The route plan: the simulator's GPX download, saved next to this
   # folder's flake.nix (or a hand-written GPX for a test walk). See
