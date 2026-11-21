@@ -250,8 +250,8 @@ subscriptions _ =
 
 {-| The player, as one line along the bottom of the screen (live.html,
 .radio): play or stop at the left, with what's on, or how tuning in's
-going, or what went wrong; the volume where a page can set it; and Links
-at the right, to radio.mctrot.nyc (its full-page player and the links for
+going, or what went wrong; the volume where a page can set it; and a radio icon
+at the right, linking to radio.mctrot.nyc (its full-page player and the links for
 other players), in a new tab so the walk stays open. The whole left part is the play/stop button.
 `now` is the server's clock, ms since the epoch (unused since the stripe
 lost its progress bar; kept so callers needn't change).
@@ -338,8 +338,10 @@ view _ playing model =
                 , Attr.href home
                 , Attr.target "_blank"
                 , Attr.rel "noopener"
+                , Attr.attribute "aria-label" "McTrot Radio (opens radio.mctrot.nyc)"
+                , Attr.title "radio.mctrot.nyc"
                 ]
-                [ Icon.view Icon.Earth, Html.text "Links" ]
+                [ Icon.view Icon.Radio ]
             ]
         ]
 
