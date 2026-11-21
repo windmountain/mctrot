@@ -37,6 +37,9 @@ async function signUp(s: Setup, email = "fan@example.com", name = "Fan"): Promis
   });
   assert.equal(verified.statusCode, 200);
   assert.match(verified.body, /Almost done/);
+  // The welcome form's redirect back to the site must be allowed, or the
+  // browser drops it with no feedback.
+  assert.match(String(verified.headers["content-security-policy"]), new RegExp(`form-action 'self' ${SITE}(;|$)`));
   const cookie = cookieFrom(verified);
   const profile = await s.app.inject({
     method: "POST",

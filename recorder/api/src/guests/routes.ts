@@ -136,7 +136,10 @@ export async function registerGuests(app: FastifyInstance, deps: GuestDeps) {
         .code(code)
         .header("content-type", "text/html; charset=utf-8")
         .header("cache-control", "no-store")
-        .header("content-security-policy", "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' " + siteOrigin + "; form-action 'self'; frame-ancestors 'none'")
+        // form-action also covers where a form's redirect goes: verify,
+        // profile and sign out send the guest back to the site, and a
+        // browser blocks that silently unless the site is allowed here.
+        .header("content-security-policy", `default-src 'none'; style-src 'unsafe-inline'; img-src 'self' ${siteOrigin}; form-action 'self' ${siteOrigin}; frame-ancestors 'none'`)
         .header("referrer-policy", "same-origin")
         .send(body);
 
