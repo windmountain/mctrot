@@ -45,7 +45,9 @@
        stripe pinned at the bottom (website/LIVE-DESIGN.md). */
     body { background: var(--paper); }
     .app { flex: 1; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-    .app-top { position: sticky; top: 0; z-index: 5; background: var(--paper); border-bottom: var(--strong); }
+    .app-top { position: sticky; top: 0; z-index: 5; background: var(--paper); }
+    /* The line under the top: on Stats only. */
+    .page-stats .app-top { border-bottom: var(--strong); }
     .app-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
       padding: var(--space-3) var(--space-4) var(--space-2); }
     .app-title { margin: 0; font: var(--t-display); letter-spacing: -0.02em; color: var(--ink); }
