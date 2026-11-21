@@ -44,7 +44,17 @@
   </header>
 
   <main id="main">
-    <div class="wrap">
+    <div class="wrap home-wrap">
+      <a class="live-callout" href="/live" hidden>
+        <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M49.7 4.4 L58.5 19.4 L68.7 8.1 L67.6 23.2 L86.2 18.6 L75.7 33.0 L94.8 32.4 L79.2 47.8 L98.9 58.7 L80.9 60.8 L85.7 68.3 L71.7 69.7 L76.5 83.2 L64.9 78.1 L60.5 97.3 L49.9 82.8 L40.3 95.6 L37.7 78.1 L17.8 88.2 L24.2 71.0 L14.0 72.1 L22.3 60.0 L6.1 52.9 L19.1 45.1 L5.0 32.0 L22.8 36.8 L18.6 18.1 L33.4 23.4 L28.6 9.0 L44.9 19.8Z"/></svg>
+        <span>Live<br>feed<small>Nov 21</small></span>
+      </a>
+      <script>
+        // Show the callout only on the day of the walk, by New York's
+        // calendar. Without JavaScript it stays hidden.
+        if (new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date()) === "2026-11-21")
+          document.querySelector(".live-callout").hidden = false;
+      </script>
       <div class="hero">
         <h1>
           <span class="line-1">Every McDonald&rsquo;s in Manhattan</span>
@@ -70,9 +80,9 @@
         <a href="mailto:admin@mctrot.nyc">admin@mctrot.nyc</a>.
       </p>
       <ul class="footer-links">
-        <li><a href="https://www.instagram.com/mctrot.nyc/">Instagram</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
         <li><a href="https://github.com/windmountain/mctrot">GitHub</a></li>
-        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="https://www.instagram.com/mctrot.nyc/">Instagram</a></li>
       </ul>
     </div>
   </footer>
