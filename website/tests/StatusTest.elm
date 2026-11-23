@@ -58,9 +58,9 @@ before now =
 {-| `n` McDonald's visited, each `late` minutes after its planned arrival
 (planned every 12 minutes from the start).
 -}
-visits : Int -> Int -> List { planned : Maybe Int, at : Int }
+visits : Int -> Int -> List { planned : Maybe Int, at : Int, skipped : Bool }
 visits n late =
-    List.range 0 (n - 1) |> List.map (\i -> { planned = Just (start + i * 12 * minute), at = start + (i * 12 + late) * minute })
+    List.range 0 (n - 1) |> List.map (\i -> { planned = Just (start + i * 12 * minute), at = start + (i * 12 + late) * minute, skipped = False })
 
 
 plainWeather : Status.Weather
@@ -104,7 +104,7 @@ suite =
                         { now = now
                         , stores = 46
                         , start = Nothing
-                        , visits = { planned = Just start, at = start } :: List.drop 1 (visits 22 9)
+                        , visits = { planned = Just start, at = start, skipped = False } :: List.drop 1 (visits 22 9)
                         , weather = Just plainWeather
                         , sun = Just sun
                         , latestPost = Just { at = now - 3 * minute, kind = TextPost "Wind tunnel on 6th. Hat gone." }
@@ -117,13 +117,26 @@ suite =
                         { now = start + 3 * minute
                         , stores = 46
                         , start = Nothing
-                        , visits = [ { planned = Just (start + 2 * minute), at = start } ]
+                        , visits = [ { planned = Just (start + 2 * minute), at = start, skipped = False } ]
                         , weather = Nothing
                         , sun = Just sun
                         , latestPost = Nothing
                         , radio = Nothing
                         }
                         |> Expect.equal (opener ++ " 1 of 46 visited, 45 to go, 3 minutes in and 2 minutes ahead of plan. Dark, 5 minutes until astronomical twilight.")
+            , test "with McDonald's skipped for being closed" <|
+                \_ ->
+                    Status.paragraph
+                        { now = start + 30 * minute
+                        , stores = 46
+                        , start = Nothing
+                        , visits = visits 3 0 |> List.indexedMap (\i v -> { v | skipped = i > 0 })
+                        , weather = Nothing
+                        , sun = Nothing
+                        , latestPost = Nothing
+                        , radio = Nothing
+                        }
+                        |> Expect.equal (opener ++ " 3 of 46 visited (2 closed, skipped), 43 to go, 30 minutes in and on plan.")
             , test "on plan" <|
                 \_ ->
                     Status.paragraph
@@ -139,13 +152,26 @@ suite =
                         |> Expect.equal (opener ++ " 3 of 46 visited, 43 to go, 30 minutes in and on plan.")
             ]
         , describe "finished"
-            [ test "all of them, with the time taken" <|
+            [ test "all of them, one skipped for being closed" <|
                 \_ ->
                     Status.paragraph
                         { now = start + 9 * hour + 42 * minute
                         , stores = 2
                         , start = Nothing
-                        , visits = [ { planned = Nothing, at = start }, { planned = Nothing, at = start + 9 * hour + 38 * minute } ]
+                        , visits = [ { planned = Nothing, at = start, skipped = False }, { planned = Nothing, at = start + 9 * hour + 38 * minute, skipped = True } ]
+                        , weather = Nothing
+                        , sun = Nothing
+                        , latestPost = Nothing
+                        , radio = Nothing
+                        }
+                        |> Expect.equal "Zach Rose’s annual challenge to eat at every McDonald’s in Manhattan, on foot, in one go. The goal for this year was 10 hours. Done: all 2 (1 closed, skipped) in 9 hours 38 minutes."
+            , test "all of them, with the time taken" <|
+                \_ ->
+                    Status.paragraph
+                        { now = start + 9 * hour + 42 * minute
+                        , stores = 2
+                        , start = Nothing
+                        , visits = [ { planned = Nothing, at = start, skipped = False }, { planned = Nothing, at = start + 9 * hour + 38 * minute, skipped = False } ]
                         , weather = Just { plainWeather | summary = Just "Clear", temperatureF = Just 44, feelsLikeF = Just 41 }
                         , sun = Nothing
                         , latestPost = Nothing
@@ -214,7 +240,7 @@ postSays kind ago expected =
                         { now = now
                         , stores = 46
                         , start = Nothing
-                        , visits = [ { planned = Nothing, at = start } ]
+                        , visits = [ { planned = Nothing, at = start, skipped = False } ]
                         , weather = Nothing
                         , sun = Nothing
                         , latestPost = Just { at = now - ago * minute, kind = kind }

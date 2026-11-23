@@ -1,0 +1,7 @@
+{
+  "about": "Skips for the Nov 21, 2026 archive. /post had no Skip button that day; the Rules let a McTrotter skip ordering at a McDonald's listed as open but not open. These are the skips I'd have pressed, at the times of my posts about them. The export (recorder/api/src/export-archive.ts) adds each as a skipped check-in at that store, replacing any unmatched tap within 2 minutes.",
+  "skips": [
+    { "storeId": "70", "at": "2026-11-21T08:57:21-05:00", "why": "Macy's closed until 10 (my 8:57 AM post; my unmatched tap at 8:57:21)" },
+    { "storeId": "102", "at": "2026-11-21T10:59:45-05:00", "why": "Canal St closed for remodel (my 10:59 AM post)" }
+  ]
+}

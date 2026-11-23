@@ -40,7 +40,7 @@ type alias Input sun =
     { now : Int
     , stores : Int
     , start : Maybe { at : Int, address : String }
-    , visits : List { planned : Maybe Int, at : Int }
+    , visits : List { planned : Maybe Int, at : Int, skipped : Bool }
     , weather : Maybe Weather
     , sun : Maybe (SolarTime.Times sun)
     , latestPost : Maybe { at : Int, kind : PostKind }
@@ -91,6 +91,19 @@ paragraph input =
         finished =
             input.stores > 0 && visited >= input.stores
 
+        -- McDonald's skipped for being closed (the Rules allow it): they
+        -- count, and the sentence says how many.
+        skips =
+            case List.length (List.filter .skipped input.visits) of
+                0 ->
+                    ""
+
+                1 ->
+                    " (1 closed, skipped)"
+
+                n ->
+                    " (" ++ String.fromInt n ++ " closed, skipped)"
+
         opener =
             "Zach Rose’s annual challenge to eat at every McDonald’s in Manhattan, on foot, in one go. The goal for this year "
                 ++ (if finished then
@@ -133,13 +146,15 @@ paragraph input =
 
             progress =
                 if finished then
-                    "Done: all " ++ String.fromInt input.stores ++ " in " ++ span (Maybe.map .at last |> Maybe.withDefault input.now) first ++ "."
+                    "Done: all " ++ String.fromInt input.stores ++ skips ++ " in " ++ span (Maybe.map .at last |> Maybe.withDefault input.now) first ++ "."
 
                 else
                     String.fromInt visited
                         ++ " of "
                         ++ String.fromInt input.stores
-                        ++ " visited, "
+                        ++ " visited"
+                        ++ skips
+                        ++ ", "
                         ++ String.fromInt (input.stores - visited)
                         ++ " to go, "
                         ++ span input.now first

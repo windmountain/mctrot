@@ -339,6 +339,32 @@ type Match
     = Matched String
     | Pending
     | Unmatched
+      -- Not open (Rules: may skip ordering), so passed by: done, but
+      -- nothing eaten. Only from an archive (recorder/skips-*.json).
+    | Skipped String
+
+
+{-| Whether a check-in counts for this store: checked in, or skipped.
+-}
+doneAt : String -> Visit -> Bool
+doneAt id visit =
+    visit.match == Matched id || visit.match == Skipped id
+
+
+{-| The stores skipped by then.
+-}
+skippedIds : LiveResponse -> List String
+skippedIds response =
+    List.filterMap
+        (\v ->
+            case v.match of
+                Skipped id ->
+                    Just id
+
+                _ ->
+                    Nothing
+        )
+        response.visits
 
 
 liveDecoder : Decoder LiveResponse
@@ -521,6 +547,9 @@ matchDecoder =
 
                     "unmatched" ->
                         Decode.succeed Unmatched
+
+                    "skipped" ->
+                        Decode.map Skipped (Decode.field "storeId" Decode.string)
 
                     other ->
                         Decode.fail ("unknown visit status " ++ other)
@@ -1393,10 +1422,10 @@ statusInput now model response =
             |> List.filterMap
                 (\store ->
                     response.visits
-                        |> List.filter (\v -> v.match == Matched store.id)
+                        |> List.filter (doneAt store.id)
                         |> List.map .tapTs
                         |> List.minimum
-                        |> Maybe.map (\at -> { planned = store.arrive, at = at })
+                        |> Maybe.map (\at -> { planned = store.arrive, at = at, skipped = List.member store.id (skippedIds response) })
                 )
     , weather =
         response.weather
@@ -1922,7 +1951,7 @@ visitedStores response =
         |> List.filterMap
             (\store ->
                 response.visits
-                    |> List.filter (\v -> v.match == Matched store.id)
+                    |> List.filter (doneAt store.id)
                     |> List.map .tapTs
                     |> List.minimum
                     |> Maybe.map (Tuple.pair store)
@@ -2072,6 +2101,18 @@ viewPlanTile response big =
                 List.drop lastDone response.stores
 
         diff store =
+            case ( store.arrive, actual store ) of
+                ( _, Just _ ) ->
+                    if List.member store.id (skippedIds response) then
+                        Html.span [ Attr.class "plan-diff plan-skipped" ] [ Html.text "skip" ]
+
+                    else
+                        diffOf store
+
+                _ ->
+                    diffOf store
+
+        diffOf store =
             case ( store.arrive, actual store ) of
                 ( Just planned, Just at ) ->
                     let
@@ -2304,20 +2345,30 @@ viewMap shape focused walked now response =
                             Matched id ->
                                 Just id
 
+                            Skipped id ->
+                                Just id
+
                             _ ->
                                 Nothing
                     )
 
-        -- When I first checked in at a store, if I have.
+        skipped =
+            Maybe.map skippedIds response |> Maybe.withDefault []
+
+        -- When I first checked in at (or skipped) a store, if I have.
         firstVisit id =
             Maybe.map .visits response
                 |> Maybe.withDefault []
-                |> List.filter (\v -> v.match == Matched id)
+                |> List.filter (doneAt id)
                 |> List.map .tapTs
                 |> List.minimum
+                |> Maybe.map (Tuple.pair (List.member id skipped))
 
         pipClass store =
-            if List.member store.id visited then
+            if List.member store.id skipped then
+                "live-pip live-pip-visited live-pip-skipped"
+
+            else if List.member store.id visited then
                 "live-pip live-pip-visited"
 
             else if now |> Maybe.map (\ms -> not (isOpen ms store)) |> Maybe.withDefault False then
@@ -3051,7 +3102,7 @@ inBox content =
 map's right edge): its name, and when I visited it (see visitNote) or, if I
 haven't yet, when it next opens or closes (see hoursNote).
 -}
-viewFocus : Maybe Int -> Maybe Int -> Store -> Html Msg
+viewFocus : Maybe Int -> Maybe ( Bool, Int ) -> Store -> Html Msg
 viewFocus now visitedAt store =
     let
         note =
@@ -3089,20 +3140,29 @@ viewFocus now visitedAt store =
 
 
 {-| "Visited 5:34 AM", or with the date when that's more than 18 hours ago
-(or the clock's not known yet): "Visited November 21, 5:34 AM EST".
+(or the clock's not known yet): "Visited November 21, 5:34 AM EST". A
+store skipped for being closed: "Skipped (closed) 5:34 AM".
 -}
-visitNote : Maybe Int -> Int -> String
-visitNote now ts =
+visitNote : Maybe Int -> ( Bool, Int ) -> String
+visitNote now ( skipped, ts ) =
+    let
+        verb =
+            if skipped then
+                "Skipped (closed) "
+
+            else
+                "Visited "
+    in
     case now of
         Just ms ->
             if ms - ts <= 18 * 3600000 then
-                "Visited " ++ NewYorkTime.clock ts
+                verb ++ NewYorkTime.clock ts
 
             else
-                "Visited " ++ NewYorkTime.format ts
+                verb ++ NewYorkTime.format ts
 
         Nothing ->
-            "Visited " ++ NewYorkTime.format ts
+            verb ++ NewYorkTime.format ts
 
 
 {-| When a store next closes, if it's open ("Open until 11:00 PM"), or next

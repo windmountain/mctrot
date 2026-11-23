@@ -119,7 +119,9 @@
   # static replay page (recorder/api/src/export-archive.ts), with sizes by
   # section and the media files it references. Runs in the recorder flake's
   # shell for Node 26 and its better-sqlite3; the database is opened
-  # read-only. Usage: export-archive [out.json]
+  # read-only. McDonald's skipped for being closed (no Skip button on the
+  # day) come from recorder/skips-2026-11-21.json.
+  # Usage: export-archive [out.json]
   #   (default recorder-media/recorder-archive.json, next to the database
   #   and the photos)
   # The route plan is made from recorder/route-plan.gpx exactly as the
@@ -139,7 +141,8 @@
       "$DEVENV_ROOT/recorder-media/recorder-redacted.sqlite" \
       "$plan" \
       "$DEVENV_ROOT/mctrot-5-radio/program.json" \
-      "$out"
+      "$out" \
+      "$DEVENV_ROOT/recorder/skips-2026-11-21.json"
   '';
 
   # Interactively name (or rename) locations, then save every nickname to

@@ -6,7 +6,12 @@
 // posts, weather, sky, sun, radio), run once over the whole day, so the
 // replay agrees with what /live showed. Kept for reference after the event.
 //
-//   node src/export-archive.ts <db.sqlite> <route-plan.json> <program.json> <out.json>
+//   node src/export-archive.ts <db.sqlite> <route-plan.json> <program.json> <out.json> [skips.json]
+//
+// skips.json (e.g. recorder/skips-2026-11-21.json): McDonald's skipped
+// because they weren't open, which /post had no button for; each becomes
+// a "skipped" check-in at its store, replacing any unmatched tap within
+// DOUBLE_TAP_MS of it (a Check In pressed for want of Skip).
 //
 // Run in the recorder flake's shell (`nix develop` in recorder/) for Node 26.
 // The database is opened read-only. What's left out on purpose: guest
@@ -23,7 +28,7 @@ import { nowPlaying, RadioProgram } from "./radio.ts";
 import { sky } from "./sky.ts";
 import { newYorkDate, sunTimes } from "./sun.ts";
 import { GAP_MS, MAX_ACCURACY_M, simplify } from "./track.ts";
-import { matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
+import { DOUBLE_TAP_MS, matchVisits, positionFromDb, tapsBetween } from "./visits.ts";
 import { compass, type SkyInputs, WEATHER_POINT, WMO } from "./weather.ts";
 
 export const FORMAT = "mctrot-archive";
@@ -35,9 +40,9 @@ const SKY_STEP_MS = 5 * 60_000;
 // Weather readings older than this before the first event are left out.
 const WEATHER_LEAD_MS = 60 * 60_000;
 
-const [dbPath, planPath, programPath, outPath] = process.argv.slice(2);
+const [dbPath, planPath, programPath, outPath, skipsPath] = process.argv.slice(2);
 if (!dbPath || !planPath || !programPath || !outPath) {
-  console.error("usage: node src/export-archive.ts <db.sqlite> <route-plan.json> <program.json> <out.json>");
+  console.error("usage: node src/export-archive.ts <db.sqlite> <route-plan.json> <program.json> <out.json> [skips.json]");
   process.exit(2);
 }
 
@@ -80,7 +85,23 @@ const track: [number, number, number][][] = [];
 
 // Visits, matched as /live matched them at the end of the day. Before late
 // GPS arrived some showed as pending; the archive keeps the final answer.
-const visits = matchVisits(tapsBetween(db, 0, Number.MAX_SAFE_INTEGER), plan.stores, (ts) => positionFromDb(db, ts));
+type Skip = { storeId: string; at: string; why: string };
+const skips: Skip[] = skipsPath ? (JSON.parse(readFileSync(skipsPath, "utf8")) as { skips: Skip[] }).skips : [];
+for (const skip of skips) {
+  if (!plan.stores.some((s) => s.id === skip.storeId)) throw new Error(`skip of ${skip.storeId}: no such store in the plan`);
+  if (Number.isNaN(Date.parse(skip.at))) throw new Error(`skip of ${skip.storeId}: bad time ${skip.at}`);
+}
+const skipTimes = skips.map((s) => Date.parse(s.at));
+const matched = matchVisits(tapsBetween(db, 0, Number.MAX_SAFE_INTEGER), plan.stores, (ts) => positionFromDb(db, ts));
+for (const skip of skips) {
+  if (matched.some((v) => v.status === "matched" && v.storeId === skip.storeId)) {
+    throw new Error(`skip of ${skip.storeId}: it was checked in at`);
+  }
+}
+const visits = [
+  ...matched.filter((v) => v.status === "matched" || !skipTimes.some((t) => Math.abs(v.tapTs - t) < DOUBLE_TAP_MS)),
+  ...skips.map((s) => ({ tapTs: Date.parse(s.at), status: "skipped" as const, storeId: s.storeId })),
+].sort((a, b) => a.tapTs - b.tapTs);
 
 // Posts, oldest first, with when the server got each (the page can reveal a
 // post at `ts`, when it was made, or `receivedAt`, when /live first had it).
