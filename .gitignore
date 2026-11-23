@@ -46,5 +46,7 @@ elm-stuff/
 # Python bytecode
 __pycache__/
 
-# redacted production backup used to make public replay archive
-recorder/recorder-redacted-2026-11-21.sqlite
+# The recorder's databases (recorder/README.md): the redacted event copy the
+# replay archive is exported from, and earlier copies. Never committed.
+recorder/*.sqlite
+recorder/*.sqlite-*

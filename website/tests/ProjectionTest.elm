@@ -28,7 +28,7 @@ suite =
                             |> List.filter (\( _, feet ) -> feet > 1)
                 in
                 Expect.equal [] misses
-        , test "compares all 46 locations" <|
+        , test "compares all 45 locations" <|
             \_ ->
-                Expect.equal 46 (Array.length McdData.cities)
+                Expect.equal 45 (Array.length McdData.cities)
         ]

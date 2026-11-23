@@ -1,0 +1,1378 @@
+{
+ "about": "McTrot radio's program, made by recorder/tools/radio_program.py: the show file, when it starts, and what's on when",
+ "file": "show-b7944379dd90.flac",
+ "startsAt": 1795255251.58542,
+ "endsAt": 1795293424.118935,
+ "startsAtText": "2026-11-21T05:00:51.585420-05:00",
+ "endsAtText": "2026-11-21T15:37:04.118935-05:00",
+ "before": {
+  "artist": "McTrot radio",
+  "title": "On air at 5:00 AM"
+ },
+ "after": {
+  "artist": "McTrot radio",
+  "title": "Off air"
+ },
+ "entries": [
+  {
+   "offset": 0.0,
+   "duration": 248.4145804988662,
+   "artist": "Dune",
+   "title": "Are You Ready To Fly - Laser Mix",
+   "album": "Are You Ready To Fly (Remixes)",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T05:00:51-05:00"
+  },
+  {
+   "offset": 248.4145804988662,
+   "duration": 228.33539682539683,
+   "artist": "Tyler, The Creator, Channel Tres",
+   "title": "EARFQUAKE - Channel Tres Remix",
+   "album": "EARFQUAKE (Channel Tres Remix)",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T05:05:00-05:00"
+  },
+  {
+   "offset": 476.74997732426306,
+   "duration": 282.40598639455783,
+   "artist": "Mobb Deep, Nick Morgan",
+   "title": "Shook Ones, Pt. III",
+   "album": "Shook Ones, Pt. III",
+   "year": "2024",
+   "kind": "track",
+   "at": "2026-11-21T05:08:48-05:00"
+  },
+  {
+   "offset": 759.1559637188209,
+   "duration": 397.7150340136054,
+   "artist": "Adam Beyer, Layton Giordani, Green Velvet",
+   "title": "Space Date",
+   "album": "Space Date",
+   "year": "2018",
+   "kind": "track",
+   "at": "2026-11-21T05:13:30-05:00"
+  },
+  {
+   "offset": 1156.8709977324263,
+   "duration": 297.3667573696145,
+   "artist": "Kraftwerk, Orbital",
+   "title": "Expo 2000 - Orbital Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T05:20:08-05:00"
+  },
+  {
+   "offset": 1454.2377551020409,
+   "duration": 171.61968253968254,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T05:25:05-05:00"
+  },
+  {
+   "offset": 1625.8574376417234,
+   "duration": 367.99965986394557,
+   "artist": "Juan Atkins, Moritz Von Oswald, Borderland",
+   "title": "Lightyears",
+   "album": "Juan Atkins & Moritz von Oswald Present Borderland: Transport",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T05:27:57-05:00"
+  },
+  {
+   "offset": 1993.857097505669,
+   "duration": 465.2177324263039,
+   "artist": "Quivver",
+   "title": "In Your Boat (Original)",
+   "album": "Structures",
+   "year": "2010",
+   "kind": "track",
+   "at": "2026-11-21T05:34:05-05:00"
+  },
+  {
+   "offset": 2459.074829931973,
+   "duration": 603.9575736961451,
+   "artist": "Låpsley, DJ Koze",
+   "title": "Operator - DJ Koze's 12 inch Extended Disco Version",
+   "album": "Operator (DJ Koze's 12 inch Extended Disco Versions)",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T05:41:50-05:00"
+  },
+  {
+   "offset": 3063.032403628118,
+   "duration": 462.1974603174603,
+   "artist": "Kraftwerk, Alex Gopher, Etienne de Crécy",
+   "title": "Aéro Dynamik - Alex Gopher / Etienne de Crecy Dynamik Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T05:51:54-05:00"
+  },
+  {
+   "offset": 3525.229863945578,
+   "duration": 289.15879818594107,
+   "artist": "Duke Ellington",
+   "title": "Rhapsody in Blue",
+   "album": "Recollections Of The Big Band Era",
+   "year": "1982",
+   "kind": "track",
+   "at": "2026-11-21T05:59:36-05:00"
+  },
+  {
+   "offset": 3814.388662131519,
+   "duration": 282.82274376417234,
+   "artist": "Dune",
+   "title": "Are You Ready To Fly - 12“ Mix",
+   "album": "Are You Ready To Fly",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T06:04:25-05:00"
+  },
+  {
+   "offset": 4097.211405895691,
+   "duration": 173.69648526077097,
+   "artist": "Joy Division",
+   "title": "Isolation - 2020 Digital Master",
+   "album": "Closer",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T06:09:08-05:00"
+  },
+  {
+   "offset": 4270.907891156463,
+   "duration": 348.36471655328796,
+   "artist": "Donna Summer",
+   "title": "I Feel Love",
+   "album": "I Remember Yesterday",
+   "year": "1977",
+   "kind": "track",
+   "at": "2026-11-21T06:12:02-05:00"
+  },
+  {
+   "offset": 4619.27260770975,
+   "duration": 231.00714285714287,
+   "artist": "Reel 2 Real, Erick Morillo, The Mad Stuntman",
+   "title": "I Like to Move It (feat. The Mad Stuntman) - Erick More Album Mix",
+   "album": "Move It!",
+   "year": "1994",
+   "kind": "track",
+   "at": "2026-11-21T06:17:50-05:00"
+  },
+  {
+   "offset": 4850.279750566893,
+   "duration": 241.79219954648525,
+   "artist": "Donna Summer",
+   "title": "On The Radio",
+   "album": "On The Radio: Greatest Hits Volumes I & II",
+   "year": "1979",
+   "kind": "track",
+   "at": "2026-11-21T06:21:41-05:00"
+  },
+  {
+   "offset": 5092.071950113379,
+   "duration": 178.71875283446713,
+   "artist": "Rollergirl",
+   "title": "luv u so",
+   "album": "Stratford Ct. | Secret Selection #1-10",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T06:25:43-05:00"
+  },
+  {
+   "offset": 5270.790702947846,
+   "duration": 214.78521541950113,
+   "artist": "Bill Evans",
+   "title": "Tenderly",
+   "album": "Everybody Digs Bill Evans",
+   "year": "1959",
+   "kind": "track",
+   "at": "2026-11-21T06:28:42-05:00"
+  },
+  {
+   "offset": 5485.575918367347,
+   "duration": 443.3940589569161,
+   "artist": "Gary Burton, Keith Jarrett",
+   "title": "Moonchild / In Your Quiet Place",
+   "album": "Gary Burton & Keith Jarrett",
+   "year": "1971",
+   "kind": "track",
+   "at": "2026-11-21T06:32:17-05:00"
+  },
+  {
+   "offset": 5928.969977324263,
+   "duration": 410.4998185941043,
+   "artist": "Tyler, The Creator",
+   "title": "2SEATER - Instrumental",
+   "album": "Cherry Bomb + Instrumentals",
+   "year": "2015",
+   "kind": "track",
+   "at": "2026-11-21T06:39:40-05:00"
+  },
+  {
+   "offset": 6339.469795918368,
+   "duration": 174.46571428571428,
+   "artist": "El Michels Affair, Rahsaan Roland Kirk",
+   "title": "Take My Hand",
+   "album": "24 Hr Sports",
+   "year": "2025",
+   "kind": "track",
+   "at": "2026-11-21T06:46:31-05:00"
+  },
+  {
+   "offset": 6513.935510204082,
+   "duration": 237.3762358276644,
+   "artist": "Björk",
+   "title": "Big Time Sensuality",
+   "album": "Debut",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T06:49:25-05:00"
+  },
+  {
+   "offset": 6751.311746031746,
+   "duration": 362.92832199546484,
+   "artist": "Culture Beat",
+   "title": "Take Me Away - Sweetbox Hotpants Mix",
+   "album": "Take Me Away",
+   "year": "1996",
+   "kind": "track",
+   "at": "2026-11-21T06:53:22-05:00"
+  },
+  {
+   "offset": 7114.240068027211,
+   "duration": 174.11643990929704,
+   "artist": "Fehlfarben",
+   "title": "Ein Jahr (Es geht voran)",
+   "album": "Monarchie und Alltag",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T06:59:25-05:00"
+  },
+  {
+   "offset": 7288.356507936508,
+   "duration": 228.3754648526077,
+   "artist": "Nirvana",
+   "title": "Scentless Apprentice",
+   "album": "In Utero",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T07:02:19-05:00"
+  },
+  {
+   "offset": 7516.731972789115,
+   "duration": 261.19414965986397,
+   "artist": "The Chemical Brothers, Q-Tip",
+   "title": "Go",
+   "album": "Born In The Echoes",
+   "year": "2015",
+   "kind": "track",
+   "at": "2026-11-21T07:06:08-05:00"
+  },
+  {
+   "offset": 7777.926122448979,
+   "duration": 273.18657596371884,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision - Extended Mix",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T07:10:29-05:00"
+  },
+  {
+   "offset": 8051.112698412699,
+   "duration": 251.27827664399092,
+   "artist": "The Clash",
+   "title": "This is Radio Clash - Different Lyrics",
+   "album": "Combat Rock + The People's Hall",
+   "year": "2022",
+   "kind": "track",
+   "at": "2026-11-21T07:15:02-05:00"
+  },
+  {
+   "offset": 8302.390975056689,
+   "duration": 256.012947845805,
+   "artist": "Whigfield",
+   "title": "Think of You - Radio Edit",
+   "album": "Think of You - Single",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T07:19:13-05:00"
+  },
+  {
+   "offset": 8558.403922902495,
+   "duration": 310.469433106576,
+   "artist": "Blümchen",
+   "title": "Verrückte Jungs",
+   "album": "Verliebt...",
+   "year": "1997",
+   "kind": "track",
+   "at": "2026-11-21T07:23:29-05:00"
+  },
+  {
+   "offset": 8868.87335600907,
+   "duration": 216.03721088435375,
+   "artist": "Alice Deejay",
+   "title": "Better Off Alone",
+   "album": "Who Needs Guitars Anyway?",
+   "year": "2000",
+   "kind": "track",
+   "at": "2026-11-21T07:28:40-05:00"
+  },
+  {
+   "offset": 9084.910566893424,
+   "duration": 5.0,
+   "artist": "McTrot Radio",
+   "title": "Break",
+   "album": null,
+   "year": null,
+   "kind": "break",
+   "at": "2026-11-21T07:32:16-05:00"
+  },
+  {
+   "offset": 9089.910566893424,
+   "duration": 228.33539682539683,
+   "artist": "Tyler, The Creator, Channel Tres",
+   "title": "EARFQUAKE - Channel Tres Remix",
+   "album": "EARFQUAKE (Channel Tres Remix)",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T07:32:21-05:00"
+  },
+  {
+   "offset": 9318.24596371882,
+   "duration": 282.40598639455783,
+   "artist": "Mobb Deep, Nick Morgan",
+   "title": "Shook Ones, Pt. III",
+   "album": "Shook Ones, Pt. III",
+   "year": "2024",
+   "kind": "track",
+   "at": "2026-11-21T07:36:09-05:00"
+  },
+  {
+   "offset": 9600.651950113379,
+   "duration": 397.7150340136054,
+   "artist": "Adam Beyer, Layton Giordani, Green Velvet",
+   "title": "Space Date",
+   "album": "Space Date",
+   "year": "2018",
+   "kind": "track",
+   "at": "2026-11-21T07:40:52-05:00"
+  },
+  {
+   "offset": 9998.366984126984,
+   "duration": 297.3667573696145,
+   "artist": "Kraftwerk, Orbital",
+   "title": "Expo 2000 - Orbital Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T07:47:29-05:00"
+  },
+  {
+   "offset": 10295.733741496599,
+   "duration": 171.61968253968254,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T07:52:27-05:00"
+  },
+  {
+   "offset": 10467.35342403628,
+   "duration": 367.99965986394557,
+   "artist": "Juan Atkins, Moritz Von Oswald, Borderland",
+   "title": "Lightyears",
+   "album": "Juan Atkins & Moritz von Oswald Present Borderland: Transport",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T07:55:18-05:00"
+  },
+  {
+   "offset": 10835.353083900227,
+   "duration": 465.2177324263039,
+   "artist": "Quivver",
+   "title": "In Your Boat (Original)",
+   "album": "Structures",
+   "year": "2010",
+   "kind": "track",
+   "at": "2026-11-21T08:01:26-05:00"
+  },
+  {
+   "offset": 11300.57081632653,
+   "duration": 603.9575736961451,
+   "artist": "Låpsley, DJ Koze",
+   "title": "Operator - DJ Koze's 12 inch Extended Disco Version",
+   "album": "Operator (DJ Koze's 12 inch Extended Disco Versions)",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T08:09:12-05:00"
+  },
+  {
+   "offset": 11904.528390022675,
+   "duration": 462.1974603174603,
+   "artist": "Kraftwerk, Alex Gopher, Etienne de Crécy",
+   "title": "Aéro Dynamik - Alex Gopher / Etienne de Crecy Dynamik Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T08:19:16-05:00"
+  },
+  {
+   "offset": 12366.725850340135,
+   "duration": 289.15879818594107,
+   "artist": "Duke Ellington",
+   "title": "Rhapsody in Blue",
+   "album": "Recollections Of The Big Band Era",
+   "year": "1982",
+   "kind": "track",
+   "at": "2026-11-21T08:26:58-05:00"
+  },
+  {
+   "offset": 12655.884648526076,
+   "duration": 285.13126984126984,
+   "artist": "JAŸ-Z",
+   "title": "Empire State Of Mind [Jay-Z + Alicia Keys]",
+   "album": "The Blueprint 3",
+   "year": "2009",
+   "kind": "track",
+   "at": "2026-11-21T08:31:47-05:00"
+  },
+  {
+   "offset": 12941.015918367348,
+   "duration": 285.13126984126984,
+   "artist": "JAŸ-Z",
+   "title": "Empire State Of Mind [Jay-Z + Alicia Keys]",
+   "album": "The Blueprint 3",
+   "year": "2009",
+   "kind": "track",
+   "at": "2026-11-21T08:36:32-05:00"
+  },
+  {
+   "offset": 13226.147188208617,
+   "duration": 285.13126984126984,
+   "artist": "JAŸ-Z",
+   "title": "Empire State Of Mind [Jay-Z + Alicia Keys]",
+   "album": "The Blueprint 3",
+   "year": "2009",
+   "kind": "track",
+   "at": "2026-11-21T08:41:17-05:00"
+  },
+  {
+   "offset": 13511.278458049886,
+   "duration": 285.13126984126984,
+   "artist": "JAŸ-Z",
+   "title": "Empire State Of Mind [Jay-Z + Alicia Keys]",
+   "album": "The Blueprint 3",
+   "year": "2009",
+   "kind": "track",
+   "at": "2026-11-21T08:46:02-05:00"
+  },
+  {
+   "offset": 13796.409727891156,
+   "duration": 285.13126984126984,
+   "artist": "JAŸ-Z",
+   "title": "Empire State Of Mind [Jay-Z + Alicia Keys]",
+   "album": "The Blueprint 3",
+   "year": "2009",
+   "kind": "track",
+   "at": "2026-11-21T08:50:47-05:00"
+  },
+  {
+   "offset": 14081.540997732427,
+   "duration": 285.13126984126984,
+   "artist": "JAŸ-Z",
+   "title": "Empire State Of Mind [Jay-Z + Alicia Keys]",
+   "album": "The Blueprint 3",
+   "year": "2009",
+   "kind": "track",
+   "at": "2026-11-21T08:55:33-05:00"
+  },
+  {
+   "offset": 14366.672267573696,
+   "duration": 282.82274376417234,
+   "artist": "Dune",
+   "title": "Are You Ready To Fly - 12“ Mix",
+   "album": "Are You Ready To Fly",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T09:00:18-05:00"
+  },
+  {
+   "offset": 14649.495011337869,
+   "duration": 173.69648526077097,
+   "artist": "Joy Division",
+   "title": "Isolation - 2020 Digital Master",
+   "album": "Closer",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T09:05:01-05:00"
+  },
+  {
+   "offset": 14823.19149659864,
+   "duration": 348.36471655328796,
+   "artist": "Donna Summer",
+   "title": "I Feel Love",
+   "album": "I Remember Yesterday",
+   "year": "1977",
+   "kind": "track",
+   "at": "2026-11-21T09:07:54-05:00"
+  },
+  {
+   "offset": 15171.556213151927,
+   "duration": 231.00714285714287,
+   "artist": "Reel 2 Real, Erick Morillo, The Mad Stuntman",
+   "title": "I Like to Move It (feat. The Mad Stuntman) - Erick More Album Mix",
+   "album": "Move It!",
+   "year": "1994",
+   "kind": "track",
+   "at": "2026-11-21T09:13:43-05:00"
+  },
+  {
+   "offset": 15402.56335600907,
+   "duration": 241.79219954648525,
+   "artist": "Donna Summer",
+   "title": "On The Radio",
+   "album": "On The Radio: Greatest Hits Volumes I & II",
+   "year": "1979",
+   "kind": "track",
+   "at": "2026-11-21T09:17:34-05:00"
+  },
+  {
+   "offset": 15644.355555555556,
+   "duration": 178.71875283446713,
+   "artist": "Rollergirl",
+   "title": "luv u so",
+   "album": "Stratford Ct. | Secret Selection #1-10",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T09:21:35-05:00"
+  },
+  {
+   "offset": 15823.074308390023,
+   "duration": 214.78521541950113,
+   "artist": "Bill Evans",
+   "title": "Tenderly",
+   "album": "Everybody Digs Bill Evans",
+   "year": "1959",
+   "kind": "track",
+   "at": "2026-11-21T09:24:34-05:00"
+  },
+  {
+   "offset": 16037.859523809524,
+   "duration": 443.3940589569161,
+   "artist": "Gary Burton, Keith Jarrett",
+   "title": "Moonchild / In Your Quiet Place",
+   "album": "Gary Burton & Keith Jarrett",
+   "year": "1971",
+   "kind": "track",
+   "at": "2026-11-21T09:28:09-05:00"
+  },
+  {
+   "offset": 16481.25358276644,
+   "duration": 174.46571428571428,
+   "artist": "El Michels Affair, Rahsaan Roland Kirk",
+   "title": "Take My Hand",
+   "album": "24 Hr Sports",
+   "year": "2025",
+   "kind": "track",
+   "at": "2026-11-21T09:35:32-05:00"
+  },
+  {
+   "offset": 16655.719297052154,
+   "duration": 237.3762358276644,
+   "artist": "Björk",
+   "title": "Big Time Sensuality",
+   "album": "Debut",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T09:38:27-05:00"
+  },
+  {
+   "offset": 16893.09553287982,
+   "duration": 362.92832199546484,
+   "artist": "Culture Beat",
+   "title": "Take Me Away - Sweetbox Hotpants Mix",
+   "album": "Take Me Away",
+   "year": "1996",
+   "kind": "track",
+   "at": "2026-11-21T09:42:24-05:00"
+  },
+  {
+   "offset": 17256.023854875282,
+   "duration": 174.11643990929704,
+   "artist": "Fehlfarben",
+   "title": "Ein Jahr (Es geht voran)",
+   "album": "Monarchie und Alltag",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T09:48:27-05:00"
+  },
+  {
+   "offset": 17430.14029478458,
+   "duration": 228.3754648526077,
+   "artist": "Nirvana",
+   "title": "Scentless Apprentice",
+   "album": "In Utero",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T09:51:21-05:00"
+  },
+  {
+   "offset": 17658.515759637186,
+   "duration": 261.19414965986397,
+   "artist": "The Chemical Brothers, Q-Tip",
+   "title": "Go",
+   "album": "Born In The Echoes",
+   "year": "2015",
+   "kind": "track",
+   "at": "2026-11-21T09:55:10-05:00"
+  },
+  {
+   "offset": 17919.709909297053,
+   "duration": 273.18657596371884,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision - Extended Mix",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T09:59:31-05:00"
+  },
+  {
+   "offset": 18192.89648526077,
+   "duration": 251.27827664399092,
+   "artist": "The Clash",
+   "title": "This is Radio Clash - Different Lyrics",
+   "album": "Combat Rock + The People's Hall",
+   "year": "2022",
+   "kind": "track",
+   "at": "2026-11-21T10:04:04-05:00"
+  },
+  {
+   "offset": 18444.17476190476,
+   "duration": 256.012947845805,
+   "artist": "Whigfield",
+   "title": "Think of You - Radio Edit",
+   "album": "Think of You - Single",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T10:08:15-05:00"
+  },
+  {
+   "offset": 18700.187709750568,
+   "duration": 310.469433106576,
+   "artist": "Blümchen",
+   "title": "Verrückte Jungs",
+   "album": "Verliebt...",
+   "year": "1997",
+   "kind": "track",
+   "at": "2026-11-21T10:12:31-05:00"
+  },
+  {
+   "offset": 19010.657142857144,
+   "duration": 216.03721088435375,
+   "artist": "Alice Deejay",
+   "title": "Better Off Alone",
+   "album": "Who Needs Guitars Anyway?",
+   "year": "2000",
+   "kind": "track",
+   "at": "2026-11-21T10:17:42-05:00"
+  },
+  {
+   "offset": 19226.694353741495,
+   "duration": 5.0,
+   "artist": "McTrot Radio",
+   "title": "Break",
+   "album": null,
+   "year": null,
+   "kind": "break",
+   "at": "2026-11-21T10:21:18-05:00"
+  },
+  {
+   "offset": 19231.694353741495,
+   "duration": 228.33539682539683,
+   "artist": "Tyler, The Creator, Channel Tres",
+   "title": "EARFQUAKE - Channel Tres Remix",
+   "album": "EARFQUAKE (Channel Tres Remix)",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T10:21:23-05:00"
+  },
+  {
+   "offset": 19460.029750566893,
+   "duration": 282.40598639455783,
+   "artist": "Mobb Deep, Nick Morgan",
+   "title": "Shook Ones, Pt. III",
+   "album": "Shook Ones, Pt. III",
+   "year": "2024",
+   "kind": "track",
+   "at": "2026-11-21T10:25:11-05:00"
+  },
+  {
+   "offset": 19742.43573696145,
+   "duration": 397.7150340136054,
+   "artist": "Adam Beyer, Layton Giordani, Green Velvet",
+   "title": "Space Date",
+   "album": "Space Date",
+   "year": "2018",
+   "kind": "track",
+   "at": "2026-11-21T10:29:54-05:00"
+  },
+  {
+   "offset": 20140.150770975055,
+   "duration": 297.3667573696145,
+   "artist": "Kraftwerk, Orbital",
+   "title": "Expo 2000 - Orbital Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T10:36:31-05:00"
+  },
+  {
+   "offset": 20437.51752834467,
+   "duration": 171.61968253968254,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T10:41:29-05:00"
+  },
+  {
+   "offset": 20609.137210884353,
+   "duration": 367.99965986394557,
+   "artist": "Juan Atkins, Moritz Von Oswald, Borderland",
+   "title": "Lightyears",
+   "album": "Juan Atkins & Moritz von Oswald Present Borderland: Transport",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T10:44:20-05:00"
+  },
+  {
+   "offset": 20977.136870748298,
+   "duration": 465.2177324263039,
+   "artist": "Quivver",
+   "title": "In Your Boat (Original)",
+   "album": "Structures",
+   "year": "2010",
+   "kind": "track",
+   "at": "2026-11-21T10:50:28-05:00"
+  },
+  {
+   "offset": 21442.354603174605,
+   "duration": 603.9575736961451,
+   "artist": "Låpsley, DJ Koze",
+   "title": "Operator - DJ Koze's 12 inch Extended Disco Version",
+   "album": "Operator (DJ Koze's 12 inch Extended Disco Versions)",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T10:58:13-05:00"
+  },
+  {
+   "offset": 22046.31217687075,
+   "duration": 462.1974603174603,
+   "artist": "Kraftwerk, Alex Gopher, Etienne de Crécy",
+   "title": "Aéro Dynamik - Alex Gopher / Etienne de Crecy Dynamik Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T11:08:17-05:00"
+  },
+  {
+   "offset": 22508.50963718821,
+   "duration": 289.15879818594107,
+   "artist": "Duke Ellington",
+   "title": "Rhapsody in Blue",
+   "album": "Recollections Of The Big Band Era",
+   "year": "1982",
+   "kind": "track",
+   "at": "2026-11-21T11:16:00-05:00"
+  },
+  {
+   "offset": 22797.66843537415,
+   "duration": 282.82274376417234,
+   "artist": "Dune",
+   "title": "Are You Ready To Fly - 12“ Mix",
+   "album": "Are You Ready To Fly",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T11:20:49-05:00"
+  },
+  {
+   "offset": 23080.491179138324,
+   "duration": 173.69648526077097,
+   "artist": "Joy Division",
+   "title": "Isolation - 2020 Digital Master",
+   "album": "Closer",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T11:25:32-05:00"
+  },
+  {
+   "offset": 23254.187664399095,
+   "duration": 348.36471655328796,
+   "artist": "Donna Summer",
+   "title": "I Feel Love",
+   "album": "I Remember Yesterday",
+   "year": "1977",
+   "kind": "track",
+   "at": "2026-11-21T11:28:25-05:00"
+  },
+  {
+   "offset": 23602.55238095238,
+   "duration": 231.00714285714287,
+   "artist": "Reel 2 Real, Erick Morillo, The Mad Stuntman",
+   "title": "I Like to Move It (feat. The Mad Stuntman) - Erick More Album Mix",
+   "album": "Move It!",
+   "year": "1994",
+   "kind": "track",
+   "at": "2026-11-21T11:34:14-05:00"
+  },
+  {
+   "offset": 23833.559523809523,
+   "duration": 241.79219954648525,
+   "artist": "Donna Summer",
+   "title": "On The Radio",
+   "album": "On The Radio: Greatest Hits Volumes I & II",
+   "year": "1979",
+   "kind": "track",
+   "at": "2026-11-21T11:38:05-05:00"
+  },
+  {
+   "offset": 24075.35172335601,
+   "duration": 178.71875283446713,
+   "artist": "Rollergirl",
+   "title": "luv u so",
+   "album": "Stratford Ct. | Secret Selection #1-10",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T11:42:06-05:00"
+  },
+  {
+   "offset": 24254.070476190474,
+   "duration": 214.78521541950113,
+   "artist": "Bill Evans",
+   "title": "Tenderly",
+   "album": "Everybody Digs Bill Evans",
+   "year": "1959",
+   "kind": "track",
+   "at": "2026-11-21T11:45:05-05:00"
+  },
+  {
+   "offset": 24468.855691609977,
+   "duration": 182.98260770975057,
+   "artist": "The Roches",
+   "title": "Come Softly to Me",
+   "album": "Another World",
+   "year": "1985",
+   "kind": "track",
+   "at": "2026-11-21T11:48:40-05:00"
+  },
+  {
+   "offset": 24651.838299319727,
+   "duration": 443.3940589569161,
+   "artist": "Gary Burton, Keith Jarrett",
+   "title": "Moonchild / In Your Quiet Place",
+   "album": "Gary Burton & Keith Jarrett",
+   "year": "1971",
+   "kind": "track",
+   "at": "2026-11-21T11:51:43-05:00"
+  },
+  {
+   "offset": 25095.232358276644,
+   "duration": 174.46571428571428,
+   "artist": "El Michels Affair, Rahsaan Roland Kirk",
+   "title": "Take My Hand",
+   "album": "24 Hr Sports",
+   "year": "2025",
+   "kind": "track",
+   "at": "2026-11-21T11:59:06-05:00"
+  },
+  {
+   "offset": 25269.698072562358,
+   "duration": 237.3762358276644,
+   "artist": "Björk",
+   "title": "Big Time Sensuality",
+   "album": "Debut",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T12:02:01-05:00"
+  },
+  {
+   "offset": 25507.074308390023,
+   "duration": 362.92832199546484,
+   "artist": "Culture Beat",
+   "title": "Take Me Away - Sweetbox Hotpants Mix",
+   "album": "Take Me Away",
+   "year": "1996",
+   "kind": "track",
+   "at": "2026-11-21T12:05:58-05:00"
+  },
+  {
+   "offset": 25870.002630385487,
+   "duration": 174.11643990929704,
+   "artist": "Fehlfarben",
+   "title": "Ein Jahr (Es geht voran)",
+   "album": "Monarchie und Alltag",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T12:12:01-05:00"
+  },
+  {
+   "offset": 26044.119070294786,
+   "duration": 228.3754648526077,
+   "artist": "Nirvana",
+   "title": "Scentless Apprentice",
+   "album": "In Utero",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T12:14:55-05:00"
+  },
+  {
+   "offset": 26272.49453514739,
+   "duration": 261.19414965986397,
+   "artist": "The Chemical Brothers, Q-Tip",
+   "title": "Go",
+   "album": "Born In The Echoes",
+   "year": "2015",
+   "kind": "track",
+   "at": "2026-11-21T12:18:44-05:00"
+  },
+  {
+   "offset": 26533.688684807257,
+   "duration": 273.18657596371884,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision - Extended Mix",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T12:23:05-05:00"
+  },
+  {
+   "offset": 26806.875260770976,
+   "duration": 251.27827664399092,
+   "artist": "The Clash",
+   "title": "This is Radio Clash - Different Lyrics",
+   "album": "Combat Rock + The People's Hall",
+   "year": "2022",
+   "kind": "track",
+   "at": "2026-11-21T12:27:38-05:00"
+  },
+  {
+   "offset": 27058.153537414964,
+   "duration": 256.012947845805,
+   "artist": "Whigfield",
+   "title": "Think of You - Radio Edit",
+   "album": "Think of You - Single",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T12:31:49-05:00"
+  },
+  {
+   "offset": 27314.166485260772,
+   "duration": 310.469433106576,
+   "artist": "Blümchen",
+   "title": "Verrückte Jungs",
+   "album": "Verliebt...",
+   "year": "1997",
+   "kind": "track",
+   "at": "2026-11-21T12:36:05-05:00"
+  },
+  {
+   "offset": 27624.63591836735,
+   "duration": 216.03721088435375,
+   "artist": "Alice Deejay",
+   "title": "Better Off Alone",
+   "album": "Who Needs Guitars Anyway?",
+   "year": "2000",
+   "kind": "track",
+   "at": "2026-11-21T12:41:16-05:00"
+  },
+  {
+   "offset": 27840.6731292517,
+   "duration": 5.0,
+   "artist": "McTrot Radio",
+   "title": "Break",
+   "album": null,
+   "year": null,
+   "kind": "break",
+   "at": "2026-11-21T12:44:52-05:00"
+  },
+  {
+   "offset": 27845.6731292517,
+   "duration": 228.33539682539683,
+   "artist": "Tyler, The Creator, Channel Tres",
+   "title": "EARFQUAKE - Channel Tres Remix",
+   "album": "EARFQUAKE (Channel Tres Remix)",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T12:44:57-05:00"
+  },
+  {
+   "offset": 28074.008526077097,
+   "duration": 282.40598639455783,
+   "artist": "Mobb Deep, Nick Morgan",
+   "title": "Shook Ones, Pt. III",
+   "album": "Shook Ones, Pt. III",
+   "year": "2024",
+   "kind": "track",
+   "at": "2026-11-21T12:48:45-05:00"
+  },
+  {
+   "offset": 28356.414512471656,
+   "duration": 397.7150340136054,
+   "artist": "Adam Beyer, Layton Giordani, Green Velvet",
+   "title": "Space Date",
+   "album": "Space Date",
+   "year": "2018",
+   "kind": "track",
+   "at": "2026-11-21T12:53:27-05:00"
+  },
+  {
+   "offset": 28754.12954648526,
+   "duration": 297.3667573696145,
+   "artist": "Kraftwerk, Orbital",
+   "title": "Expo 2000 - Orbital Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T13:00:05-05:00"
+  },
+  {
+   "offset": 29051.496303854874,
+   "duration": 171.61968253968254,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T13:05:03-05:00"
+  },
+  {
+   "offset": 29223.115986394558,
+   "duration": 367.99965986394557,
+   "artist": "Juan Atkins, Moritz Von Oswald, Borderland",
+   "title": "Lightyears",
+   "album": "Juan Atkins & Moritz von Oswald Present Borderland: Transport",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T13:07:54-05:00"
+  },
+  {
+   "offset": 29591.115646258502,
+   "duration": 465.2177324263039,
+   "artist": "Quivver",
+   "title": "In Your Boat (Original)",
+   "album": "Structures",
+   "year": "2010",
+   "kind": "track",
+   "at": "2026-11-21T13:14:02-05:00"
+  },
+  {
+   "offset": 30056.33337868481,
+   "duration": 603.9575736961451,
+   "artist": "Låpsley, DJ Koze",
+   "title": "Operator - DJ Koze's 12 inch Extended Disco Version",
+   "album": "Operator (DJ Koze's 12 inch Extended Disco Versions)",
+   "year": "2016",
+   "kind": "track",
+   "at": "2026-11-21T13:21:47-05:00"
+  },
+  {
+   "offset": 30660.290952380954,
+   "duration": 462.1974603174603,
+   "artist": "Kraftwerk, Alex Gopher, Etienne de Crécy",
+   "title": "Aéro Dynamik - Alex Gopher / Etienne de Crecy Dynamik Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T13:31:51-05:00"
+  },
+  {
+   "offset": 31122.488412698414,
+   "duration": 289.15879818594107,
+   "artist": "Duke Ellington",
+   "title": "Rhapsody in Blue",
+   "album": "Recollections Of The Big Band Era",
+   "year": "1982",
+   "kind": "track",
+   "at": "2026-11-21T13:39:34-05:00"
+  },
+  {
+   "offset": 31411.647210884355,
+   "duration": 282.82274376417234,
+   "artist": "Dune",
+   "title": "Are You Ready To Fly - 12“ Mix",
+   "album": "Are You Ready To Fly",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T13:44:23-05:00"
+  },
+  {
+   "offset": 31694.469954648524,
+   "duration": 173.69648526077097,
+   "artist": "Joy Division",
+   "title": "Isolation - 2020 Digital Master",
+   "album": "Closer",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T13:49:06-05:00"
+  },
+  {
+   "offset": 31868.1664399093,
+   "duration": 348.36471655328796,
+   "artist": "Donna Summer",
+   "title": "I Feel Love",
+   "album": "I Remember Yesterday",
+   "year": "1977",
+   "kind": "track",
+   "at": "2026-11-21T13:51:59-05:00"
+  },
+  {
+   "offset": 32216.531156462584,
+   "duration": 231.00714285714287,
+   "artist": "Reel 2 Real, Erick Morillo, The Mad Stuntman",
+   "title": "I Like to Move It (feat. The Mad Stuntman) - Erick More Album Mix",
+   "album": "Move It!",
+   "year": "1994",
+   "kind": "track",
+   "at": "2026-11-21T13:57:48-05:00"
+  },
+  {
+   "offset": 32447.538299319727,
+   "duration": 241.79219954648525,
+   "artist": "Donna Summer",
+   "title": "On The Radio",
+   "album": "On The Radio: Greatest Hits Volumes I & II",
+   "year": "1979",
+   "kind": "track",
+   "at": "2026-11-21T14:01:39-05:00"
+  },
+  {
+   "offset": 32689.330498866213,
+   "duration": 178.71875283446713,
+   "artist": "Rollergirl",
+   "title": "luv u so",
+   "album": "Stratford Ct. | Secret Selection #1-10",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T14:05:40-05:00"
+  },
+  {
+   "offset": 32868.04925170068,
+   "duration": 214.78521541950113,
+   "artist": "Bill Evans",
+   "title": "Tenderly",
+   "album": "Everybody Digs Bill Evans",
+   "year": "1959",
+   "kind": "track",
+   "at": "2026-11-21T14:08:39-05:00"
+  },
+  {
+   "offset": 33082.834467120185,
+   "duration": 443.3940589569161,
+   "artist": "Gary Burton, Keith Jarrett",
+   "title": "Moonchild / In Your Quiet Place",
+   "album": "Gary Burton & Keith Jarrett",
+   "year": "1971",
+   "kind": "track",
+   "at": "2026-11-21T14:12:14-05:00"
+  },
+  {
+   "offset": 33526.228526077095,
+   "duration": 410.4998185941043,
+   "artist": "Tyler, The Creator",
+   "title": "2SEATER - Instrumental",
+   "album": "Cherry Bomb + Instrumentals",
+   "year": "2015",
+   "kind": "track",
+   "at": "2026-11-21T14:19:37-05:00"
+  },
+  {
+   "offset": 33936.7283446712,
+   "duration": 174.46571428571428,
+   "artist": "El Michels Affair, Rahsaan Roland Kirk",
+   "title": "Take My Hand",
+   "album": "24 Hr Sports",
+   "year": "2025",
+   "kind": "track",
+   "at": "2026-11-21T14:26:28-05:00"
+  },
+  {
+   "offset": 34111.19405895691,
+   "duration": 237.3762358276644,
+   "artist": "Björk",
+   "title": "Big Time Sensuality",
+   "album": "Debut",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T14:29:22-05:00"
+  },
+  {
+   "offset": 34348.57029478458,
+   "duration": 362.92832199546484,
+   "artist": "Culture Beat",
+   "title": "Take Me Away - Sweetbox Hotpants Mix",
+   "album": "Take Me Away",
+   "year": "1996",
+   "kind": "track",
+   "at": "2026-11-21T14:33:20-05:00"
+  },
+  {
+   "offset": 34711.498616780045,
+   "duration": 174.11643990929704,
+   "artist": "Fehlfarben",
+   "title": "Ein Jahr (Es geht voran)",
+   "album": "Monarchie und Alltag",
+   "year": "1980",
+   "kind": "track",
+   "at": "2026-11-21T14:39:23-05:00"
+  },
+  {
+   "offset": 34885.61505668934,
+   "duration": 228.3754648526077,
+   "artist": "Nirvana",
+   "title": "Scentless Apprentice",
+   "album": "In Utero",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T14:42:17-05:00"
+  },
+  {
+   "offset": 35113.99052154195,
+   "duration": 261.19414965986397,
+   "artist": "The Chemical Brothers, Q-Tip",
+   "title": "Go",
+   "album": "Born In The Echoes",
+   "year": "2015",
+   "kind": "track",
+   "at": "2026-11-21T14:46:05-05:00"
+  },
+  {
+   "offset": 35375.184671201816,
+   "duration": 273.18657596371884,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision - Extended Mix",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T14:50:26-05:00"
+  },
+  {
+   "offset": 35648.37124716553,
+   "duration": 251.27827664399092,
+   "artist": "The Clash",
+   "title": "This is Radio Clash - Different Lyrics",
+   "album": "Combat Rock + The People's Hall",
+   "year": "2022",
+   "kind": "track",
+   "at": "2026-11-21T14:54:59-05:00"
+  },
+  {
+   "offset": 35899.64952380952,
+   "duration": 256.012947845805,
+   "artist": "Whigfield",
+   "title": "Think of You - Radio Edit",
+   "album": "Think of You - Single",
+   "year": "1995",
+   "kind": "track",
+   "at": "2026-11-21T14:59:11-05:00"
+  },
+  {
+   "offset": 36155.66247165533,
+   "duration": 310.469433106576,
+   "artist": "Blümchen",
+   "title": "Verrückte Jungs",
+   "album": "Verliebt...",
+   "year": "1997",
+   "kind": "track",
+   "at": "2026-11-21T15:03:27-05:00"
+  },
+  {
+   "offset": 36466.1319047619,
+   "duration": 216.03721088435375,
+   "artist": "Alice Deejay",
+   "title": "Better Off Alone",
+   "album": "Who Needs Guitars Anyway?",
+   "year": "2000",
+   "kind": "track",
+   "at": "2026-11-21T15:08:37-05:00"
+  },
+  {
+   "offset": 36682.16911564626,
+   "duration": 5.0,
+   "artist": "McTrot Radio",
+   "title": "Break",
+   "album": null,
+   "year": null,
+   "kind": "break",
+   "at": "2026-11-21T15:12:13-05:00"
+  },
+  {
+   "offset": 36687.16911564626,
+   "duration": 228.33539682539683,
+   "artist": "Tyler, The Creator, Channel Tres",
+   "title": "EARFQUAKE - Channel Tres Remix",
+   "album": "EARFQUAKE (Channel Tres Remix)",
+   "year": "2019",
+   "kind": "track",
+   "at": "2026-11-21T15:12:18-05:00"
+  },
+  {
+   "offset": 36915.504512471656,
+   "duration": 282.40598639455783,
+   "artist": "Mobb Deep, Nick Morgan",
+   "title": "Shook Ones, Pt. III",
+   "album": "Shook Ones, Pt. III",
+   "year": "2024",
+   "kind": "track",
+   "at": "2026-11-21T15:16:07-05:00"
+  },
+  {
+   "offset": 37197.910498866215,
+   "duration": 397.7150340136054,
+   "artist": "Adam Beyer, Layton Giordani, Green Velvet",
+   "title": "Space Date",
+   "album": "Space Date",
+   "year": "2018",
+   "kind": "track",
+   "at": "2026-11-21T15:20:49-05:00"
+  },
+  {
+   "offset": 37595.62553287982,
+   "duration": 297.3667573696145,
+   "artist": "Kraftwerk, Orbital",
+   "title": "Expo 2000 - Orbital Mix",
+   "album": "Remixes",
+   "year": "2020",
+   "kind": "track",
+   "at": "2026-11-21T15:27:27-05:00"
+  },
+  {
+   "offset": 37892.992290249436,
+   "duration": 171.61968253968254,
+   "artist": "The Disco Boys",
+   "title": "Funk Decision",
+   "album": "Funk Decision",
+   "year": "2021",
+   "kind": "track",
+   "at": "2026-11-21T15:32:24-05:00"
+  },
+  {
+   "offset": 38064.61197278911,
+   "duration": 107.92154195011338,
+   "artist": "Jerry Goldsmith",
+   "title": "Take Us Out",
+   "album": "Rudy (Original Motion Picture Soundtrack)",
+   "year": "1993",
+   "kind": "track",
+   "at": "2026-11-21T15:35:16-05:00"
+  }
+ ]
+}

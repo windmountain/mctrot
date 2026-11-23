@@ -115,35 +115,23 @@
     done
   '';
 
-  # Export the finished event's recorder database as one JSON file for the
-  # static replay page (recorder/api/src/export-archive.ts), with sizes by
-  # section and the media files it references. Runs in the recorder flake's
-  # shell for Node 26 and its better-sqlite3; the database is opened
-  # read-only. McDonald's skipped for being closed (no Skip button on the
-  # day) come from recorder/skips-2026-11-21.json.
+  # Export McTrot 5's database as one JSON file for the replay page
+  # (recorder/export/export-archive.ts), with sizes by section and the
+  # media files it references. Its ingredients are all in recorder/export/:
+  # recorded.json (GPS, posts, weather and the rest, dumped from the event's
+  # database), the route plan, the radio program and the skips. Plain Node:
+  # no packages, no database, no recorder (it's gone; see
+  # recorder/README.md).
   # Usage: export-archive [out.json]
   #   (default website/archive/2026-11-21/archive.json, the archive page's
-  #   data, beside its photos in media/). The database is the redacted copy
-  #   recorder/recorder-redacted-2026-11-21.sqlite (gitignored).
-  # The route plan is made from recorder/route-plan.gpx exactly as the
-  # deployed server made it (host/api.nix: tools/route_plan.py), not
-  # read from recorder/api/route-plan.json, a gitignored local copy that
-  # can be out of date.
+  #   data, beside its photos in media/)
   scripts.export-archive.exec = ''
     set -euo pipefail
     # A relative out.json is from where the script was run.
     out="''${1:-$DEVENV_ROOT/website/archive/2026-11-21/archive.json}"
     case "$out" in /*) ;; *) out="$PWD/$out" ;; esac
-    cd "$DEVENV_ROOT/recorder"
-    plan="$(mktemp -t route-plan.XXXXXX)"
-    trap 'rm -f "$plan"' EXIT
-    nix run .#route-plan -- route-plan.gpx > "$plan"
-    nix develop -c bash -c 'cd api && exec node src/export-archive.ts "$@"' -- \
-      "$DEVENV_ROOT/recorder/recorder-redacted-2026-11-21.sqlite" \
-      "$plan" \
-      "$DEVENV_ROOT/mctrot-5-radio/program.json" \
-      "$out" \
-      "$DEVENV_ROOT/recorder/skips-2026-11-21.json"
+    exec node --experimental-strip-types --disable-warning=ExperimentalWarning \
+      "$DEVENV_ROOT/recorder/export/export-archive.ts" "$out"
   '';
 
   # Interactively name (or rename) locations, then save every nickname to

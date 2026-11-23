@@ -7,7 +7,7 @@ Live, it polls the recorder's `GET /live` (recorder/api/src/live.ts;
 contract in recorder/api/live.schema.json) every 15 seconds. With an
 `archive` flag, it's the replay of a finished event instead
 (mctrot.nyc/archive/2026-11-21, website/archive/2026-11-21/index.html):
-no recorder, one JSON file (recorder/api/src/export-archive.ts) holding
+no recorder, one JSON file (recorder/export/export-archive.ts) holding
 everything /live showed and when, and a scrubber over the page that sets
 the moment shown. Every view is drawn from what /live would have
 answered then (see REPLAY).
@@ -233,7 +233,7 @@ type alias LiveResponse =
 
 {-| The sky's colour overhead or low in one direction ("NE"), simulated by
 the recorder from the sun's position and the latest weather
-(recorder/api/src/sky.ts).
+(recorder/export/sky.ts).
 -}
 type alias SkySquare =
     { label : String
@@ -354,7 +354,7 @@ type Match
     | Pending
     | Unmatched
       -- Not open (Rules: may skip ordering), so passed by: done, but
-      -- nothing eaten. Only from an archive (recorder/skips-*.json).
+      -- nothing eaten. Only from an archive (recorder/export/skips-*.json).
     | Skipped String
 
 
@@ -3713,7 +3713,7 @@ type alias ReplayState =
     }
 
 
-{-| The archive (recorder/api/src/export-archive.ts): everything /live
+{-| The archive (recorder/export/export-archive.ts): everything /live
 showed over the event, each part with its own time, so what /live would
 have answered at any moment can be worked out (see `snapshot`).
 -}
@@ -4255,7 +4255,7 @@ positionAt at points =
 
 
 {-| Whether the server's track would have had this fix
-(recorder/api/src/track.ts, MAX_ACCURACY_M).
+(recorder/export/track.ts, MAX_ACCURACY_M).
 -}
 onTrack : Position -> Bool
 onTrack position =
