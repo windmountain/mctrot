@@ -630,6 +630,12 @@ type alias Model =
     -- line over its scrubber.
     , replay : Replay
     , archived : String
+
+    -- The zoomed-in map gliding back to the red line's tip (followTip),
+    -- and a step of that under way (its measuring takes a few frames; a
+    -- second one meanwhile would act on stale measurements and overshoot).
+    , followingTip : Bool
+    , followStepping : Bool
     , site : Site
     }
 
@@ -730,6 +736,8 @@ init flags =
       , walked = []
       , site = site
       , archived = flags.archived
+      , followingTip = False
+      , followStepping = False
       , replay =
             case flags.archive of
                 Just url ->
@@ -785,6 +793,7 @@ type Msg
     | ReplayPlay Bool
     | ReplaySpeed Int
     | ReplayFrame Float
+    | TipFollowed Bool
     | NoOp
 
 
@@ -969,11 +978,16 @@ update msg model =
             else
                 ( { model | zoom = zoom }
                 , Cmd.batch
-                    [ case ( model.focused, model.pinch == Nothing && model.lastTap == Nothing ) of
-                        ( Just (FocusedStore _), True ) ->
+                    [ case ( replayTip model, model.focused, model.pinch == Nothing && model.lastTap == Nothing ) of
+                        -- A replay zooms on the tip of the red line (or the
+                        -- start, before there's one), however it's zoomed.
+                        ( Just tip, _, _ ) ->
+                            centreOnTip tip anchor
+
+                        ( Nothing, Just (FocusedStore _), True ) ->
                             centreOnFocused anchor
 
-                        ( Just (FocusedPosts _), True ) ->
+                        ( Nothing, Just (FocusedPosts _), True ) ->
                             centreOnFocused anchor
 
                         _ ->
@@ -1184,7 +1198,16 @@ update msg model =
                 )
                 model
                 |> autoClick
-                |> (\m -> ( m, followTimeline m ))
+                |> (\m ->
+                        let
+                            ( followed, step ) =
+                                followMap m
+                        in
+                        ( followed, Cmd.batch [ followTimeline followed, step ] )
+                   )
+
+        TipFollowed moving ->
+            ( { model | followingTip = moving, followStepping = False }, Cmd.none )
 
 
 {-| The first data on the Timeline tab: scroll it to now.
@@ -1714,6 +1737,144 @@ centreOnFocused before =
         |> Task.andThen (\{ x, y } -> Browser.Dom.setViewportOf mapFrameId x y)
         |> Task.onError (\_ -> keepAnchorTask before)
         |> Task.attempt (\_ -> NoOp)
+
+
+{-| The tip of the red line on the map, in map coordinates, in a replay:
+where the path walked ends, or the first McDonald's (the start) before
+there's a path. Nothing live, or without a plan.
+-}
+replayTip : Model -> Maybe ( Float, Float )
+replayTip model =
+    case model.replay of
+        Replaying _ ->
+            case List.reverse model.walked |> List.head |> Maybe.andThen (List.reverse >> List.head) of
+                Just tip ->
+                    Just tip
+
+                Nothing ->
+                    Maybe.andThen (.response >> .stores >> List.head) model.latest
+                        |> Maybe.map mapPoint
+
+        _ ->
+            Nothing
+
+
+{-| Where a map point falls across the map's box, 0 to 1 each way.
+-}
+boxFraction : ( Float, Float ) -> Maybe ( Float, Float )
+boxFraction ( x, y ) =
+    case stretchBox of
+        [ minX, minY, width, height ] ->
+            Just ( (x - minX) / width, (y - minY) / height )
+
+        _ ->
+            Nothing
+
+
+{-| How far a map point is from the middle of the map's frame, on screen
+(px, right and down), and the frame's scroll and size.
+-}
+offFrameMiddle : ( Float, Float ) -> Task.Task Browser.Dom.Error { dx : Float, dy : Float, x : Float, y : Float, width : Float, height : Float }
+offFrameMiddle point =
+    case boxFraction point of
+        Just ( fx, fy ) ->
+            Task.map3
+                (\frame box v ->
+                    { dx = box.element.x + fx * box.element.width - frame.element.x - v.viewport.width / 2
+                    , dy = box.element.y + fy * box.element.height - frame.element.y - v.viewport.height / 2
+                    , x = v.viewport.x
+                    , y = v.viewport.y
+                    , width = v.viewport.width
+                    , height = v.viewport.height
+                    }
+                )
+                (Browser.Dom.getElement mapFrameId)
+                (Browser.Dom.getElement mapBoxId)
+                (Browser.Dom.getViewportOf mapFrameId)
+
+        Nothing ->
+            Task.fail (Browser.Dom.NotFound mapBoxId)
+
+
+{-| After a zoom in a replay: the tip in the middle of the map's frame.
+-}
+centreOnTip : ( Float, Float ) -> Anchor -> Cmd Msg
+centreOnTip tip before =
+    offFrameMiddle tip
+        |> Task.andThen (\o -> Browser.Dom.setViewportOf mapFrameId (o.x + o.dx) (o.y + o.dy))
+        |> Task.onError (\_ -> keepAnchorTask before)
+        |> Task.attempt (\_ -> NoOp)
+
+
+{-| While a replay plays on the zoomed-in map, keep the tip of the red line
+in view loosely: nothing while it's within followSlack of the middle;
+past that, glide back a little each step (followEase of the way) until
+it's within followSettle, then rest. Not while the map's being dragged.
+-}
+followMap : Model -> ( Model, Cmd Msg )
+followMap model =
+    case ( model.replay, model.route, replayTip model ) of
+        ( Replaying r, MapTab, Just tip ) ->
+            if r.playing && model.zoom > 1 && model.drag == Nothing && not model.followStepping then
+                ( { model | followStepping = True }, followTip model.followingTip tip )
+
+            else
+                ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+followTip : Bool -> ( Float, Float ) -> Cmd Msg
+followTip following tip =
+    offFrameMiddle tip
+        |> Task.andThen
+            (\o ->
+                let
+                    far =
+                        abs o.dx > o.width * followSlack || abs o.dy > o.height * followSlack
+
+                    settled =
+                        abs o.dx < o.width * followSettle && abs o.dy < o.height * followSettle
+                in
+                if (following || far) && not settled then
+                    let
+                        -- A long way back still glides: no step past
+                        -- followMaxStep of the frame.
+                        step d size =
+                            clamp (-size * followMaxStep) (size * followMaxStep) (d * followEase)
+                    in
+                    Browser.Dom.setViewportOf mapFrameId (o.x + step o.dx o.width) (o.y + step o.dy o.height)
+                        |> Task.map (\_ -> True)
+
+                else
+                    Task.succeed False
+            )
+        |> Task.attempt (Result.withDefault False >> TipFollowed)
+
+
+{-| The map follows once the tip's this far from the middle (a fraction
+of the frame's width or height), eases this much of the way each step (a
+step takes a few frames), and rests once it's this close.
+-}
+followSlack : Float
+followSlack =
+    0.25
+
+
+followEase : Float
+followEase =
+    0.2
+
+
+followSettle : Float
+followSettle =
+    0.04
+
+
+followMaxStep : Float
+followMaxStep =
+    0.06
 
 
 {-| The id of the selected dot on the map, for centreOnFocused.
