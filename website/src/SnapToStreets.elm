@@ -1,4 +1,4 @@
-module SnapToStreets exposing (Network, fromPath, snap)
+module SnapToStreets exposing (Network, fromPath, join, pieces, snap)
 
 {-| The path walked, redrawn along the streets: for /live's map, so GPS
 wobble doesn't show and corners come out square.
@@ -176,20 +176,35 @@ type Fix
 streets.
 -}
 snap : Network -> List ( Float, Float ) -> List ( Float, Float )
-snap network points =
+snap network =
+    pieces network >> join
+
+
+{-| `snap`, a piece per point: the first point on its street, then for
+each point after it, the way there from the one before. `join` of the
+first n pieces is `snap` of the first n points, so a path can be cut
+anywhere without snapping it again (the archive's scrubber, src/Live.elm).
+-}
+pieces : Network -> List ( Float, Float ) -> List (List ( Float, Float ))
+pieces network points =
     case List.map (place network) points of
         [] ->
             []
 
         first :: rest ->
             List.foldl
-                (\fix ( previous, acc ) -> ( fix, List.reverse (between network previous fix) ++ acc ))
-                ( first, [ pointOf first ] )
+                (\fix ( previous, acc ) -> ( fix, between network previous fix :: acc ))
+                ( first, [ [ pointOf first ] ] )
                 rest
                 |> Tuple.second
                 |> List.reverse
-                |> dropRepeats
-                |> dropSpikes
+
+
+{-| Pieces (see `pieces`) back into one stretch of the path.
+-}
+join : List (List ( Float, Float )) -> List ( Float, Float )
+join =
+    List.concat >> dropRepeats >> dropSpikes
 
 
 pointOf : Fix -> ( Float, Float )

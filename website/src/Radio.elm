@@ -1,4 +1,4 @@
-port module Radio exposing (Flags, Model, Msg, NowPlaying, OnAir, announce, init, nowPlaying, onAirDecoder, subscriptions, update, view)
+port module Radio exposing (Flags, Model, Msg, NowPlaying, OnAir, announce, archived, init, isOn, nowPlaying, onAirDecoder, slotDecoder, subscriptions, update, view)
 
 {-| The radio player along the bottom of /live's screen: play and stop McTrot
 radio (recorder/host/radio.nix), set the volume, and go to the station's
@@ -76,22 +76,26 @@ type alias NowPlaying =
 
 onAirDecoder : Decode.Decoder OnAir
 onAirDecoder =
+    Decode.map2 OnAir
+        (Decode.field "current" slotDecoder)
+        (Decode.field "next" (Decode.nullable slotDecoder))
+
+
+{-| One slot, as /live and the archive's radio.slots have it.
+-}
+slotDecoder : Decode.Decoder Slot
+slotDecoder =
     let
         optional name =
             Decode.oneOf [ Decode.field name (Decode.nullable Decode.string), Decode.succeed Nothing ]
-
-        slot =
-            Decode.map6 Slot
-                (Decode.field "artist" Decode.string)
-                (Decode.field "title" Decode.string)
-                (optional "album")
-                (optional "year")
-                (Decode.field "from" (Decode.nullable Decode.int))
-                (Decode.field "to" (Decode.nullable Decode.int))
     in
-    Decode.map2 OnAir
-        (Decode.field "current" slot)
-        (Decode.field "next" (Decode.nullable slot))
+    Decode.map6 Slot
+        (Decode.field "artist" Decode.string)
+        (Decode.field "title" Decode.string)
+        (optional "album")
+        (optional "year")
+        (Decode.field "from" (Decode.nullable Decode.int))
+        (Decode.field "to" (Decode.nullable Decode.int))
 
 
 {-| What's on at `now` (the server's clock): the next slot once the current
@@ -136,6 +140,10 @@ type alias Model =
     { volumeAdjustable : Bool
     , state : State
     , volume : Float
+
+    -- The archive's replay (src/Live.elm): the audio isn't kept, so
+    -- play and stop only change what's shown.
+    , archived : Bool
     }
 
 
@@ -144,7 +152,24 @@ init flags =
     { volumeAdjustable = flags.volumeAdjustable
     , state = Stopped
     , volume = 0.8
+    , archived = False
     }
+
+
+{-| The player for the archive's replay: it shows what was on, and play
+and stop work, but nothing sounds (Live.elm says so) and there's no
+volume or station to go to.
+-}
+archived : Model -> Model
+archived model =
+    { model | archived = True, state = Stopped }
+
+
+{-| Playing, or trying to.
+-}
+isOn : Model -> Bool
+isOn model =
+    model.state /= Stopped
 
 
 type Msg
@@ -158,10 +183,18 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Play ->
-            ( { model | state = Connecting }, play model )
+            if model.archived then
+                ( { model | state = Playing }, Cmd.none )
+
+            else
+                ( { model | state = Connecting }, play model )
 
         Stop ->
-            ( { model | state = Stopped }, command "stop" [] )
+            if model.archived then
+                ( { model | state = Stopped }, Cmd.none )
+
+            else
+                ( { model | state = Stopped }, command "stop" [] )
 
         SetVolume volume ->
             ( { model | volume = volume }, command "volume" [ ( "volume", Encode.float volume ) ] )
@@ -318,7 +351,7 @@ view _ playing model =
                     )
                 , Html.span [ Attr.class "radio-label", Attr.attribute "aria-live" "polite" ] label
                 ]
-            , if model.volumeAdjustable then
+            , if model.volumeAdjustable && not model.archived then
                 Html.input
                     [ Attr.type_ "range"
                     , Attr.class "radio-volume"
@@ -333,7 +366,11 @@ view _ playing model =
 
               else
                 Html.text ""
-            , Html.a
+            , if model.archived then
+                Html.text ""
+
+              else
+                Html.a
                 [ Attr.class "radio-home"
                 , Attr.href home
                 , Attr.target "_blank"

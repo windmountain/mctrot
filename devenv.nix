@@ -115,6 +115,33 @@
     done
   '';
 
+  # Export the finished event's recorder database as one JSON file for the
+  # static replay page (recorder/api/src/export-archive.ts), with sizes by
+  # section and the media files it references. Runs in the recorder flake's
+  # shell for Node 26 and its better-sqlite3; the database is opened
+  # read-only. Usage: export-archive [out.json]
+  #   (default recorder-media/recorder-archive.json, next to the database
+  #   and the photos)
+  # The route plan is made from recorder/route-plan.gpx exactly as the
+  # deployed server made it (host/api.nix: tools/route_plan.py), not
+  # read from recorder/api/route-plan.json, a gitignored local copy that
+  # can be out of date.
+  scripts.export-archive.exec = ''
+    set -euo pipefail
+    # A relative out.json is from where the script was run.
+    out="''${1:-$DEVENV_ROOT/recorder-media/recorder-archive.json}"
+    case "$out" in /*) ;; *) out="$PWD/$out" ;; esac
+    cd "$DEVENV_ROOT/recorder"
+    plan="$(mktemp -t route-plan.XXXXXX)"
+    trap 'rm -f "$plan"' EXIT
+    nix run .#route-plan -- route-plan.gpx > "$plan"
+    nix develop -c bash -c 'cd api && exec node src/export-archive.ts "$@"' -- \
+      "$DEVENV_ROOT/recorder-media/recorder-redacted.sqlite" \
+      "$plan" \
+      "$DEVENV_ROOT/mctrot-5-radio/program.json" \
+      "$out"
+  '';
+
   # Interactively name (or rename) locations, then save every nickname to
   # data/nicknames.json -- committed, unlike the rest of data/, and not
   # managed by datapackage.json/fetch.py. Needs a loaded database (run-all).

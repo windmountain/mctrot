@@ -339,6 +339,37 @@
     @media (min-width: 48rem) {
       .live-posts .live-post-pair { position: relative; left: 50%; width: min(44rem, calc(100vw - 32px)); transform: translateX(-50%); }
     }
+
+    /* The archive's replay (src/Live.elm, REPLAY): the scrubber across the
+       top and its notes, in a look of their own (black, monospace), so
+       they read as the archive's and not part of /live. The page moves
+       down by the scrubber's height. */
+    .replay-shell { --replay-h: 52px; flex: 1; display: flex; flex-direction: column; }
+    .replay { position: sticky; top: 0; z-index: 20; box-sizing: border-box; height: var(--replay-h);
+      display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "play when slider speed";
+      align-items: center; column-gap: 12px; padding: 0 16px; background: #111; color: #f5f5f5;
+      font: 13px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .replay button { display: flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 10px;
+      color: inherit; background: none; border: 1px solid currentColor; font: inherit; cursor: pointer; }
+    .replay button:focus-visible, .replay-slider:focus-visible { outline: 2px solid #f5f5f5; outline-offset: 2px; }
+    .replay-play { grid-area: play; width: 36px; padding: 0; }
+    .replay-play .icon-glyph { fill: #111; }
+    .replay-when { grid-area: when; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .replay-slider { grid-area: slider; width: 100%; min-width: 0; margin: 0; accent-color: #f5f5f5; }
+    .replay-speed { grid-area: speed; white-space: nowrap; }
+    /* Phones: the slider gets a line of its own. */
+    @media (max-width: 600px) {
+      .replay-shell { --replay-h: 84px; }
+      .replay { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "play when speed" "slider slider slider";
+        row-gap: 6px; align-content: center; }
+    }
+    /* Under the scrubber where the page scrolls (overview, blog); the map, timeline and stats are already a screen tall below it. */
+    .replay-shell .page-overview .app-top, .replay-shell .page-blog .app-top { top: var(--replay-h); }
+    .replay-shell .page-map, .replay-shell .page-timeline, .replay-shell .page-stats {
+      height: calc(100vh - var(--replay-h)); height: calc(100dvh - var(--replay-h)); }
+    .replay-note { position: fixed; left: 16px; right: 16px; bottom: calc(var(--stripe-h) + 12px + env(safe-area-inset-bottom)); z-index: 20;
+      max-width: 30rem; margin: 0 auto; padding: 8px 12px; background: #111; color: #f5f5f5;
+      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   </style>
 </head>
 <body>
@@ -358,6 +389,11 @@
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.
     var api = params.get("api");
+    // ?archive=/path/to/archive.json replays a finished event from its
+    // archive (recorder/api/src/export-archive.ts) instead of the
+    // recorder. Only a path on this site: no one can link this page to
+    // made-up data elsewhere.
+    var archive = params.get("archive");
 
     // --- The radio (src/Radio.elm draws it; this plays it) ---------------
     var audio = new Audio();
@@ -374,7 +410,8 @@
         origin: location.origin,
         hash: location.hash,
         api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc",
-        radio: { volumeAdjustable: volumeAdjustable }
+        radio: { volumeAdjustable: volumeAdjustable },
+        archive: /^\/(?![\/\\])/.test(archive || "") ? archive : null
       }
     });
 

@@ -15,6 +15,12 @@ all of them; website/_redirects):
 All five share the title, the radio and the tab switcher.
 Switching tabs doesn't reload the page, so the radio keeps playing.
 
+With an `archive` flag (live.html's ?archive=…), it's the replay of a
+finished event instead: no recorder, one JSON file
+(recorder/api/src/export-archive.ts) holding everything /live showed and
+when, and a scrubber over the page that sets the moment shown. Every view
+is drawn from what /live would have answered then (see REPLAY).
+
 Elm runs in its own element (Browser.element), not over the whole page
 (Browser.application): browser extensions add things to <body>, and an
 application, which owns the body, crashes when they do. So the address
@@ -23,6 +29,7 @@ is handled here through two ports and a few lines in live.html:
 
 -}
 
+import Array exposing (Array)
 import Browser
 import Browser.Dom
 import Browser.Events
@@ -180,6 +187,9 @@ type alias Flags =
 
     -- location.hash: what to do after signing in (#like=…, Guests.elm)
     , hash : String
+
+    -- The archive's JSON, to replay a finished event; Nothing: live.
+    , archive : Maybe String
     }
 
 
@@ -366,12 +376,19 @@ andMap =
 
 weatherDecoder : Decoder Weather
 weatherDecoder =
+    Decode.at [ "place", "name" ] Decode.string |> Decode.andThen weatherAtDecoder
+
+
+{-| A reading's fields, for the place given: the archive names the place
+once, not in every reading.
+-}
+weatherAtDecoder : String -> Decoder Weather
+weatherAtDecoder place =
     let
         maybe field decoder =
             Decode.field field (Decode.nullable decoder)
     in
-    Decode.succeed Weather
-        |> andMap (Decode.at [ "place", "name" ] Decode.string)
+    Decode.succeed (Weather place)
         |> andMap (Decode.field "observedAt" Decode.int)
         |> andMap (maybe "temperatureF" Decode.float)
         |> andMap (maybe "feelsLikeF" Decode.float)
@@ -564,7 +581,11 @@ type alias Model =
 
     -- Guests' likes and comments under posts (src/Guests.elm).
     , guests : Guests.Model
-    , origin : String    }
+    , origin : String
+
+    -- The archive being replayed, if this is one (see REPLAY).
+    , replay : Replay
+    }
 
 
 {-| A drag of the map with the mouse: where the pointer was pressed and how
@@ -627,6 +648,9 @@ init flags =
 
         ( guests, guestsCmd ) =
             Guests.init flags.api flags.hash
+
+        radio =
+            Radio.init flags.radio
     in
     ( { api = flags.api
       , guests = guests
@@ -634,7 +658,12 @@ init flags =
       , latest = Nothing
       , failing = False
       , now = Nothing
-      , radio = Radio.init flags.radio
+      , radio =
+            if flags.archive == Nothing then
+                radio
+
+            else
+                Radio.archived radio
       , announced = Nothing
       , route = route
       , zoom = 1
@@ -650,8 +679,20 @@ init flags =
       , timelinePlaced = False
       , focused = Nothing
       , walked = []
+      , replay =
+            case flags.archive of
+                Just url ->
+                    ReplayLoading url
+
+                Nothing ->
+                    NotReplay
       }
-    , Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route), Cmd.map GuestsMsg guestsCmd ]
+    , case flags.archive of
+        Just url ->
+            Cmd.batch [ fetchArchive url, setTitle (titleOf route) ]
+
+        Nothing ->
+            Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route), Cmd.map GuestsMsg guestsCmd ]
     )
 
 
@@ -686,6 +727,11 @@ type Msg
     | TimelineDragTo Float
     | TimelineDragEnd
     | TimelineStep Int
+    | GotArchive (Result Http.Error Archive)
+    | ScrubTo Int
+    | ReplayPlay Bool
+    | ReplaySpeed Int
+    | ReplayFrame Float
     | NoOp
 
 
@@ -1029,6 +1075,53 @@ update msg model =
             ( { model | now = Just now }, Cmd.none )
                 |> announceRadio
 
+        GotArchive (Ok archive) ->
+            ( showAt archive.to { archive = archive, at = archive.to, playing = False, speed = defaultSpeed } model, Cmd.none )
+                |> placeTimelineOnce
+
+        GotArchive (Err error) ->
+            case model.replay of
+                ReplayLoading url ->
+                    ( { model | replay = ReplayFailed url (replayProblem error) }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ScrubTo at ->
+            ( withReplay (\r -> showAt at { r | playing = False }) model, Cmd.none )
+
+        -- Play from the start again once it's reached the end.
+        ReplayPlay playing ->
+            ( withReplay
+                (\r ->
+                    if playing && r.at >= r.archive.to then
+                        showAt r.archive.from { r | playing = True }
+
+                    else
+                        \m -> { m | replay = Replaying { r | playing = playing } }
+                )
+                model
+            , Cmd.none
+            )
+
+        ReplaySpeed speed ->
+            ( withReplay (\r m -> { m | replay = Replaying { r | speed = speed } }) model, Cmd.none )
+
+        -- A frame while playing: on by the speed times the time since
+        -- the last frame, stopping at the end.
+        ReplayFrame delta ->
+            ( withReplay
+                (\r ->
+                    let
+                        at =
+                            min r.archive.to (r.at + round (delta * toFloat r.speed))
+                    in
+                    showAt at { r | playing = r.playing && at < r.archive.to }
+                )
+                model
+            , Cmd.none
+            )
+
 
 {-| The first data on the Timeline tab: scroll it to now.
 -}
@@ -1052,7 +1145,17 @@ radioNow model =
 -}
 announceRadio : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 announceRadio ( model, cmd ) =
-    case radioNow model of
+    case ( model.replay, radioNow model ) of
+        ( Replaying _, _ ) ->
+            ( model, cmd )
+
+        ( _, playingNow ) ->
+            announceRadioLive playingNow ( model, cmd )
+
+
+announceRadioLive : Maybe Radio.NowPlaying -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+announceRadioLive playingNow ( model, cmd ) =
+    case playingNow of
         Just playing ->
             if model.announced == Just playing then
                 ( model, cmd )
@@ -1090,9 +1193,23 @@ subscriptions model =
     Sub.batch
         [ Sub.map RadioMsg (Radio.subscriptions model.radio)
         , pathChanged PathChanged
-        , -- Overland sends every 30 s, so polling faster shows nothing new.
-          Time.every 15000 (\_ -> Poll)
-        , Time.every 1000 Tick
+        , case model.replay of
+            NotReplay ->
+                Sub.batch
+                    [ -- Overland sends every 30 s, so polling faster shows nothing new.
+                      Time.every 15000 (\_ -> Poll)
+                    , Time.every 1000 Tick
+                    ]
+
+            Replaying { playing } ->
+                if playing then
+                    Browser.Events.onAnimationFrameDelta ReplayFrame
+
+                else
+                    Sub.none
+
+            _ ->
+                Sub.none
         , case model.timelineDrag of
             Just _ ->
                 Sub.batch
@@ -1119,6 +1236,27 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    case model.replay of
+        NotReplay ->
+            viewApp model
+
+        _ ->
+            -- The scrubber and its notes sit over the page, apart from it
+            -- (live.html, .replay): they're the archive's, not /live's.
+            Html.div [ Attr.class "replay-shell" ]
+                [ viewScrubber model.replay
+                , viewApp model
+                , if Radio.isOn model.radio then
+                    Html.p [ Attr.class "replay-note replay-radio-note", Attr.attribute "role" "status" ]
+                        [ Html.text "Archive: the radio’s audio isn’t kept, so nothing plays. Shown is what was on." ]
+
+                  else
+                    Html.text ""
+                ]
+
+
+viewApp : Model -> Html Msg
+viewApp model =
     Html.div [ Attr.class ("app page-" ++ routeName model.route) ]
         [ -- The title row and the view switcher stay at the top as the page
           -- scrolls, and the radio at the bottom (live.html, .app-top and
@@ -2028,6 +2166,16 @@ a viewer's wrong clock doesn't matter.
 -}
 serverNow : Model -> Maybe Int
 serverNow model =
+    case model.replay of
+        Replaying { at } ->
+            Just at
+
+        _ ->
+            serverNowLive model
+
+
+serverNowLive : Model -> Maybe Int
+serverNowLive model =
     model.latest
         |> Maybe.map
             (\{ response, receivedAt } ->
@@ -3069,7 +3217,12 @@ viewPosts model =
                             , Html.li [ Attr.class "live-post" ]
                                 [ Html.p [ Attr.class "live-post-when" ] [ Html.text (NewYorkTime.clock post.ts) ]
                                 , viewPostContent post.content
-                                , Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.route) post.id model.guests)
+                                , case model.replay of
+                                    Replaying r ->
+                                        viewArchivedComments r post.id
+
+                                    _ ->
+                                        Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.route) post.id model.guests)
                                 ]
                             )
                         )
@@ -3148,3 +3301,612 @@ viewPostContent content =
                 , Attr.class "live-post-voice"
                 ]
                 []
+
+
+
+-- REPLAY
+
+
+{-| A finished event's replay (flag `archive`): loading its JSON, unable
+to, or showing it at a moment, playing on by itself or not.
+-}
+type Replay
+    = NotReplay
+    | ReplayLoading String
+    | ReplayFailed String String
+    | Replaying ReplayState
+
+
+{-| `at`: the moment shown, ms since epoch. `speed`: while playing, how
+many ms of the event pass in one of the viewer's.
+-}
+type alias ReplayState =
+    { archive : Archive
+    , at : Int
+    , playing : Bool
+    , speed : Int
+    }
+
+
+{-| The archive (recorder/api/src/export-archive.ts): everything /live
+showed over the event, each part with its own time, so what /live would
+have answered at any moment can be worked out (see `snapshot`).
+-}
+type alias Archive =
+    { from : Int
+    , to : Int
+    , stores : List Store
+    , plannedTrack : List ( Float, Float )
+
+    -- Every fix, in time order: the position at a moment is the last
+    -- one at or before it.
+    , points : Array Position
+
+    -- The path walked as the server simplified it, split where GPS was
+    -- lost, each point with its time; and the same, snapped to the
+    -- streets once, piece by piece (SnapToStreets.pieces).
+    , track : List (List TrackPoint)
+    , walked : List (List WalkedPiece)
+    , visits : List Visit
+
+    -- Oldest first, each with when /live first had it.
+    , posts : List ( Int, Post )
+
+    -- Each with when the recorder fetched it.
+    , weather : List ( Int, Weather )
+    , sky : List ( Int, List SkySquare )
+
+    -- One per New York date the event touches (at least one).
+    , sun : Sun
+    , suns : List Sun
+    , radio : List Radio.NowPlaying
+    , comments : List ArchivedComment
+    }
+
+
+type alias TrackPoint =
+    { ts : Int
+    , lat : Float
+    , lon : Float
+    }
+
+
+{-| A point of the path walked: its time, where it is on the map, and the
+way there along the streets from the point before (or just itself, for a
+stretch's first).
+-}
+type alias WalkedPiece =
+    { ts : Int
+    , point : ( Float, Float )
+    , piece : List ( Float, Float )
+    }
+
+
+{-| An approved guest comment, shown once it was made.
+-}
+type alias ArchivedComment =
+    { postId : String
+    , name : String
+    , link : Maybe String
+    , text : String
+    , ts : Int
+    }
+
+
+{-| A day in about a minute and a half to start with; see `speeds`.
+-}
+defaultSpeed : Int
+defaultSpeed =
+    600
+
+
+{-| The scrubber's speeds, with what each says: event time per second.
+-}
+speeds : List ( Int, String )
+speeds =
+    [ ( 60, "1 min/s" ), ( 600, "10 min/s" ), ( 3600, "1 h/s" ) ]
+
+
+fetchArchive : String -> Cmd Msg
+fetchArchive url =
+    Http.get { url = url, expect = Http.expectJson GotArchive (archiveDecoder (directoryOf url)) }
+
+
+{-| Up to and including the last "/": media paths in the archive
+("media/…") are relative to the JSON file.
+-}
+directoryOf : String -> String
+directoryOf url =
+    case List.reverse (String.indexes "/" url) of
+        last :: _ ->
+            String.left (last + 1) url
+
+        [] ->
+            ""
+
+
+archiveDecoder : String -> Decoder Archive
+archiveDecoder base =
+    Decode.map2 Tuple.pair (Decode.field "format" Decode.string) (Decode.field "version" Decode.int)
+        |> Decode.andThen
+            (\( format, version ) ->
+                if format == "mctrot-archive" && version == 1 then
+                    Decode.at [ "place", "name" ] Decode.string |> Decode.andThen (archiveV1Decoder base)
+
+                else
+                    Decode.fail ("not an archive this page reads: " ++ format ++ " " ++ String.fromInt version)
+            )
+
+
+archiveV1Decoder : String -> String -> Decoder Archive
+archiveV1Decoder base place =
+    let
+        stamped field decoder =
+            Decode.map2 Tuple.pair (Decode.field field Decode.int) decoder
+    in
+    Decode.succeed
+        (\from to stores plannedTrack points track visits posts weather sky suns radio comments ->
+            case suns of
+                sun :: _ ->
+                    Decode.succeed
+                        { from = from
+                        , to = to
+                        , stores = stores
+                        , plannedTrack = plannedTrack
+                        , points = Array.fromList points
+                        , track = track
+                        , walked = List.map walkedPieces track
+                        , visits = visits
+                        , posts = posts
+                        , weather = weather
+                        , sky = sky
+                        , sun = sun
+                        , suns = suns
+                        , radio = radio
+                        , comments = comments
+                        }
+
+                [] ->
+                    Decode.fail "no sun times"
+        )
+        |> andMap (Decode.at [ "window", "from" ] Decode.int)
+        |> andMap (Decode.at [ "window", "to" ] Decode.int)
+        |> andMap (Decode.field "stores" (Decode.list storeDecoder))
+        |> andMap (Decode.field "plannedTrack" (Decode.list latLonDecoder))
+        |> andMap
+            (Decode.field "points"
+                (Decode.list
+                    (Decode.map4 Position
+                        (Decode.index 0 Decode.int)
+                        (Decode.index 1 Decode.float)
+                        (Decode.index 2 Decode.float)
+                        (Decode.index 3 (Decode.nullable Decode.float))
+                    )
+                )
+            )
+        |> andMap
+            (Decode.field "track"
+                (Decode.list
+                    (Decode.list
+                        (Decode.map3 TrackPoint
+                            (Decode.index 0 Decode.int)
+                            (Decode.index 1 Decode.float)
+                            (Decode.index 2 Decode.float)
+                        )
+                    )
+                )
+            )
+        |> andMap (Decode.field "visits" (Decode.list visitDecoder))
+        |> andMap (Decode.field "posts" (Decode.list (stamped "receivedAt" (Decode.map (rebasePost base) postDecoder))))
+        |> andMap (Decode.field "weather" (Decode.list (stamped "fetchedAt" (weatherAtDecoder place))))
+        |> andMap (Decode.field "sky" (Decode.list (stamped "at" (Decode.field "squares" (Decode.list skySquareDecoder)))))
+        |> andMap (Decode.field "sun" (Decode.keyValuePairs sunDecoder |> Decode.map (List.map Tuple.second)))
+        |> andMap (Decode.at [ "radio", "slots" ] (Decode.list Radio.slotDecoder))
+        |> andMap
+            (Decode.at [ "guests", "comments" ]
+                (Decode.list
+                    (Decode.map5 ArchivedComment
+                        (Decode.field "postId" Decode.string)
+                        (Decode.field "name" Decode.string)
+                        (Decode.field "link" (Decode.nullable Decode.string))
+                        (Decode.field "text" Decode.string)
+                        (Decode.field "ts" Decode.int)
+                    )
+                )
+            )
+        |> Decode.andThen identity
+
+
+skySquareDecoder : Decoder SkySquare
+skySquareDecoder =
+    Decode.map2 SkySquare
+        (Decode.field "label" Decode.string)
+        (Decode.field "color" Decode.string)
+
+
+{-| The archive's media paths ("media/…"), from the JSON's own folder.
+-}
+rebasePost : String -> Post -> Post
+rebasePost base post =
+    let
+        rebase url =
+            if String.startsWith "media/" url then
+                base ++ url
+
+            else
+                url
+
+        clip c =
+            { url = rebase c.url, posterUrl = Maybe.map rebase c.posterUrl }
+    in
+    { post
+        | content =
+            case post.content of
+                Text text ->
+                    Text text
+
+                Photo full thumb ->
+                    Photo (rebase full) (Maybe.map rebase thumb)
+
+                Video url poster ->
+                    Video (rebase url) (Maybe.map rebase poster)
+
+                Voice url ->
+                    Voice (rebase url)
+
+                Pair pair ->
+                    Pair { cut = clip pair.cut, first = clip pair.first, second = clip pair.second }
+    }
+
+
+{-| A stretch of the path walked, snapped to the streets once, a piece
+per point, so it can be cut at any moment cheaply (see walkedAt).
+-}
+walkedPieces : List TrackPoint -> List WalkedPiece
+walkedPieces stretch =
+    let
+        points =
+            List.map mapPoint stretch
+    in
+    List.map3 WalkedPiece (List.map .ts stretch) points (SnapToStreets.pieces streets points)
+
+
+mapPoint : { a | lat : Float, lon : Float } -> ( Float, Float )
+mapPoint { lat, lon } =
+    Projection.toMap { lat = lat, lon = lon }
+
+
+{-| Show the replay at a moment (kept within the event): what /live would
+have answered then, and the path walked by then.
+-}
+showAt : Int -> ReplayState -> Model -> Model
+showAt requested replay model =
+    let
+        at =
+            clamp replay.archive.from replay.archive.to requested
+
+        response =
+            snapshot at replay.archive
+    in
+    { model
+        | replay = Replaying { replay | at = at }
+        , latest = Just { response = response, receivedAt = Time.millisToPosix at }
+        , failing = False
+        , walked = walkedAt at response.position replay.archive
+    }
+
+
+withReplay : (ReplayState -> Model -> Model) -> Model -> Model
+withReplay f model =
+    case model.replay of
+        Replaying replay ->
+            f replay model
+
+        _ ->
+            model
+
+
+{-| What /live answered at `at` (recorder/api/src/live.ts), from the
+archive: the latest of each thing by then.
+-}
+snapshot : Int -> Archive -> LiveResponse
+snapshot at archive =
+    let
+        position =
+            positionAt at archive.points
+    in
+    { serverTs = at
+    , position = position
+    , attempt = Nothing
+    , stores = archive.stores
+    , plannedTrack = archive.plannedTrack
+    , track = List.filterMap (trackAt at position) archive.track
+    , visits = List.filter (\v -> v.tapTs <= at) archive.visits
+    , posts =
+        archive.posts
+            |> List.filter (\( received, _ ) -> received <= at)
+            |> List.map Tuple.second
+            |> List.reverse
+    , weather = latestBy at archive.weather
+    , sun =
+        -- Today's: the one whose noon is nearest.
+        List.foldl
+            (\sun best ->
+                if abs (sun.solarNoon - at) < abs (best.solarNoon - at) then
+                    sun
+
+                else
+                    best
+            )
+            archive.sun
+            archive.suns
+    , sky = latestBy at archive.sky |> Maybe.withDefault []
+    , radio = onAirAt at archive.radio
+    }
+
+
+{-| The last of a time-ordered list at or before `at`.
+-}
+latestBy : Int -> List ( Int, a ) -> Maybe a
+latestBy at =
+    List.foldl
+        (\( ts, x ) found ->
+            if ts <= at then
+                Just x
+
+            else
+                found
+        )
+        Nothing
+
+
+{-| The last fix at or before `at`, by halving.
+-}
+positionAt : Int -> Array Position -> Maybe Position
+positionAt at points =
+    let
+        -- How many fixes are at or before `at`: the answer's in lo..hi.
+        count lo hi =
+            if lo >= hi then
+                lo
+
+            else
+                let
+                    mid =
+                        (lo + hi) // 2
+                in
+                case Array.get mid points of
+                    Just p ->
+                        if p.ts <= at then
+                            count (mid + 1) hi
+
+                        else
+                            count lo mid
+
+                    Nothing ->
+                        lo
+    in
+    Array.get (count 0 (Array.length points) - 1) points
+
+
+{-| Whether the server's track would have had this fix
+(recorder/api/src/track.ts, MAX_ACCURACY_M).
+-}
+onTrack : Position -> Bool
+onTrack position =
+    Maybe.withDefault 0 position.accuracy <= 50
+
+
+{-| A stretch of the path walked as the server sent it at `at`: its points
+up to then, and, if it was still going, on to the position then (the
+simplified path's points can be minutes apart). Nothing before it began.
+-}
+trackAt : Int -> Maybe Position -> List TrackPoint -> Maybe (List ( Float, Float ))
+trackAt at position stretch =
+    let
+        kept =
+            List.filter (\p -> p.ts <= at) stretch
+
+        toHere =
+            case ( position, List.reverse kept ) of
+                ( Just here, last :: _ ) ->
+                    if List.length kept < List.length stretch && here.ts > last.ts && onTrack here then
+                        [ ( here.lat, here.lon ) ]
+
+                    else
+                        []
+
+                _ ->
+                    []
+
+        points =
+            List.map (\p -> ( p.lat, p.lon )) kept ++ toHere
+    in
+    if List.length points >= 2 then
+        Just points
+
+    else
+        Nothing
+
+
+{-| The path walked by `at`, along the streets, as `walked` is for /live:
+the pieces up to then, and the way on to the position then.
+-}
+walkedAt : Int -> Maybe Position -> Archive -> List (List ( Float, Float ))
+walkedAt at position archive =
+    List.filterMap
+        (\stretch ->
+            let
+                kept =
+                    List.filter (\p -> p.ts <= at) stretch
+
+                toHere =
+                    case ( position, List.reverse kept ) of
+                        ( Just here, last :: _ ) ->
+                            if List.length kept < List.length stretch && here.ts > last.ts && onTrack here then
+                                SnapToStreets.pieces streets [ last.point, mapPoint here ] |> List.drop 1
+
+                            else
+                                []
+
+                        _ ->
+                            []
+            in
+            if List.length kept + List.length toHere >= 2 then
+                Just (SnapToStreets.join (List.map .piece kept ++ toHere))
+
+            else
+                Nothing
+        )
+        archive.walked
+
+
+{-| What the radio was playing at `at`, and what came next.
+-}
+onAirAt : Int -> List Radio.NowPlaying -> Maybe Radio.OnAir
+onAirAt at slots =
+    let
+        isOnAt slot =
+            Maybe.withDefault at slot.from <= at && at < Maybe.withDefault (at + 1) slot.to
+
+        find rest =
+            case rest of
+                slot :: after ->
+                    if isOnAt slot then
+                        Just (Radio.OnAir slot (List.head after))
+
+                    else
+                        find after
+
+                [] ->
+                    Nothing
+    in
+    find slots
+
+
+replayProblem : Http.Error -> String
+replayProblem error =
+    case error of
+        Http.BadStatus code ->
+            "the server answered " ++ String.fromInt code
+
+        Http.BadBody message ->
+            "it isn’t an archive this page can read: " ++ message
+
+        Http.Timeout ->
+            "it took too long"
+
+        Http.NetworkError ->
+            "no connection"
+
+        Http.BadUrl url ->
+            "bad address " ++ url
+
+
+{-| The scrubber, over the page: play or stop, the moment shown, a slider
+across the whole event, and the speed. Its own look (live.html, .replay),
+not the site's: it belongs to the archive, not to /live.
+-}
+viewScrubber : Replay -> Html Msg
+viewScrubber replay =
+    Html.div [ Attr.class "replay", Attr.attribute "role" "region", Attr.attribute "aria-label" "Replay" ]
+        (case replay of
+            Replaying r ->
+                let
+                    nextSpeed =
+                        case List.filter (\( speed, _ ) -> speed > r.speed) speeds of
+                            ( speed, _ ) :: _ ->
+                                speed
+
+                            [] ->
+                                List.head speeds |> Maybe.map Tuple.first |> Maybe.withDefault defaultSpeed
+
+                    speedLabel =
+                        List.filter (\( speed, _ ) -> speed == r.speed) speeds
+                            |> List.head
+                            |> Maybe.map Tuple.second
+                            |> Maybe.withDefault (String.fromInt r.speed ++ "×")
+                in
+                [ Html.button
+                    [ Attr.class "replay-play"
+                    , Attr.type_ "button"
+                    , Events.onClick (ReplayPlay (not r.playing))
+                    , Attr.attribute "aria-label"
+                        (if r.playing then
+                            "Stop the replay"
+
+                         else
+                            "Play the replay"
+                        )
+                    ]
+                    [ Icon.view
+                        (if r.playing then
+                            Icon.Stop
+
+                         else
+                            Icon.Play
+                        )
+                    ]
+                , Html.span [ Attr.class "replay-when", Attr.attribute "aria-live" "off" ] [ Html.text (NewYorkTime.formatShort r.at) ]
+                , Html.input
+                    [ Attr.type_ "range"
+                    , Attr.class "replay-slider"
+                    , Attr.min (String.fromInt r.archive.from)
+                    , Attr.max (String.fromInt r.archive.to)
+                    , Attr.step "60000"
+                    , Attr.value (String.fromInt r.at)
+                    , Attr.attribute "aria-label" "Moment shown"
+                    , Attr.attribute "aria-valuetext" (NewYorkTime.format r.at)
+                    , Events.onInput (String.toFloat >> Maybe.map round >> Maybe.withDefault r.at >> ScrubTo)
+                    ]
+                    []
+                , Html.button
+                    [ Attr.class "replay-speed"
+                    , Attr.type_ "button"
+                    , Events.onClick (ReplaySpeed nextSpeed)
+                    , Attr.attribute "aria-label" ("Replay speed: " ++ speedLabel)
+                    ]
+                    [ Html.text speedLabel ]
+                ]
+
+            ReplayLoading _ ->
+                [ Html.span [ Attr.class "replay-when" ] [ Html.text "Loading the archive…" ] ]
+
+            ReplayFailed _ problem ->
+                [ Html.span [ Attr.class "replay-when" ] [ Html.text ("Can’t load the archive: " ++ problem ++ ".") ] ]
+
+            NotReplay ->
+                []
+        )
+
+
+{-| Under a post in the replay: the guests' comments made by then, as
+/live showed them, with nothing to like or add.
+-}
+viewArchivedComments : ReplayState -> String -> Html Msg
+viewArchivedComments replay postId =
+    case List.filter (\c -> c.postId == postId && c.ts <= replay.at) replay.archive.comments of
+        [] ->
+            Html.text ""
+
+        comments ->
+            Html.div [ Attr.class "guest guest-archived" ]
+                [ Html.ul [ Attr.class "guest-comments" ]
+                    (List.map
+                        (\c ->
+                            Html.li [ Attr.class "guest-comment" ]
+                                [ Html.strong []
+                                    [ case c.link of
+                                        Just href ->
+                                            Html.a [ Attr.href href, Attr.rel "nofollow ugc noopener", Attr.target "_blank" ] [ Html.text c.name ]
+
+                                        Nothing ->
+                                            Html.text c.name
+                                    ]
+                                , Html.text " "
+                                , Html.span [ Attr.class "guest-comment-text" ] [ Html.text c.text ]
+                                ]
+                        )
+                        comments
+                    )
+                ]

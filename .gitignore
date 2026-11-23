@@ -45,3 +45,6 @@ elm-stuff/
 
 # Python bytecode
 __pycache__/
+
+# redacted production backup used to make public replay archive
+recorder-media/recorder-redacted.sqlite
