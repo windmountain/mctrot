@@ -756,8 +756,10 @@ type Msg
     | TimelineDragTo Float
     | TimelineDragEnd
     | TimelineStep Int
+    | TimelineGrabbed
     | GotArchive (Result Http.Error Archive)
     | ScrubTo Int
+    | ScrubEnd
     | ReplayPlay Bool
     | ReplaySpeed Int
     | ReplayFrame Float
@@ -1008,7 +1010,7 @@ update msg model =
         -- A tap or drag on the day strip: centre that part of the day (it
         -- then settles on an hour).
         TimelineJump fraction ->
-            ( model
+            ( stopReplay model
             , Browser.Dom.getViewportOf Burndown.scrollerId
                 |> Task.andThen (\v -> Browser.Dom.setViewportOf Burndown.scrollerId (fraction * v.scene.width - v.viewport.width / 2) 0)
                 |> Task.attempt (\_ -> NoOp)
@@ -1018,7 +1020,12 @@ update msg model =
         -- meanwhile); let go and it settles on the nearest hour. (Touch
         -- scrolls it natively.)
         TimelineDragStart x left ->
-            ( { model | timelineDrag = Just ( x, left ) }, Cmd.none )
+            ( stopReplay { model | timelineDrag = Just ( x, left ) }, Cmd.none )
+
+        -- A finger, wheel or key on the timeline: the replay stops, so
+        -- it isn't scrolled back (see followTimeline), and stays stopped.
+        TimelineGrabbed ->
+            ( stopReplay model, Cmd.none )
 
         TimelineDragTo x ->
             case model.timelineDrag of
@@ -1034,7 +1041,7 @@ update msg model =
         -- ← or →: to the hour before or after the one at the left edge
         -- (an hour's a third of the screen, see live.html).
         TimelineStep by ->
-            ( model
+            ( stopReplay model
             , Browser.Dom.getViewportOf Burndown.scrollerId
                 |> Task.andThen
                     (\v ->
@@ -1105,7 +1112,7 @@ update msg model =
                 |> announceRadio
 
         GotArchive (Ok archive) ->
-            ( showAt archive.to { archive = archive, at = archive.to, playing = False, speed = defaultSpeed } model, Cmd.none )
+            ( showAt archive.to { archive = archive, at = archive.to, playing = False, speed = defaultSpeed, autoFocus = Nothing, scrubbing = False } model, Cmd.none )
                 |> placeTimelineOnce
 
         GotArchive (Err error) ->
@@ -1116,8 +1123,14 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        -- Dragging doesn't stop playback: it holds still meanwhile (see
+        -- subscriptions), and goes on from there once let go.
         ScrubTo at ->
-            ( withReplay (\r -> showAt at { r | playing = False }) model, Cmd.none )
+            withReplay (\r -> showAt at { r | scrubbing = r.playing }) model
+                |> (\m -> ( m, followTimeline m ))
+
+        ScrubEnd ->
+            ( withReplay (\r m -> { m | replay = Replaying { r | scrubbing = False } }) model, Cmd.none )
 
         -- Play from the start again once it's reached the end.
         ReplayPlay playing ->
@@ -1139,7 +1152,7 @@ update msg model =
         -- A frame while playing: on by the speed times the time since
         -- the last frame, stopping at the end.
         ReplayFrame delta ->
-            ( withReplay
+            withReplay
                 (\r ->
                     let
                         at =
@@ -1148,8 +1161,8 @@ update msg model =
                     showAt at { r | playing = r.playing && at < r.archive.to }
                 )
                 model
-            , Cmd.none
-            )
+                |> autoClick
+                |> (\m -> ( m, followTimeline m ))
 
 
 {-| The first data on the Timeline tab: scroll it to now.
@@ -1230,12 +1243,15 @@ subscriptions model =
                     , Time.every 1000 Tick
                     ]
 
-            Replaying { playing } ->
-                if playing then
-                    Browser.Events.onAnimationFrameDelta ReplayFrame
+            Replaying { playing, scrubbing } ->
+                Sub.batch
+                    [ if playing && not scrubbing then
+                        Browser.Events.onAnimationFrameDelta ReplayFrame
 
-                else
-                    Sub.none
+                      else
+                        Sub.none
+                    , Browser.Events.onKeyDown (spaceBar (ReplayPlay (not playing)))
+                    ]
 
             _ ->
                 Sub.none
@@ -1272,7 +1288,19 @@ view model =
         _ ->
             -- The scrubber and its notes sit over the page, apart from it
             -- (live.html, .replay): they're the archive's, not /live's.
-            Html.div [ Attr.class "replay-shell" ]
+            Html.div
+                [ Attr.class "replay-shell"
+                , Attr.classList
+                    [ ( "replay-following"
+                      , case model.replay of
+                            Replaying r ->
+                                r.playing
+
+                            _ ->
+                                False
+                      )
+                    ]
+                ]
                 [ viewScrubber model.replay
                 , viewApp model
                 , if Radio.isOn model.radio then
@@ -1471,6 +1499,55 @@ statusInput now model response =
 -}
 positionChip : Model -> String
 positionChip model =
+    case ( model.replay, serverNow model ) of
+        ( Replaying _, Just now ) ->
+            if now < replayStart then
+                "Starting in " ++ startingIn (replayStart - now)
+
+            else
+                positionChipLive model
+
+        _ ->
+            positionChipLive model
+
+
+{-| When the walk started (5:05 AM, Nov 21, 2026): before it, the
+replay's map chip counts down to it instead of showing the position.
+-}
+replayStart : Int
+replayStart =
+    1795255500000
+
+
+{-| "5 hours" (whole hours, rounded down) from an hour out, then "12
+minutes" (rounded up, so it never says 0).
+-}
+startingIn : Int -> String
+startingIn ms =
+    let
+        minutes =
+            ceiling (toFloat ms / 60000)
+
+        plural n word =
+            String.fromInt n
+                ++ " "
+                ++ word
+                ++ (if n == 1 then
+                        ""
+
+                    else
+                        "s"
+                   )
+    in
+    if minutes >= 60 then
+        plural (minutes // 60) "hour"
+
+    else
+        plural minutes "minute"
+
+
+positionChipLive : Model -> String
+positionChipLive model =
     case ( Maybe.andThen (.response >> .position) model.latest, serverNow model ) of
         ( Just position, Just now ) ->
             NewYorkTime.clock position.ts
@@ -1699,6 +1776,7 @@ viewTimelineTab model =
                 , jump = TimelineJump
                 , dragStart = TimelineDragStart
                 , step = TimelineStep
+                , grabbed = TimelineGrabbed
                 , visible = model.timelineVisible
                 , dragging = model.timelineDrag /= Nothing
                 }
@@ -1722,7 +1800,7 @@ viewTimelineTab model =
                                                             postsBox (Just now)
                                                                 target
                                                                 posts
-                                                                [ ( "live-focus-left", at.x > 0.55 )
+                                                                [ ( "live-focus-left", opensLeft model.timelineVisible at.x )
                                                                 , ( "live-focus-below", at.y < 0.35 )
                                                                 , ( "live-focus-above", at.y > 0.65 )
                                                                 ]
@@ -1738,15 +1816,37 @@ viewTimelineTab model =
                             )
                 , key = "Posts"
                 }
-                (burndownInput now response)
+                (burndownInput model now response)
             ]
 
         _ ->
             [ Html.p [ Attr.class "tab-empty" ] [ Html.text (status model) ] ]
 
 
-burndownInput : Int -> LiveResponse -> Burndown.Input
-burndownInput now response =
+{-| Whether a post's box on the timeline opens to the left of its dot
+(`across`: how far across the whole day it is, 0 to 1): when there's
+room for it between the dot and the left edge of what's on screen. Before
+the timeline has said what's on screen, past the middle of the day.
+-}
+opensLeft : Maybe Burndown.Visible -> Float -> Bool
+opensLeft visible across =
+    case visible of
+        Just { left, scene } ->
+            across * scene - left >= postBoxWidth + 14 + 8
+
+        Nothing ->
+            across > 0.55
+
+
+{-| A post box's width beside a dot (live.html, .live-focus-posts), px.
+-}
+postBoxWidth : Float
+postBoxWidth =
+    240
+
+
+burndownInput : Model -> Int -> LiveResponse -> Burndown.Input
+burndownInput model now response =
     { plan = List.filterMap .arrive response.stores
     , planEnd =
         List.filterMap .depart response.stores
@@ -1756,7 +1856,57 @@ burndownInput now response =
     , visits = visitedStores response |> List.map Tuple.second
     , total = List.length response.stores
     , now = now
+
+    -- A replay's timeline ends where the event does.
+    , until =
+        case model.replay of
+            Replaying r ->
+                Just r.archive.to
+
+            _ ->
+                Nothing
     }
+
+
+{-| While the replay plays (or is scrubbed while playing), keep the tip of
+the red line in the middle of the timeline. Its scroll snapping is off
+meanwhile (live.html, .replay-following), or it'd pull back to the hour.
+-}
+followTimeline : Model -> Cmd Msg
+followTimeline model =
+    case ( model.replay, model.route ) of
+        ( Replaying r, TimelineTab ) ->
+            if r.playing then
+                timelineTo 0.5 model
+
+            else
+                Cmd.none
+
+        _ ->
+            Cmd.none
+
+
+{-| Scroll the timeline so now is this far across it (0 to 1).
+-}
+timelineTo : Float -> Model -> Cmd Msg
+timelineTo across model =
+    case ( Maybe.map .response model.latest, serverNow model ) of
+        ( Just response, Just now ) ->
+            case Burndown.track (burndownInput model now response) of
+                Just ( start, end ) ->
+                    let
+                        fraction =
+                            clamp 0 1 (toFloat (now - start) / toFloat (max 1 (end - start)))
+                    in
+                    Browser.Dom.getViewportOf Burndown.scrollerId
+                        |> Task.andThen (\v -> Browser.Dom.setViewportOf Burndown.scrollerId (fraction * v.scene.width - v.viewport.width * across) 0)
+                        |> Task.attempt (\_ -> NoOp)
+
+                Nothing ->
+                    Cmd.none
+
+        _ ->
+            Cmd.none
 
 
 {-| Scroll the timeline so now is a third of the way in from the left (it
@@ -1766,7 +1916,7 @@ placeTimeline : Model -> Cmd Msg
 placeTimeline model =
     case ( Maybe.map .response model.latest, serverNow model ) of
         ( Just response, Just now ) ->
-            case Burndown.track (burndownInput now response) of
+            case Burndown.track (burndownInput model now response) of
                 Just ( start, end ) ->
                     let
                         fraction =
@@ -2474,11 +2624,6 @@ viewMap shape focused walked now response =
                 ]
                 ]
             ]
-        , if placed /= Nothing && not (onMap placed) then
-            Html.p [ Attr.class "live-note" ] [ Html.text "The last position is off this map." ]
-
-          else
-            Html.text ""
         ]
 
 
@@ -3248,16 +3393,6 @@ viewMe xy =
     ]
 
 
-onMap : Maybe ( Float, Float ) -> Bool
-onMap placed =
-    case ( placed, stretchBox ) of
-        ( Just ( x, y ), [ minX, minY, width, height ] ) ->
-            x >= minX && x <= minX + width && y >= minY && y <= minY + height
-
-        _ ->
-            True
-
-
 viewPosts : Model -> Html Msg
 viewPosts model =
     case Maybe.map .response model.latest of
@@ -3385,6 +3520,13 @@ type alias ReplayState =
     , at : Int
     , playing : Bool
     , speed : Int
+
+    -- What playback last opened on the map by itself (see autoClick).
+    , autoFocus : Maybe Focused
+
+    -- The slider's being dragged while playing: playback holds still
+    -- under it, and carries on from where it's let go.
+    , scrubbing : Bool
     }
 
 
@@ -3656,6 +3798,186 @@ showAt requested replay model =
     }
 
 
+{-| Synthetic clicks while playing: a post's box opens when the post
+arrives and closes a little later: on the map, its pin's; on the
+timeline, its moment's (McDonald's don't: too busy). "A little later" is
+in the viewer's time (autoClickLead, autoClickLag), so it's the same at
+any speed. Not at the fastest speed, where it'd be a blur. Only what
+playback opened is closed by it; a click of the viewer's own stays until
+playback opens something else. The last post (the finish) stays open
+once it has opened, to the end and after.
+-}
+autoClick : Model -> Model
+autoClick model =
+    case ( model.replay, Maybe.map .response model.latest ) of
+        ( Replaying r, Just response ) ->
+            let
+                where_ =
+                    autoClickable model.route response r
+
+                target =
+                    if r.playing && r.speed < autoClickMaxSpeed then
+                        autoTarget r where_
+
+                    else
+                        Nothing
+            in
+            if target == r.autoFocus then
+                model
+
+            else
+                { model
+                    | replay = Replaying { r | autoFocus = target }
+                    , focused =
+                        case target of
+                            Just _ ->
+                                target
+
+                            Nothing ->
+                                if model.focused == r.autoFocus && r.autoFocus /= lastPostFocus r where_ then
+                                    Nothing
+
+                                else
+                                    model.focused
+                }
+
+        _ ->
+            model
+
+
+{-| Together, how long a post's box stays open after it arrives: ms of
+the viewer's time. A post that another replaces within autoClickMin
+isn't opened at all, so posts arriving together (photos sent at once
+after a signal gap) don't flash by.
+-}
+autoClickLead : Int
+autoClickLead =
+    800
+
+
+autoClickLag : Int
+autoClickLag =
+    1500
+
+
+autoClickMin : Int
+autoClickMin =
+    500
+
+
+{-| At this speed or faster, no synthetic clicks.
+-}
+autoClickMaxSpeed : Int
+autoClickMaxSpeed =
+    3600
+
+
+{-| The posts playback can open on this view, oldest first with when each
+arrived, and the box each opens in now. On the timeline: every post made
+on the walk's day, in its moment (postMoments; one from another day
+would be drawn at its time of day on the walk's, out of place). Elsewhere
+(the map): every post with a place, on its pin (postSpots).
+-}
+type alias AutoClickable =
+    { posts : List ( Int, Post )
+    , boxOf : Post -> Maybe Focused
+    }
+
+
+autoClickable : Route -> LiveResponse -> ReplayState -> AutoClickable
+autoClickable route response r =
+    let
+        containing post groups =
+            List.filter (List.any (\p -> p.id == post.id)) groups |> List.head
+    in
+    if route == TimelineTab then
+        let
+            onDay =
+                onWalkDay response.stores
+
+            moments =
+                postMoments onDay response.posts
+        in
+        { posts = List.filter (\( _, post ) -> onDay post.ts == post.ts) r.archive.posts
+        , boxOf = \post -> containing post moments |> Maybe.map (momentId >> FocusedMoment)
+        }
+
+    else
+        let
+            spots =
+                postSpots response.posts |> List.map .posts
+        in
+        { posts = List.filter (\( _, post ) -> post.at /= Nothing) r.archive.posts
+        , boxOf = \post -> containing post spots |> Maybe.map (\posts -> FocusedPosts (spotId { at = ( 0, 0 ), posts = posts }))
+        }
+
+
+{-| What should be open now: of the posts whose moment is on, the one
+that arrived last.
+-}
+autoTarget : ReplayState -> AutoClickable -> Maybe Focused
+autoTarget r { posts, boxOf } =
+    let
+        lead =
+            autoClickLead * r.speed
+
+        lag =
+            autoClickLag * r.speed
+
+        -- Another post arrives too soon after this one.
+        overtaken received =
+            List.any (\( other, _ ) -> other > received && other - received <= autoClickMin * r.speed) posts
+
+        lastReceived =
+            List.map Tuple.first posts |> List.maximum
+    in
+    posts
+        |> List.filter (\( received, _ ) -> not (overtaken received))
+        |> List.filterMap
+            (\( received, post ) ->
+                boxOf post
+                    |> Maybe.map
+                        (\box ->
+                            ( received
+                            , if Just received == lastReceived then
+                                r.archive.to
+
+                              else
+                                received + lead + lag
+                            , box
+                            )
+                        )
+            )
+        |> List.filter (\( from, to, _ ) -> from <= r.at && r.at <= to)
+        |> List.sortBy (\( from, _, _ ) -> -from)
+        |> List.head
+        |> Maybe.map (\( _, _, box ) -> box)
+
+
+{-| The last post's box, once it's arrived.
+-}
+lastPostFocus : ReplayState -> AutoClickable -> Maybe Focused
+lastPostFocus r { posts, boxOf } =
+    case List.reverse posts of
+        ( received, last ) :: _ ->
+            if received <= r.at then
+                boxOf last
+
+            else
+                Nothing
+
+        [] ->
+            Nothing
+
+
+{-| Stop the replay playing (when the viewer takes the timeline over).
+Unlike the scrubber's slider, it doesn't start again on its own.
+-}
+stopReplay : Model -> Model
+stopReplay =
+    withReplay (\r m -> { m | replay = Replaying { r | playing = False, scrubbing = False } })
+
+
 withReplay : (ReplayState -> Model -> Model) -> Model -> Model
 withReplay f model =
     case model.replay of
@@ -3844,6 +4166,37 @@ onAirAt at slots =
     find slots
 
 
+{-| Space plays or stops the replay, unless it's typing in a field or
+pressing a focused button (which Space does itself). live.html keeps it
+from scrolling the page too.
+-}
+spaceBar : msg -> Decoder msg
+spaceBar msg =
+    Decode.map5
+        (\key repeat tag inputType editable ->
+            key
+                == " "
+                && not repeat
+                && not editable
+                && not (List.member tag [ "TEXTAREA", "SELECT", "BUTTON" ])
+                -- A field, but not the scrubber's slider, which Space does nothing to.
+                && not (tag == "INPUT" && inputType /= "range")
+        )
+        (Decode.field "key" Decode.string)
+        (Decode.oneOf [ Decode.field "repeat" Decode.bool, Decode.succeed False ])
+        (Decode.oneOf [ Decode.at [ "target", "tagName" ] Decode.string, Decode.succeed "" ])
+        (Decode.oneOf [ Decode.at [ "target", "type" ] Decode.string, Decode.succeed "" ])
+        (Decode.oneOf [ Decode.at [ "target", "isContentEditable" ] Decode.bool, Decode.succeed False ])
+        |> Decode.andThen
+            (\yes ->
+                if yes then
+                    Decode.succeed msg
+
+                else
+                    Decode.fail "not the space bar"
+            )
+
+
 replayProblem : Http.Error -> String
 replayProblem error =
     case error of
@@ -3918,6 +4271,9 @@ viewScrubber replay =
                     , Attr.attribute "aria-label" "Moment shown"
                     , Attr.attribute "aria-valuetext" (NewYorkTime.format r.at)
                     , Events.onInput (String.toFloat >> Maybe.map round >> Maybe.withDefault r.at >> ScrubTo)
+
+                    -- "change": let go (or a key's step done).
+                    , Events.on "change" (Decode.succeed ScrubEnd)
                     ]
                     []
                 , Html.button

@@ -25,19 +25,19 @@ suite =
         , describe "window"
             [ test "the plan's first arrival to its last departure" <|
                 \_ ->
-                    Burndown.window { plan = [ 300, 100, 200 ], planEnd = 400, visits = [], total = 3, now = 0 }
+                    Burndown.window { plan = [ 300, 100, 200 ], planEnd = 400, visits = [], total = 3, now = 0, until = Nothing }
                         |> Expect.equal (Just ( 100, 400 ))
             , test "on to now when the walk runs over" <|
                 \_ ->
-                    Burndown.window { plan = [ 100 ], planEnd = 400, visits = [], total = 1, now = 500 }
+                    Burndown.window { plan = [ 100 ], planEnd = 400, visits = [], total = 1, now = 500, until = Nothing }
                         |> Expect.equal (Just ( 100, 500 ))
             , test "but not to a now days later" <|
                 \_ ->
-                    Burndown.window { plan = [ 100 ], planEnd = 400, visits = [], total = 1, now = 100 + 2 * 86400000 }
+                    Burndown.window { plan = [ 100 ], planEnd = 400, visits = [], total = 1, now = 100 + 2 * 86400000, until = Nothing }
                         |> Expect.equal (Just ( 100, 400 ))
             , test "no plan, no chart" <|
                 \_ ->
-                    Burndown.window { plan = [], planEnd = 0, visits = [], total = 0, now = 0 }
+                    Burndown.window { plan = [], planEnd = 0, visits = [], total = 0, now = 0, until = Nothing }
                         |> Expect.equal Nothing
             ]
         ]

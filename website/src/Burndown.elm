@@ -35,7 +35,9 @@ import Svg.Attributes as SvgAttr
 
 {-| `plan`: each store's expected arrival, and `planEnd`, the last
 departure; `visits`: when each store visited so far was first checked in
-at; `total`: how many stores; all times ms since the epoch.
+at; `total`: how many stores; all times ms since the epoch. `until`:
+where the chart ends, exactly, if it's known (a finished event's replay:
+where the red line stops), instead of the hour after the plan's end.
 -}
 type alias Input =
     { plan : List Int
@@ -43,6 +45,7 @@ type alias Input =
     , visits : List Int
     , total : Int
     , now : Int
+    , until : Maybe Int
     }
 
 
@@ -133,6 +136,10 @@ type alias Config msg =
     , jump : Float -> msg
     , dragStart : Float -> Float -> msg
     , step : Int -> msg
+
+    -- A finger, wheel or key starts scrolling it (the others are
+    -- covered by jump, dragStart and step).
+    , grabbed : msg
     , visible : Maybe Visible
     , dragging : Bool
     }
@@ -144,22 +151,25 @@ scrollerId =
 
 
 {-| The chart's span, whole hours: the hour the window starts in to the
-hour after it ends.
+hour after it ends; or to `until` exactly.
 -}
 track : Input -> Maybe ( Int, Int )
 track input =
     window input
         |> Maybe.map
-            (\( start, end ) ->
+            (\( start, windowEnd ) ->
                 let
                     floorHour t =
                         t - modBy hourMs (modBy (24 * hourMs) (NewYorkTime.minuteOfWeek t * 60000) + modBy 60000 t)
+
+                    end =
+                        Maybe.withDefault windowEnd input.until
 
                     endHour =
                         floorHour end
                 in
                 ( floorHour start
-                , if endHour == end then
+                , if endHour == end || input.until /= Nothing then
                     end
 
                   else
@@ -279,6 +289,19 @@ view config marks input =
                     , Attr.tabindex 0
                     , Attr.attribute "aria-label" "Timeline, an hour at a time"
                     , Events.on "scroll" (Decode.map config.scrolled visibleScroll)
+                    , Events.on "touchstart" (Decode.succeed config.grabbed)
+                    , Events.on "wheel" (Decode.succeed config.grabbed)
+                    , Events.on "keydown"
+                        (Decode.field "key" Decode.string
+                            |> Decode.andThen
+                                (\key ->
+                                    if List.member key [ "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown" ] then
+                                        Decode.succeed config.grabbed
+
+                                    else
+                                        Decode.fail "not a scrolling key"
+                                )
+                        )
                     , Events.preventDefaultOn "mousedown"
                         (Decode.map3 (\button cx left -> ( button, config.dragStart cx left ))
                             (Decode.field "button" Decode.int)
@@ -294,7 +317,7 @@ view config marks input =
                                 )
                         )
                     ]
-                    [ Html.div [ Attr.class "burndown-track", Attr.style "width" ("calc(" ++ String.fromInt hoursLong ++ " * 100cqw / 3)") ]
+                    [ Html.div [ Attr.class "burndown-track", Attr.style "width" ("calc(" ++ String.fromFloat (span / toFloat hourMs) ++ " * 100cqw / 3)") ]
                         (List.map
                             (\t ->
                                 Html.div [ Attr.class "burndown-hour", Attr.style "left" (pct (x t)) ]

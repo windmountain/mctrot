@@ -95,7 +95,6 @@
     .live-map-zoom .icon { width: var(--icon-l); height: var(--icon-l); }
     .live-map-zoom .icon-glyph { fill: var(--paper); }
     .live-map-zoom button:disabled { color: var(--line); cursor: default; }
-    .tab-map .live-note { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-3); margin: 0; font: var(--t-helper); }
 
     /* Blog */
     .tab-blog .live-posts { padding: 0 var(--space-4) var(--space-6); }
@@ -274,6 +273,11 @@
     .live-focus-posts.live-focus-left.live-focus-below { transform: translate(calc(-100% - 14px), -12px); }
     .live-focus-posts.live-focus-above { transform: translate(14px, calc(-100% + 12px)); }
     .live-focus-posts.live-focus-left.live-focus-above { transform: translate(calc(-100% - 14px), calc(-100% + 12px)); }
+    /* On the timeline a dot can sit on the chart's bottom edge (none left), which clips anything below it: a box above its dot clears it entirely. */
+    @media not (max-width: 40rem) {
+      .burndown-mark .live-focus-posts.live-focus-above { transform: translate(14px, calc(-100% - 8px)); }
+      .burndown-mark .live-focus-posts.live-focus-left.live-focus-above { transform: translate(calc(-100% - 14px), calc(-100% - 8px)); }
+    }
     /* On a phone there's no room beside a pin: a sheet along the screen's
        bottom instead. */
     @media (max-width: 40rem) {
@@ -299,7 +303,6 @@
     .live-flag-start { fill: #1E9E3E; }
     .live-flag-finish { fill: #fff; }
     .live-flag-check { fill: #000; }
-    .live-note { text-align: center; }
     /* Posts (viewPosts in Live.elm): newest first, a hairline between. */
     .live-posts { list-style: none; padding: 0; margin: 0 auto; max-width: 28rem; }
     .live-post { padding: var(--space-5) 0; }
@@ -365,6 +368,8 @@
       .replay { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "play when speed" "slider slider slider";
         row-gap: 6px; align-content: center; }
     }
+    /* Playing: the timeline follows the replay (Live.elm, followTimeline), unsnapped. */
+    .replay-following .burndown-scroller { scroll-snap-type: none; }
     /* Under the scrubber where the page scrolls (overview, blog); the map, timeline and stats are already a screen tall below it. */
     .replay-shell .page-overview .app-top, .replay-shell .page-blog .app-top { top: var(--replay-h); }
     .replay-shell .page-map, .replay-shell .page-timeline, .replay-shell .page-stats {
@@ -386,7 +391,7 @@
   </noscript>
 
   <script src="/js/pair-player.js?v=a92a0ea6eb"></script>
-  <script src="/js/live.js?v=81cae6b264"></script>
+  <script src="/js/live.js?v=837d3d3da1"></script>
   <script>
     var params = new URLSearchParams(window.location.search);
     // ?api=http://localhost:3000 points the page at a local recorder.
@@ -421,6 +426,17 @@
     // so take it off the address and a reload doesn't do it again.
     if (/^#(like|comment)=/.test(location.hash)) {
       history.replaceState(null, "", location.pathname + location.search);
+    }
+
+    // The replay: Space plays or stops it (src/Live.elm, spaceBar), so it
+    // mustn't scroll the page as well. Not in fields or on buttons, where
+    // Space is theirs.
+    if (archive) {
+      window.addEventListener("keydown", function (e) {
+        var t = e.target;
+        var field = /^(TEXTAREA|SELECT|BUTTON)$/.test(t.tagName) || (t.tagName === "INPUT" && t.type !== "range");
+        if (e.key === " " && !t.isContentEditable && !field) e.preventDefault();
+      });
     }
 
     // --- The address (src/Live.elm's navigate, setTitle, pathChanged) -----
