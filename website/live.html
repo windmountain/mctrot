@@ -3,18 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>McTrot 5 · Live</title>
-  <meta name="description" content="Where I am during a McTrot attempt, live.">
-  <!-- Unlinked until launch: keep it out of search results. -->
-  <meta name="robots" content="noindex">
+  <!-- /live between attempts: nothing live, just where McTrot 5's replay
+       is. During an attempt this was the live page, now the replay at
+       /archive/2026-11-21 (website/archive/2026-11-21/index.html). Netlify
+       serves this for /live/map and the rest too (website/_redirects), so
+       old links land here. No JavaScript. -->
+  <title>McTrot · Live</title>
+  <meta name="description" content="Nothing is live right now. McTrot 5, November 21, 2026, can be replayed.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#ffffff">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="McTrot">
-  <meta property="og:title" content="McTrot 5 · Live">
-  <meta property="og:description" content="Where I am during a McTrot attempt, live.">
+  <meta property="og:title" content="McTrot · Live">
+  <meta property="og:description" content="Nothing is live right now. McTrot 5, November 21, 2026, can be replayed.">
   <meta property="og:url" content="https://mctrot.nyc/live">
   <meta property="og:image" content="https://mctrot.nyc/live-share/og.png">
   <meta property="og:image:type" content="image/png">
@@ -22,489 +25,34 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="A McTrot route, drawn in yellow with its stops circled, over a close-up of Manhattan&rsquo;s streets, beside the word Live.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="McTrot 5 · Live">
-  <meta name="twitter:description" content="Where I am during a McTrot attempt, live.">
+  <meta name="twitter:title" content="McTrot · Live">
+  <meta name="twitter:description" content="Nothing is live right now. McTrot 5, November 21, 2026, can be replayed.">
   <meta name="twitter:image" content="https://mctrot.nyc/live-share/og.png">
   <meta name="twitter:image:alt" content="A McTrot route, drawn in yellow with its stops circled, over a close-up of Manhattan&rsquo;s streets, beside the word Live.">
 
   <!-- Absolute paths: this page is also served at /live/map and the rest. -->
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    /* /live is white, not the site's yellow: the page behind everything (and Safari's overscroll and toolbar,
-       with theme-color above), the header and the tabs. Every theme of style.css's --bg, overridden. */
+    /* As the live page looked (website/archive/2026-11-21/index.html):
+       white, the title at the top left, one paragraph in the middle. */
     :root, :root[data-theme="dark"], :root[data-theme="light"] { --bg: #fff; }
     @media (prefers-color-scheme: dark) { :root { --bg: #fff; } }
-    /* Icons (src/Icon.elm, Carbon): the disc takes the text colour unless
-       a control says otherwise; the glyph inside a filled icon is clear. */
-    .icon { display: block; flex: none; width: var(--icon-s); height: var(--icon-s); }
-    .icon-disc { fill: currentColor; }
-    .icon-glyph { fill: transparent; }
-
-    /* The shell, the same on every view (src/Live.elm): the title row
-       and the view switcher pinned at the top, the view, and the radio
-       stripe pinned at the bottom (website/LIVE-DESIGN.md). */
     body { background: var(--paper); }
-    .app { flex: 1; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-    .app-top { position: sticky; top: 0; z-index: 5; background: var(--paper); }
-    /* The line under the top: on Stats only. */
-    .page-stats .app-top { border-bottom: var(--strong); }
-    .app-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
-      padding: var(--space-3) var(--space-4) var(--space-2); }
-    .app-title { margin: 0; font: var(--t-display); letter-spacing: -0.02em; color: var(--ink); }
-    .app-title a { color: inherit; text-decoration: none; }
-    .guest-signout { font: var(--t-ui); color: var(--ink); background: none; border: 0; padding: 0; min-height: var(--control-h);
-      text-decoration: underline; cursor: pointer; }
-    .app-tabs { padding: 0 var(--space-4) var(--space-3); }
-    .app-tabs ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 30rem; border: var(--strong); }
-    .app-tabs li { flex: 1; }
-    .app-tabs li + li a { border-left: var(--strong); }
-    .app-tabs a { display: flex; align-items: center; justify-content: center; min-height: calc(var(--control-h) - 4px); padding: 0 var(--space-1);
-      font: var(--t-ui); text-decoration: none; color: var(--ink); }
-    .app-tabs a[aria-current="page"] { background: var(--ink); color: var(--paper); }
-    .app-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
-    .app-main { flex: 1; min-height: 0; padding-bottom: 0; }
-    /* Map, timeline and stats take exactly the screen; the overview and
-       the blog scroll like a page. */
-    /* (flex: none: in the body's flex column, flex: 1 would override the
-       height and let the view grow with its content.) */
-    .page-map, .page-timeline, .page-stats { flex: none; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
-    .tab-empty { padding: 1rem 16px; text-align: center; }
-
-    /* Map: fills the space between the tabs and the radio. The frame
-       scrolls; the scene inside it is the map's box, with half a frame of
-       empty margin all round once zoomed in (50cqh/50cqw: the frame is a
-       size container), so any place can be scrolled to the middle. */
-    .tab-map { position: relative; display: flex; flex-direction: column; }
-    .tab-map .live-map { flex: 1; min-height: 0; }
-    /* Pinching or double-tapping the map mustn't zoom the page (a finger still scrolls it): the map has its own zoom. */
-    .tab-map .live-map { position: relative; touch-action: pan-x pan-y; }
-    .tab-map .live-map-frame { height: 100%; max-width: none; overflow: auto; overscroll-behavior: contain; container-type: size;
-      text-align: center; padding: 48px 12px 12px; }
-    .tab-map .live-map-scene { display: inline-block; vertical-align: top; text-align: left; }
-    .tab-map .live-map-zoomed { padding: 50cqh 50cqw; }
-    .live-map-draggable { cursor: grab; user-select: none; -webkit-user-select: none; }
-    .live-map-dragging { cursor: grabbing; }
-    /* The last position, floating at the top left. */
-    .live-map-chip { position: absolute; top: var(--space-3); left: var(--space-4); z-index: 2; margin: 0; max-width: calc(100% - 96px);
-      padding: var(--space-1) var(--space-2); background: var(--paper); border: var(--strong); font: var(--t-helper); color: var(--ink);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Top right, clear of the map's scrollbar. */
-    .live-map-zoom { position: absolute; top: var(--space-3); right: var(--space-4); z-index: 2; display: flex; flex-direction: column; gap: var(--space-2); }
-    .live-map-zoom button { display: flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h); padding: 0;
-      border: 0; background: none; color: var(--ink); cursor: pointer; }
-    .live-map-zoom .icon { width: var(--icon-l); height: var(--icon-l); }
-    .live-map-zoom .icon-glyph { fill: var(--paper); }
-    .live-map-zoom button:disabled { color: var(--line); cursor: default; }
-
-    /* Blog */
-    .tab-blog .live-posts { padding: 0 var(--space-4) var(--space-6); }
-
-    /* Timeline: the burndown chart (src/Burndown.elm). The 46-to-0 axis
-       stays at the left while the chart scrolls sideways under it, three
-       hours to a screen (100cqw / 3: the scroller is an inline-size
-       container), snapping to each hour; under it, the whole day small. */
-    .tab-timeline { display: flex; padding: var(--space-3) var(--space-4) var(--space-3) var(--space-2); }
-    .burndown { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto;
-      column-gap: var(--space-2); }
-    .burndown-levels { grid-row: 1; grid-column: 1; position: relative; min-width: 1.5em; margin-top: 24px;
-      font: var(--t-helper); font-variant-numeric: tabular-nums; color: var(--ink-muted); }
-    .burndown-level { position: absolute; right: 0; transform: translateY(-50%); line-height: 1; }
-    .burndown-scroller { grid-row: 1; grid-column: 2; min-height: 0; overflow-x: auto; overflow-y: hidden; container-type: inline-size;
-      scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; cursor: grab; user-select: none; -webkit-user-select: none; }
-    .burndown-scroller::-webkit-scrollbar { display: none; }
-    .burndown-scroller:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-    .burndown-dragging { scroll-snap-type: none; cursor: grabbing; }
-    .burndown-track { position: relative; height: 100%; display: grid; grid-template-rows: 24px minmax(0, 1fr); }
-    /* An hour's line: where the chart settles, and its label. */
-    /* 1px wide, not 0: Safari ignores a snap point on an element with no
-       width, and then snaps any scroll from code (the ← and → buttons) to the end. */
-    .burndown-hour { position: absolute; top: 0; height: 24px; width: 1px; scroll-snap-align: start; scroll-snap-stop: always; }
-    .burndown-hour-label { position: absolute; top: 2px; left: var(--space-1); font: var(--t-helper); color: var(--ink); white-space: nowrap; }
-    .burndown-plot { grid-row: 2; position: relative; box-shadow: inset 0 0 0 1px var(--line); }
-    .burndown-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-    .burndown-marks { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-    .burndown-mark { position: absolute; width: 0; height: 0; }
-    .burndown-mark .live-post-pin, .burndown-mark .live-focus { left: 0; top: 0; }
-    .burndown-mark:has(.live-focus) { z-index: 1; }  /* an open box over the other dots */
-    .burndown-grid { stroke: #eee; stroke-width: 1px; vector-effect: non-scaling-stroke; }
-    .burndown-plan { fill: none; stroke: var(--plan); stroke-width: 2px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-    .burndown-actual { fill: none; stroke: var(--signal); stroke-width: 3px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-    .burndown-now { stroke: var(--ink); stroke-width: 1px; vector-effect: non-scaling-stroke; }
-    /* ← and →, over the chart's top right, below the hour labels (like the map's + and -). */
-    .burndown-step { grid-row: 1; grid-column: 2; align-self: start; justify-self: end; z-index: 3; display: flex; gap: var(--space-2);
-      margin: calc(24px + var(--space-2)) var(--space-2) 0 0; }
-    .burndown-step button { display: flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h); padding: 0;
-      border: 0; background: none; color: var(--ink); cursor: pointer; }
-    .burndown-step .icon { width: var(--icon-l); height: var(--icon-l); }
-    .burndown-step .icon-glyph { fill: var(--paper); }
-    .burndown-step button:disabled { color: var(--line); cursor: default; }
-    /* The day strip: the whole day small, the part on screen boxed. */
-    .burndown-strip { grid-row: 2; grid-column: 1 / -1; position: relative; height: 32px; margin-top: var(--space-3); border: var(--hairline);
-      touch-action: none; cursor: pointer; }
-    .burndown-strip svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-    .burndown-strip .burndown-actual { stroke-width: 2px; }
-    .burndown-strip .burndown-plan { stroke-width: 1px; }
-    .burndown-strip-window { position: absolute; top: -2px; bottom: -2px; box-sizing: border-box; border: var(--strong); pointer-events: none; }
-    .burndown-strip-labels { grid-row: 3; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2);
-      margin-top: var(--space-1); font: var(--t-helper); color: var(--ink-muted); }
-    .burndown-key { display: flex; gap: var(--space-3); }
-    .burndown-key span::before { content: ""; display: inline-block; width: 14px; height: 0; margin-right: var(--space-1); vertical-align: middle; border-top: 3px solid; }
-    .burndown-key-plan::before { border-color: var(--plan) !important; }
-    .burndown-key-actual::before { border-color: var(--signal) !important; }
-    .burndown-key .burndown-key-marks::before { width: 6px; height: 6px; border: 1px solid var(--ink) !important; border-radius: 50%; background: var(--signal); }
-
-    /* Stats: tiles filling the screen, 2px ink lines between them (the
-       grid's gap over an ink background). Two small tiles side by side,
-       then full-width ones; the Plan takes what's left. A maximized tile
-       takes all of it and scrolls. */
-    .tab-stats { overflow: hidden; }
-    .stats-tiles { box-sizing: border-box; height: 100%; display: grid; gap: 2px; background: var(--ink);
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr); }
-    .stats-tile { background: var(--paper); padding: var(--space-3) var(--space-4); min-height: 0; overflow: hidden; cursor: pointer; }
-    .stats-tile-weather, .stats-tile-sun, .stats-tile-plan { grid-column: 1 / -1; }
-    .stats-maximized { grid-template-rows: minmax(0, 1fr); }
-    .stats-maximized .stats-tile { grid-column: 1 / -1; overflow: auto; cursor: auto; }
-    .stats-tile-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 var(--space-2); }
-    .stats-tile-head h2 { margin: 0; }
-    .stats-tile-toggle { display: flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h);
-      margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0; padding: 0; border: 0; background: none; color: var(--ink); cursor: pointer; }
-    .stats-tile-toggle .icon { width: 16px; height: 16px; }
-    .stats-tile p { margin: 0; }
-    .stats-big { margin: var(--space-1) 0 var(--space-1) !important; }
-    .stats-line { font: var(--t-body); color: var(--ink); }
-    /* The sky: tiny swatches, a label beside each. */
-    .stats-sky { list-style: none; padding: 0; margin: var(--space-2) 0 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font: var(--t-helper); color: var(--ink); }
-    .stats-sky li { display: flex; align-items: center; gap: var(--space-1); }
-    .stats-swatch { display: block; width: 12px; height: 12px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
-    .stats-maximized .stats-swatch { width: 48px; height: 48px; }
-    .stats-maximized .stats-sky li { flex-direction: column; align-items: flex-start; }
-    /* The sun: sunrise, a bar with the sun on it now, sunset. */
-    .stats-sun { display: flex; align-items: center; gap: var(--space-2); }
-    .stats-sun-track { position: relative; flex: 1; height: 2px; background: var(--ink); }
-    .stats-sun-now { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--ink);
-      transform: translate(-50%, -50%); box-sizing: border-box; }
-    .stats-maximized .stats-line { margin: var(--space-3) 0 0; }
-    .stats-maximized .live-sun { margin: var(--space-3) 0 0; }
-    /* The plan: one line a stop; full screen, the actual time and the
-       address too, two lines a stop, the next one marked. */
-    .plan-list { list-style: none; margin: 0; padding: 0; }
-    .plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 3.5em; gap: 0 var(--space-3); align-items: baseline; padding: 2px 0;
-      font: var(--t-body); font-variant-numeric: tabular-nums; }
-    .plan-list-full .plan-row { grid-template-columns: minmax(0, 1fr) auto auto 3.5em; padding: var(--space-2) 0 var(--space-2) var(--space-4);
-      border-bottom: var(--hairline); position: relative; }
-    .plan-name { font: var(--t-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .plan-address { grid-column: 1 / -1; }
-    .plan-diff { text-align: right; font-weight: 700; }
-    .plan-ahead { color: #1a7f37; }
-    .plan-behind { color: var(--signal); }
-    .plan-done .plan-name { color: var(--ink-muted); }
-    .plan-list-full .plan-next::before { content: "▸"; position: absolute; left: 0; top: var(--space-2); }
-
-    /* The overview (plain /live) */
+    .live-header { padding: var(--space-3) var(--space-4) var(--space-2); }
+    .live-title { margin: 0; font: var(--t-display); letter-spacing: -0.02em; color: var(--ink); }
+    .live-title a { color: inherit; text-decoration: none; }
     .live { max-width: var(--measure); margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
-    .live-paragraph { margin: 0; font: var(--t-body); color: var(--ink); }
-    /* The radio (src/Radio.elm): one line pinned to the bottom of the
-       screen, above the home indicator. Its buttons' tap areas reach 12px
-       above the stripe, to 44px. */
-    .radio { position: sticky; bottom: 0; z-index: 5; background: var(--accent); color: var(--ink);
-      padding-bottom: env(safe-area-inset-bottom); }
-    .radio-bar { display: flex; align-items: stretch; height: var(--stripe-h); }
-    .radio button, .radio-home { position: relative; font: var(--t-heading); letter-spacing: 0.08em; text-transform: uppercase; color: inherit;
-      background: none; border: 0; padding: 0 var(--space-4); cursor: pointer; text-decoration: none; }
-    .radio button::before, .radio-home::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--stripe-h) - var(--control-h)); bottom: 0; }
-    .radio-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); text-align: left; }
-    /* On the yellow stripe, play and stop are black discs with a yellow
-       symbol (a yellow disc wouldn't show). */
-    .radio .icon .icon-disc { fill: var(--ink); }
-    .radio .icon .icon-glyph { fill: var(--accent); }
-    /* The radio icon at the right: to radio.mctrot.nyc, in a new tab. */
-    .radio-home { display: flex; align-items: center; gap: var(--space-1); }
-    .radio-home .icon { width: 20px; height: 20px; }
-    .radio-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .radio-volume { align-self: center; width: 5rem; accent-color: var(--ink); }
-    .radio button:focus-visible, .radio input:focus-visible, .radio a:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
-    .live-sun { margin: 1rem auto 0; border-collapse: collapse; font-size: 0.9em; }
-    .live-sun caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
-    .live-sun th, .live-sun td { text-align: left; padding: 0.15rem 0.75rem 0.15rem 0; font-variant-numeric: tabular-nums; }
-    .live-sun thead th { font-weight: normal; opacity: 0.7; }
-    .live-sun tbody th { font-weight: normal; }
-    /* The stretched map (viewMap in Live.elm): the frame's padding leaves room for Manhattan to spill past the
-       McDonald's and for the start flag above the northernmost one; past the padding it's cut off. */
-    .live-map-frame { box-sizing: border-box; height: 560px; max-width: 360px; margin: 0 auto; padding: 40px 12px 12px; overflow: hidden; }
-    .live-map-box { position: relative; height: 100%; }
-    .live-map-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-    div.live-map-layer { pointer-events: none; }
-    /* The map (src/Live.elm, viewMap), bottom to top. */
-    /* Sizes are screen pixels however the map stretches: lines don't scale, and the dots and the last position
-       are the end caps of zero-length strokes (dotPath in Live.elm). */
-    .live-borough { fill: #d9d9d9; }
-    .live-network { fill: none; stroke: #fff; stroke-width: 0.5px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-planned-casing { fill: none; stroke: #000; stroke-width: 6px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-planned { fill: none; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-track { fill: none; stroke: #DA291C; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    /* A black dot 1px wider all round, drawn under the planned route, then a white dot over it, then the colour. */
-    .live-store-casing { fill: none; stroke: #000; stroke-width: 16px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-store { fill: none; stroke: #fff; stroke-width: 14px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-pip { fill: none; stroke: #FFD100; stroke-width: 8px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-    .live-pip-visited { stroke: #DA291C; }
-    .live-pip-closed { stroke: #9C7C00; }
-    /* Skipped for being closed (the archive only): done, but nothing eaten. */
-    .live-pip-skipped { stroke: #555; }
-    .live-store-hit { fill: none; stroke: transparent; stroke-width: 24px; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }
-    /* A focused store's box, beside its dot (viewFocus in Live.elm). */
-    .live-focus { position: absolute; transform: translate(14px, -50%); display: flex; flex-direction: column; padding: 4px 8px; background: #fff;
-      border: 2px solid #000; font-size: 13px; line-height: 1.3; white-space: nowrap; pointer-events: none; }
-    .live-focus-left { transform: translate(calc(-100% - 14px), -50%); }
-    /* Posts on the map (viewPostPin): small solid red dots, centred on
-       their spot, with a thin black outline;
-       smaller than a McDonald's, so they don't compete with it. */
-    .live-post-pin { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer;
-      width: 6px; height: 6px; padding: 0; box-sizing: content-box; background: #DA291C; border: 1px solid #000; border-radius: 50%; }
-    /* A bigger, invisible target, for fingers. */
-    .live-post-pin::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
-    .live-post-pin-open { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #000; }
-    .live-post-pin:focus-visible { outline: 2px solid #000; outline-offset: 2px; }
-    /* A spot's posts, beside its pin: taller than a store's box, so it
-       scrolls, and takes presses (video controls) rather than passing them on. */
-    .live-focus-posts { pointer-events: auto; white-space: normal; width: 240px; max-width: calc(100vw - 80px); max-height: min(60vh, 26rem);
-      overflow-y: auto; gap: 10px; padding: 8px; transform: translate(14px, -50%); cursor: auto; }
-    .live-focus-posts.live-focus-left { transform: translate(calc(-100% - 14px), -50%); }
-    .live-focus-posts.live-focus-below { transform: translate(14px, -12px); }
-    .live-focus-posts.live-focus-left.live-focus-below { transform: translate(calc(-100% - 14px), -12px); }
-    .live-focus-posts.live-focus-above { transform: translate(14px, calc(-100% + 12px)); }
-    .live-focus-posts.live-focus-left.live-focus-above { transform: translate(calc(-100% - 14px), calc(-100% + 12px)); }
-    /* On the timeline a dot can sit on the chart's bottom edge (none left), which clips anything below it: a box above its dot clears it entirely. */
-    @media not (max-width: 40rem) {
-      .burndown-mark .live-focus-posts.live-focus-above { transform: translate(14px, calc(-100% - 8px)); }
-      .burndown-mark .live-focus-posts.live-focus-left.live-focus-above { transform: translate(calc(-100% - 14px), calc(-100% - 8px)); }
-    }
-    /* On a phone there's no room beside a pin: a sheet along the screen's
-       bottom instead. */
-    @media (max-width: 40rem) {
-      .live-focus-posts, .live-focus-posts.live-focus-left, .live-focus-posts.live-focus-below, .live-focus-posts.live-focus-above,
-      .live-focus-posts.live-focus-left.live-focus-below, .live-focus-posts.live-focus-left.live-focus-above {
-        position: fixed; left: 16px !important; right: 16px; top: auto !important; bottom: calc(var(--stripe-h) + var(--space-4) + env(safe-area-inset-bottom)); width: auto; max-width: none;
-        max-height: 55vh; transform: none; z-index: 5; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
-      .live-focus-post .live-post-photo img, .live-focus-post .live-post-video { max-height: 38vh; }
-    }
-    .live-focus-post { display: flex; flex-direction: column; gap: 3px; }
-    .live-focus-close { position: sticky; top: 0; align-self: flex-end; margin: -4px -4px -34px 0; z-index: 1; width: 28px; height: 28px; padding: 0;
-      border: 0; border-radius: 50%; background: var(--paper); color: var(--ink); cursor: pointer; flex: none; }
-    .live-focus-close .icon { width: 28px; height: 28px; }
-    .live-focus-close .icon-glyph { fill: var(--paper); }
-    .live-focus-post .live-post-photo img, .live-focus-post .live-post-video { max-height: 40vh; }
-    .live-focus-when { font-size: 12px; opacity: 0.7; }
-    .live-me-edge { fill: none; stroke: #fff; stroke-width: 7px; stroke-linecap: square; vector-effect: non-scaling-stroke; }
-    .live-me { fill: none; stroke: #DA291C; stroke-width: 4px; stroke-linecap: square; vector-effect: non-scaling-stroke; }
-    /* The flags: pinned pictures (viewFlag), drawn in their own units. */
-    .live-flag-pin { position: absolute; }
-    .live-flag { position: absolute; overflow: visible; }
-    .live-flag-outline { fill: none; stroke: #000; stroke-width: 70px; stroke-linejoin: round; }
-    .live-flag-start { fill: #1E9E3E; }
-    .live-flag-finish { fill: #fff; }
-    .live-flag-check { fill: #000; }
-    /* Posts (viewPosts in Live.elm): newest first, a hairline between. */
-    .live-posts { list-style: none; padding: 0; margin: 0 auto; max-width: 28rem; }
-    .live-post { padding: var(--space-5) 0; }
-    .live-post + .live-post { border-top: var(--hairline); }
-    .live-post-when { margin: 0 0 var(--space-2); font: var(--t-helper); color: var(--ink-muted); }
-    .live-post-text { margin: 0; font: var(--t-body); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
-    /* body is a flex column (css/style.css), and a flex item won't shrink
-       below its content's natural width: a 720 px video would widen the
-       page past the screen. */
-    main { min-width: 0; }
-    .live-post-photo img, .live-post-video { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; background: var(--ink); }
-    .live-post-voice { display: block; width: 100%; }
-    /* Guests' likes and comments under a post (src/Guests.elm): the heart,
-       the latest comments, "More comments", "Add a comment…". */
-    .guest { margin-top: var(--space-1); font: var(--t-body); color: var(--ink); }
-    .guest button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-    .guest-like { display: flex; align-items: center; min-width: var(--control-h); min-height: var(--control-h); }
-    .guest-liked { color: var(--signal) !important; }
-    .guest-comments { list-style: none; padding: 0; margin: 0; }
-    .guest-comment { margin: 0 0 var(--space-1); overflow-wrap: anywhere; }
-    .guest-comment strong { font-weight: 700; }
-    .guest-comment strong a { color: inherit; }
-    .guest-comment > .guest-link { margin-left: var(--space-2); }
-    .guest-more { display: block; padding: var(--space-1) 0 !important; font: var(--t-helper) !important; color: var(--ink) !important; text-decoration: underline; }
-    .guest-add { display: block; width: 100%; text-align: left; padding: var(--space-2) 0 !important; color: var(--ink-muted) !important; }
-    .guest-pending { color: var(--ink-muted); }
-    .guest .guest-meta { font: var(--t-helper); color: var(--ink-muted); }
-    .guest-link { text-decoration: underline; }
-    .guest-composer textarea { display: block; width: 100%; min-height: 5rem; font: var(--t-body); padding: var(--space-2); border: var(--strong); border-radius: 0;
-      box-sizing: border-box; margin-top: var(--space-2); }
-    .guest-composer-row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
-    .guest-composer button[type=submit], .guest-report button[type=submit] { font: var(--t-ui) !important; background: var(--ink) !important; color: var(--paper) !important;
-      min-height: var(--control-h); padding: 0 var(--space-4) !important; }
-    .guest-report { display: flex; gap: var(--space-2); align-items: center; margin-top: var(--space-1); flex-wrap: wrap; }
-    .guest-report input { flex: 1; min-width: 10rem; font: var(--t-body); padding: var(--space-1) var(--space-2); border: var(--strong); border-radius: 0; }
-    .guest-note { margin: var(--space-1) 0 0; font: var(--t-helper); color: var(--ink-muted); }
-    /* A DoubleTake pair: on a wide screen, both cameras side by side,
-       wider than the feed (js/pair-player.js). */
-    @media (min-width: 48rem) {
-      .live-posts .live-post-pair { position: relative; left: 50%; width: min(44rem, calc(100vw - 32px)); transform: translateX(-50%); }
-    }
-
-    /* The archive's replay (src/Live.elm, REPLAY): the scrubber across the
-       top and its notes, in a look of their own (black, monospace), so
-       they read as the archive's and not part of /live. The page moves
-       down by the scrubber's height. */
-    .replay-shell { --replay-h: 52px; flex: 1; display: flex; flex-direction: column; }
-    .replay { position: sticky; top: 0; z-index: 20; box-sizing: border-box; height: var(--replay-h);
-      display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "play when slider speed";
-      align-items: center; column-gap: 12px; padding: 0 16px; background: #111; color: #f5f5f5;
-      font: 13px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .replay button { display: flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 10px;
-      color: inherit; background: none; border: 1px solid currentColor; font: inherit; cursor: pointer; }
-    .replay button:focus-visible, .replay-slider:focus-visible { outline: 2px solid #f5f5f5; outline-offset: 2px; }
-    .replay-play { grid-area: play; width: 36px; padding: 0; }
-    .replay-play .icon-glyph { fill: #111; }
-    .replay-when { grid-area: when; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .replay-slider { grid-area: slider; width: 100%; min-width: 0; margin: 0; accent-color: #f5f5f5; }
-    .replay-speed { grid-area: speed; white-space: nowrap; }
-    /* Phones: the slider gets a line of its own. */
-    @media (max-width: 600px) {
-      .replay-shell { --replay-h: 84px; }
-      .replay { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "play when speed" "slider slider slider";
-        row-gap: 6px; align-content: center; }
-    }
-    /* Playing: the timeline follows the replay (Live.elm, followTimeline), unsnapped. */
-    .replay-following .burndown-scroller { scroll-snap-type: none; }
-    /* Under the scrubber where the page scrolls (overview, blog); the map, timeline and stats are already a screen tall below it. */
-    .replay-shell .page-overview .app-top, .replay-shell .page-blog .app-top { top: var(--replay-h); }
-    .replay-shell .page-map, .replay-shell .page-timeline, .replay-shell .page-stats {
-      height: calc(100vh - var(--replay-h)); height: calc(100dvh - var(--replay-h)); }
-    .replay-note { position: fixed; left: 16px; right: 16px; bottom: calc(var(--stripe-h) + 12px + env(safe-area-inset-bottom)); z-index: 20;
-      max-width: 30rem; margin: 0 auto; padding: 8px 12px; background: #111; color: #f5f5f5;
-      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .live p { margin: 0 0 var(--space-4); font: var(--t-body); color: var(--ink); }
+    .live a { color: inherit; }
   </style>
 </head>
 <body>
-  <!-- Elm draws the page here (src/Live.elm). Its own element, not the
-       whole body: extensions add things to <body>, which would crash an
-       Elm program that owned it. -->
-  <div id="app"></div>
-  <noscript>
-    <p><a href="/">McTrot</a></p>
-    <h1>McTROT 5</h1>
-    <p>This page shows where I am during a McTrot attempt. It requires JavaScript.</p>
-  </noscript>
-
-  <script src="/js/pair-player.js"></script>
-  <script src="/js/live.js"></script>
-  <script>
-    var params = new URLSearchParams(window.location.search);
-    // ?api=http://localhost:3000 points the page at a local recorder.
-    var api = params.get("api");
-    // ?archive=/path/to/archive.json replays a finished event from its
-    // archive (recorder/api/src/export-archive.ts) instead of the
-    // recorder. Only a path on this site: no one can link this page to
-    // made-up data elsewhere.
-    var archive = params.get("archive");
-
-    // --- The radio (src/Radio.elm draws it; this plays it) ---------------
-    var audio = new Audio();
-    audio.preload = "none";
-    // iPhones and iPads ignore a page setting the volume.
-    audio.volume = 0.5;
-    var volumeAdjustable = audio.volume === 0.5;
-    audio.volume = 1;
-
-    var app = Elm.Live.init({
-      node: document.getElementById("app"),
-      flags: {
-        path: location.pathname,
-        origin: location.origin,
-        hash: location.hash,
-        api: /^https?:\/\//.test(api || "") ? api.replace(/\/+$/, "") : "https://api.mctrot.nyc",
-        radio: { volumeAdjustable: volumeAdjustable },
-        archive: /^\/(?![\/\\])/.test(archive || "") ? archive : null
-      }
-    });
-
-    // Back from signing in to like or comment (#like=…): Elm has it now,
-    // so take it off the address and a reload doesn't do it again.
-    if (/^#(like|comment)=/.test(location.hash)) {
-      history.replaceState(null, "", location.pathname + location.search);
-    }
-
-    // The replay: Space plays or stops it (src/Live.elm, spaceBar), so it
-    // mustn't scroll the page as well. Not in fields or on buttons, where
-    // Space is theirs.
-    if (archive) {
-      window.addEventListener("keydown", function (e) {
-        var t = e.target;
-        var field = /^(TEXTAREA|SELECT|BUTTON)$/.test(t.tagName) || (t.tagName === "INPUT" && t.type !== "range");
-        if (e.key === " " && !t.isContentEditable && !field) e.preventDefault();
-      });
-    }
-
-    // --- The address (src/Live.elm's navigate, setTitle, pathChanged) -----
-    // ?api=… stays on the address as views change, for local testing.
-    app.ports.navigate.subscribe(function (page) {
-      history.pushState(null, "", page.path + location.search);
-      document.title = page.title;
-      window.scrollTo(0, 0);
-    });
-    app.ports.setTitle.subscribe(function (title) { document.title = title; });
-    window.addEventListener("popstate", function () { app.ports.pathChanged.send(location.pathname); });
-
-    var send = function (event) { app.ports.radioIn.send(event); };
-    var stopping = false;
-    // Browsers give the same error for a stream they can't reach and one
-    // they can't play, so a failed start asks the address directly: no
-    // answer at all means unreachable. (The answer itself can't be read
-    // from another site, but that it came is enough.)
-    var problem = function (url) {
-      var e = audio.error;
-      if (e && e.code === 3) return Promise.resolve("The stream broke off.");
-      var stop = new AbortController();
-      setTimeout(function () { stop.abort(); }, 8000);
-      return fetch(url, { mode: "no-cors", signal: stop.signal })
-        .then(function () { stop.abort(); return "That isn’t audio this browser can play (a playlist?)."; })
-        .catch(function () { return "Can’t reach the stream."; });
-    };
-    var fail = function () {
-      var url = audio.getAttribute("src");
-      if (!url) return;
-      problem(url).then(function (message) {
-        // Only if that's still the station playing.
-        if (!stopping && audio.getAttribute("src") === url) send({ event: "error", message: message });
-      });
-    };
-    audio.addEventListener("playing", function () { send({ event: "playing" }); });
-    audio.addEventListener("waiting", function () { send({ event: "waiting" }); });
-    audio.addEventListener("pause", function () { if (!stopping) send({ event: "paused" }); });
-    audio.addEventListener("ended", function () { send({ event: "ended" }); });
-    audio.addEventListener("error", function () { if (!stopping) fail(); });
-    if ("mediaSession" in navigator && window.MediaMetadata) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: "Radio", artist: "McTrot" });
-    }
-
-    app.ports.radioOut.subscribe(function (cmd) {
-      if (cmd.command === "play") {
-        stopping = false;
-        audio.src = cmd.url;
-        audio.volume = cmd.volume;
-        audio.play().catch(function (err) {
-          if (err.name === "NotAllowedError") send({ event: "error", message: "The browser wants a tap on ▶ first." });
-          else if (err.name !== "AbortError" && !audio.error) fail();
-        });
-      } else if (cmd.command === "stop") {
-        // Drop the connection, so playing again joins the stream live
-        // rather than resuming from a buffer.
-        stopping = true;
-        audio.pause();
-        audio.removeAttribute("src");
-        audio.load();
-      } else if (cmd.command === "volume") {
-        audio.volume = cmd.volume;
-      } else if (cmd.command === "nowPlaying") {
-        if ("mediaSession" in navigator && window.MediaMetadata) {
-          navigator.mediaSession.metadata = new MediaMetadata({ title: cmd.title, artist: cmd.artist, album: cmd.album });
-        }
-      }
-    });
-  </script>
+  <header class="live-header">
+    <p class="live-title"><a href="/">McTROT</a></p>
+  </header>
+  <main class="live">
+    <p>Nothing is live right now. McTrot 5 was on November 21, 2026: you can <a href="/archive/2026-11-21">replay the whole day</a>, with the map, the posts, the timeline and the radio as they were at any moment.</p>
+    <p>If you&rsquo;d like to attempt your own McTrot and have a live-updating page here, email <a href="mailto:admin@mctrot.nyc">admin@mctrot.nyc</a>.</p>
+  </main>
 </body>
 </html>

@@ -122,8 +122,9 @@
   # read-only. McDonald's skipped for being closed (no Skip button on the
   # day) come from recorder/skips-2026-11-21.json.
   # Usage: export-archive [out.json]
-  #   (default recorder-media/recorder-archive.json, next to the database
-  #   and the photos)
+  #   (default website/archive/2026-11-21/archive.json, the archive page's
+  #   data, beside its photos in media/). The database is the redacted copy
+  #   recorder/recorder-redacted-2026-11-21.sqlite (gitignored).
   # The route plan is made from recorder/route-plan.gpx exactly as the
   # deployed server made it (host/api.nix: tools/route_plan.py), not
   # read from recorder/api/route-plan.json, a gitignored local copy that
@@ -131,14 +132,14 @@
   scripts.export-archive.exec = ''
     set -euo pipefail
     # A relative out.json is from where the script was run.
-    out="''${1:-$DEVENV_ROOT/recorder-media/recorder-archive.json}"
+    out="''${1:-$DEVENV_ROOT/website/archive/2026-11-21/archive.json}"
     case "$out" in /*) ;; *) out="$PWD/$out" ;; esac
     cd "$DEVENV_ROOT/recorder"
     plan="$(mktemp -t route-plan.XXXXXX)"
     trap 'rm -f "$plan"' EXIT
     nix run .#route-plan -- route-plan.gpx > "$plan"
     nix develop -c bash -c 'cd api && exec node src/export-archive.ts "$@"' -- \
-      "$DEVENV_ROOT/recorder-media/recorder-redacted.sqlite" \
+      "$DEVENV_ROOT/recorder/recorder-redacted-2026-11-21.sqlite" \
       "$plan" \
       "$DEVENV_ROOT/mctrot-5-radio/program.json" \
       "$out" \

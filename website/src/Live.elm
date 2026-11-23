@@ -1,30 +1,32 @@
 port module Live exposing (main)
 
-{-| mctrot.nyc/live: where I am during a McTrot attempt.
+{-| A McTrot attempt's page: live, where I am during it, or replayed
+afterwards.
 
-Polls the recorder's `GET /live` (recorder/api/src/live.ts; contract in
-recorder/api/live.schema.json) every 15 seconds.
+Live, it polls the recorder's `GET /live` (recorder/api/src/live.ts;
+contract in recorder/api/live.schema.json) every 15 seconds. With an
+`archive` flag, it's the replay of a finished event instead
+(mctrot.nyc/archive/2026-11-21, website/archive/2026-11-21/index.html):
+no recorder, one JSON file (recorder/api/src/export-archive.ts) holding
+everything /live showed and when, and a scrubber over the page that sets
+the moment shown. Every view is drawn from what /live would have
+answered then (see REPLAY).
 
-One program for five addresses, routed here (Netlify serves live.html for
-all of them; website/_redirects):
+One program for five addresses under the page's own (the `base` flag,
+e.g. "/archive/2026-11-21"), routed here (Netlify serves the page for all
+of them; website/_redirects):
 
-  - /live: everything on one page, as it has been
-  - /live/map, /live/blog, /live/timeline, /live/stats: one view each,
+  - the base: everything on one page
+  - base/map, base/blog, base/timeline, base/stats: one view each,
     taking over the page
 
 All five share the title, the radio and the tab switcher.
 Switching tabs doesn't reload the page, so the radio keeps playing.
 
-With an `archive` flag (live.html's ?archive=…), it's the replay of a
-finished event instead: no recorder, one JSON file
-(recorder/api/src/export-archive.ts) holding everything /live showed and
-when, and a scrubber over the page that sets the moment shown. Every view
-is drawn from what /live would have answered then (see REPLAY).
-
 Elm runs in its own element (Browser.element), not over the whole page
 (Browser.application): browser extensions add things to <body>, and an
 application, which owns the body, crashes when they do. So the address
-is handled here through two ports and a few lines in live.html:
+is handled here through two ports and a few lines in the page:
 `navigate` (pushState) and `pathChanged` (Back and Forward).
 
 -}
@@ -58,8 +60,6 @@ import Svg.Events
 import Svg.Lazy
 import Task
 import Time
-import Url exposing (Url)
-import Url.Parser as Parser exposing ((</>))
 
 
 main : Program Flags Model Msg
@@ -100,57 +100,64 @@ type Route
     | StatsTab
 
 
-{-| /live (or /live.html, as a plain file server has it) is the overview;
-anything unknown under /live shows it too.
+{-| Where the page is (`base`: its address, e.g. "/archive/2026-11-21"),
+and the overview's title (e.g. "McTrot 5 · November 21, 2026"); the views
+are "McTrot 5 · Map" and so on.
 -}
-routeFromUrl : Url -> Route
-routeFromUrl url =
-    Parser.parse routeParser url |> Maybe.withDefault Overview
+type alias Site =
+    { base : String
+    , title : String
+    }
 
 
-routeFromPath : String -> Route
-routeFromPath path =
-    Url.fromString ("https://mctrot.nyc" ++ path)
-        |> Maybe.map routeFromUrl
+{-| The base (or base/index.html, as a plain file server may have it) is
+the overview; anything unknown under it shows it too.
+-}
+routeFromPath : Site -> String -> Route
+routeFromPath site path =
+    let
+        rest =
+            if String.startsWith site.base path then
+                String.dropLeft (String.length site.base) path
+
+            else
+                path
+    in
+    tabs
+        |> List.filter (\( _, _, segment ) -> rest == "/" ++ segment || rest == "/" ++ segment ++ "/")
+        |> List.head
+        |> Maybe.map (\( route, _, _ ) -> route)
         |> Maybe.withDefault Overview
 
 
-pathOf : Route -> String
-pathOf route =
+pathOf : Site -> Route -> String
+pathOf site route =
     case List.filter (\( r, _, _ ) -> r == route) tabs of
-        ( _, _, path ) :: _ ->
-            path
+        ( _, _, segment ) :: _ ->
+            site.base ++ "/" ++ segment
 
         [] ->
-            "/live"
+            site.base
 
 
-titleOf : Route -> String
-titleOf route =
+titleOf : Site -> Route -> String
+titleOf site route =
     case List.filter (\( r, _, _ ) -> r == route) tabs of
         ( _, label, _ ) :: _ ->
             "McTrot 5 · " ++ label
 
         [] ->
-            "McTrot 5 · Live"
+            site.title
 
 
-routeParser : Parser.Parser (Route -> a) a
-routeParser =
-    Parser.oneOf
-        [ Parser.map MapTab (Parser.s "live" </> Parser.s "map")
-        , Parser.map BlogTab (Parser.s "live" </> Parser.s "blog")
-        , Parser.map TimelineTab (Parser.s "live" </> Parser.s "timeline")
-        , Parser.map StatsTab (Parser.s "live" </> Parser.s "stats")
-        ]
-
-
+{-| The views: route, label, and address under the page's.
+-}
 tabs : List ( Route, String, String )
 tabs =
-    [ ( MapTab, "Map", "/live/map" )
-    , ( BlogTab, "Blog", "/live/blog" )
-    , ( TimelineTab, "Timeline", "/live/timeline" )
-    , ( StatsTab, "Stats", "/live/stats" )
+    [ ( MapTab, "Map", "map" )
+    , ( BlogTab, "Blog", "blog" )
+    , ( TimelineTab, "Timeline", "timeline" )
+    , ( StatsTab, "Stats", "stats" )
     ]
 
 
@@ -190,6 +197,10 @@ type alias Flags =
 
     -- The archive's JSON, to replay a finished event; Nothing: live.
     , archive : Maybe String
+
+    -- The page's address, and the overview's title (see Site).
+    , base : String
+    , title : String
     }
 
 
@@ -614,6 +625,7 @@ type alias Model =
 
     -- The archive being replayed, if this is one (see REPLAY).
     , replay : Replay
+    , site : Site
     }
 
 
@@ -673,7 +685,10 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         route =
-            routeFromPath flags.path
+            routeFromPath site flags.path
+
+        site =
+            { base = flags.base, title = flags.title }
 
         ( guests, guestsCmd ) =
             Guests.init flags.api flags.hash
@@ -708,6 +723,7 @@ init flags =
       , timelinePlaced = False
       , focused = Nothing
       , walked = []
+      , site = site
       , replay =
             case flags.archive of
                 Just url ->
@@ -718,10 +734,10 @@ init flags =
       }
     , case flags.archive of
         Just url ->
-            Cmd.batch [ fetchArchive url, setTitle (titleOf route) ]
+            Cmd.batch [ fetchArchive url, setTitle (titleOf site route) ]
 
         Nothing ->
-            Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf route), Cmd.map GuestsMsg guestsCmd ]
+            Cmd.batch [ fetch flags.api, Task.perform Tick Time.now, setTitle (titleOf site route), Cmd.map GuestsMsg guestsCmd ]
     )
 
 
@@ -975,7 +991,7 @@ update msg model =
         Navigate route ->
             ( { model | route = route, timelinePlaced = route == TimelineTab && model.latest /= Nothing }
             , Cmd.batch
-                [ navigate { path = pathOf route, title = titleOf route }
+                [ navigate { path = pathOf model.site route, title = titleOf model.site route }
                 , if route == TimelineTab then
                     placeTimeline model
 
@@ -988,11 +1004,11 @@ update msg model =
         PathChanged path ->
             let
                 route =
-                    routeFromPath path
+                    routeFromPath model.site path
             in
             ( { model | route = route, timelinePlaced = route == TimelineTab && model.latest /= Nothing }
             , Cmd.batch
-                [ setTitle (titleOf route)
+                [ setTitle (titleOf model.site route)
                 , if route == TimelineTab then
                     placeTimeline model
 
@@ -1318,7 +1334,7 @@ viewApp model =
         [ -- The title row and the view switcher stay at the top as the page
           -- scrolls, and the radio at the bottom (live.html, .app-top and
           -- .radio).
-          Html.div [ Attr.class "app-top" ] [ viewHeader model, viewTabs model.route ]
+          Html.div [ Attr.class "app-top" ] [ viewHeader model, viewTabs model.site model.route ]
         , Html.main_ [ Attr.id "main", Attr.class ("app-main tab-" ++ routeName model.route) ]
             (case model.route of
                 Overview ->
@@ -1346,7 +1362,7 @@ guest is signed in.
 viewHeader : Model -> Html Msg
 viewHeader model =
     Html.header [ Attr.class "app-header" ]
-        [ Html.h1 [ Attr.class "app-title" ] [ link Overview [] [ Html.text "McTROT 5" ] ]
+        [ Html.h1 [ Attr.class "app-title" ] [ link model.site Overview [] [ Html.text "McTROT 5" ] ]
         , Html.map GuestsMsg (Guests.viewSignOut model.guests)
         ]
 
@@ -1354,14 +1370,14 @@ viewHeader model =
 {-| The views, as a row of square segments: links, so each has its own
 address, with the current one marked.
 -}
-viewTabs : Route -> Html Msg
-viewTabs current =
+viewTabs : Site -> Route -> Html Msg
+viewTabs site current =
     Html.nav [ Attr.class "app-tabs", Attr.attribute "aria-label" "Views" ]
         [ Html.ul []
             (List.map
                 (\( route, label, href ) ->
                     Html.li []
-                        [ link route
+                        [ link site route
                             (if route == current then
                                 [ Attr.attribute "aria-current" "page" ]
 
@@ -1379,10 +1395,10 @@ viewTabs current =
 {-| A link to one of the views: a real link (it can be opened in a new
 tab, copied, bookmarked), but a plain click switches views in place.
 -}
-link : Route -> List (Html.Attribute Msg) -> List (Html Msg) -> Html Msg
-link route attributes children =
+link : Site -> Route -> List (Html.Attribute Msg) -> List (Html Msg) -> Html Msg
+link site route attributes children =
     Html.a
-        (Attr.href (pathOf route)
+        (Attr.href (pathOf site route)
             :: Events.preventDefaultOn "click" (plainClick (Navigate route))
             :: attributes
         )
@@ -3417,7 +3433,7 @@ viewPosts model =
                                         viewArchivedComments r post.id
 
                                     _ ->
-                                        Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.route) post.id model.guests)
+                                        Html.map GuestsMsg (Guests.viewPost (model.origin ++ pathOf model.site model.route) post.id model.guests)
                                 ]
                             )
                         )

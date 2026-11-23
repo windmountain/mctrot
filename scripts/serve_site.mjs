@@ -10,17 +10,14 @@
 // The page talks to the real recorder (api.mctrot.nyc) unless you add
 // ?api=http://localhost:3000 to point it at a local one.
 //
-// Local only: /recorder-media/ is the repo's recorder-media/ folder (the
-// event's archive JSON and photos, never copied into build/), so the
-// replay can be tried at
-// /live?archive=/recorder-media/recorder-archive.json
+// The Nov 21, 2026 replay is at /archive/2026-11-21 (and /map, /blog,
+// /timeline, /stats under it).
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../website/build/", import.meta.url));
-const recorderMedia = fileURLToPath(new URL("../recorder-media/", import.meta.url));
 const port = Number(process.argv[2] ?? 8000);
 
 const TYPES = {
@@ -63,18 +60,6 @@ async function resolve(pathname) {
 
 createServer(async (req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
-  if (pathname.startsWith("/recorder-media/")) {
-    const path = normalize(decodeURIComponent(pathname.slice("/recorder-media/".length))).replace(/^(\.\.[/\\])+/, "");
-    const full = join(recorderMedia, path);
-    if (full.startsWith(recorderMedia) && (await isFile(full))) {
-      res.writeHead(200, { "content-type": TYPES[extname(full)] ?? "application/octet-stream", "cache-control": "no-store" });
-      res.end(await readFile(full));
-    } else {
-      res.writeHead(404, { "content-type": "text/plain" });
-      res.end("Not found");
-    }
-    return;
-  }
   const file = await resolve(pathname);
   if (!file) {
     res.writeHead(404, { "content-type": "text/plain" });

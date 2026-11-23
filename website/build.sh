@@ -20,6 +20,12 @@ for page in *.html; do
 done
 
 cp -R css geo sim build/
+# The McTrot 5 replay: its page, archive.json, og.png and media/
+# (made by export-archive; see src/Live.elm). Only these, by name: nothing
+# else in the folder is meant for the site.
+mkdir -p build/archive/2026-11-21
+cp archive/2026-11-21/index.html archive/2026-11-21/archive.json archive/2026-11-21/og.png build/archive/2026-11-21/
+cp -R archive/2026-11-21/media build/archive/2026-11-21/
 mkdir -p build/live-share
 cp live-share/og.png build/live-share/
 cp favicon.svg favicon.ico favicon-16.png favicon-32.png favicon-48.png \
@@ -41,11 +47,14 @@ compile MegaSearch mega-search
 compile MegaSearchWorker mega-search-worker-elm
 compile Live live
 
-# live.html's scripts and stylesheets get their contents' fingerprint in
-# the address (/js/live.js?v=3f9a…), so a browser never runs a stale copy
-# it kept from before a change: a changed file has a new address.
-for asset in js/live.js js/pair-player.js css/style.css; do
-  hash=$(shasum -a 256 "build/$asset" | cut -c1-10)
-  sed -i.bak "s|\"/$asset\"|\"/$asset?v=$hash\"|" build/live.html
+# The replay's (and /live's) scripts and stylesheets get their contents'
+# fingerprint in the address (/js/live.js?v=3f9a…), so a browser never
+# runs a stale copy it kept from before a change: a changed file has a new
+# address.
+for page in build/archive/2026-11-21/index.html build/live.html; do
+  for asset in js/live.js js/pair-player.js css/style.css; do
+    hash=$(shasum -a 256 "build/$asset" | cut -c1-10)
+    sed -i.bak "s|\"/$asset\"|\"/$asset?v=$hash\"|" "$page"
+  done
+  rm "$page.bak"
 done
-rm build/live.html.bak
