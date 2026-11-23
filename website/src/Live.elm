@@ -201,6 +201,9 @@ type alias Flags =
     -- The page's address, and the overview's title (see Site).
     , base : String
     , title : String
+
+    -- A replay's line across the top of its bar: "Archived November 23, 2026".
+    , archived : String
     }
 
 
@@ -623,8 +626,10 @@ type alias Model =
     , guests : Guests.Model
     , origin : String
 
-    -- The archive being replayed, if this is one (see REPLAY).
+    -- The archive being replayed, if this is one (see REPLAY), and the
+    -- line over its scrubber.
     , replay : Replay
+    , archived : String
     , site : Site
     }
 
@@ -724,6 +729,7 @@ init flags =
       , focused = Nothing
       , walked = []
       , site = site
+      , archived = flags.archived
       , replay =
             case flags.archive of
                 Just url ->
@@ -1317,7 +1323,7 @@ view model =
                       )
                     ]
                 ]
-                [ viewScrubber model.replay
+                [ viewScrubber model.archived model.replay
                 , viewApp model
                 , if Radio.isOn model.radio then
                     Html.p [ Attr.class "replay-note replay-radio-note", Attr.attribute "role" "status" ]
@@ -4236,10 +4242,11 @@ replayProblem error =
 across the whole event, and the speed. Its own look (live.html, .replay),
 not the site's: it belongs to the archive, not to /live.
 -}
-viewScrubber : Replay -> Html Msg
-viewScrubber replay =
+viewScrubber : String -> Replay -> Html Msg
+viewScrubber archived replay =
     Html.div [ Attr.class "replay", Attr.attribute "role" "region", Attr.attribute "aria-label" "Replay" ]
-        (case replay of
+        (Html.p [ Attr.class "replay-archived" ] [ Html.text archived ]
+            :: (case replay of
             Replaying r ->
                 let
                     nextSpeed =
@@ -4309,6 +4316,7 @@ viewScrubber replay =
 
             NotReplay ->
                 []
+               )
         )
 
 
